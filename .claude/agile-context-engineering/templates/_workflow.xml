@@ -1,0 +1,17 @@
+<workflow>
+
+    <purpose>
+    </purpose>
+
+    <mandatory-context>
+        [TODO] Read all files referenced by the invoking prompt's execution-context before starting. Also Read any document or text passed as parameter in the invoking command that called this template.
+    </mandatory-context>
+
+    <process>
+        <step name="1">
+        </step>
+
+        <step name="2">
+        </step>
+    </process>
+</workflow>

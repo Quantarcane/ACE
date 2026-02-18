@@ -1,0 +1,292 @@
+<workflow>
+
+    <purpose>Initialize a new project through unified flow: questioning, research (optional), requirements, roadmap. This is the most leveraged moment in any project — deep questioning here means better plans, better execution, better outcomes. One workflow takes you from idea to ready-for-planning.</purpose>
+
+    <mandatory-context>
+        Read all files referenced by the invoking prompt's execution-context before starting. Also read any document or text passed as parameter ($ARGUMENTS) in the invoking command.
+    </mandatory-context>
+
+    <process>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 1: SETUP                                                     -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="setup" order="1">
+            **MANDATORY FIRST STEP — Execute these checks before ANY user interaction:**
+
+            ```bash
+            INIT=$(node ~/.claude/agile-context-engineering/src/ace-tools.js init new-project)
+            ```
+
+            Parse JSON for: `product_owner_model`, `researcher_model`, `synthesizer_model`, `commit_docs`, `has_product_vision`, `project_exists`, `has_codebase_map`, `planning_exists`, `has_existing_code`, `has_package_file`, `is_brownfield`, `needs_codebase_map`, `has_git`, `has_gh_cli`.
+
+            **If `has_product_vision` is true:**
+
+            A product vision already exists. Use AskUserQuestion:
+            - header: "Vision exists"
+            - question: "A product vision already exists at `.docs/product/product-vision.md`. What would you like to do?"
+            - options:
+              - "Update it" — Review and refine the existing vision
+              - "Start fresh" — Discard and create a new vision from scratch
+              - "Skip" — Keep the current vision and continue to next step
+
+            If "Update it":
+            - Read `.docs/product/product-vision.md`
+            - Show the current content to the user
+            - Ask what they want to change
+            - Proceed to substep 2c (deep-questioning) with the existing vision as seed context
+            - Then proceed to substep 2d (write) using Edit to update in place
+
+            If "Start fresh":
+            - Proceed to step 2 as normal (ignore existing file, overwrite at the end)
+
+            If "Skip":
+            - Skip step 2 entirely, proceed to step 3
+
+            **If `has_git` is false:** Initialize git:
+            ```bash
+            git init
+            ```
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 2: PRODUCT VISION                                            -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="product-vision" order="2">
+
+            <!-- ─────────────────────────────────────────────────────────── -->
+            <!-- 2a: ABSORB PROVIDED CONTEXT                                 -->
+            <!-- ─────────────────────────────────────────────────────────── -->
+
+            <substep name="absorb-provided-context">
+                Before asking any questions, absorb the user-provided document or text silently (do NOT summarize it to the user yet).
+
+                If the user passed a document reference (e.g., `/ace:init @prd.md`) or inline text:
+                - Read the document / parse the text
+                - Extract: product idea, target users, problems mentioned, features described, constraints stated
+                - Hold this as seed context for questioning — do NOT skip questioning because a document exists
+
+                If no document or text was provided, skip to next substep.
+            </substep>
+
+            <!-- ─────────────────────────────────────────────────────────── -->
+            <!-- 2b: ABSORB BROWNFIELD CONTEXT                               -->
+            <!-- ─────────────────────────────────────────────────────────── -->
+
+            <substep name="absorb-brownfield-context">
+                **If `is_brownfield` is false:** Skip to next substep.
+
+                If existing code was detected, scan for **product-relevant** documentation. You are looking for business context — what the product is, who it's for, what it does — NOT architecture or stack details.
+
+                **IMPORTANT: Use a Task agent to avoid filling main context.**
+
+                On a large brownfield project, READMEs, changelogs, and docs can be massive. Spawn a Task agent that reads everything and returns only a short product summary.
+
+                ```
+                Task(
+                    prompt="Scan this project for product-level context and return a brief summary (max 500 words) of what the product is, who uses it, and what features it has. Do NOT include architecture, stack, or code convention details — focus on WHAT the product does, not HOW it's built.
+
+                    **Phase 1: Look for documentation first.**
+
+                    Read these files if they exist (skip any that don't):
+                    - README.md or README.txt
+                    - CONTRIBUTING.md
+                    - CHANGELOG.md (scan for feature-level entries, not every line)
+                    - Any docs/ or documentation/ directory (product-level docs only, skip API docs)
+                    - package.json (description field only)
+                    - *.csproj (Description property only)
+                    - Cargo.toml (description field only)
+                    - pyproject.toml (description field only)
+                    - .github/ISSUE_TEMPLATE/ (what kind of features/bugs are tracked)
+
+                    **Phase 2: If documentation is thin or missing, infer from code.**
+
+                    If Phase 1 didn't produce a clear picture of what the product does, look at the code itself:
+                    - API routes / controllers / endpoints (route names reveal features: /auth, /payments, /users)
+                    - Service / handler / command names (UserService, OrderProcessor, NotificationSender)
+                    - Database models / entities / schemas (what data the product manages)
+                    - UI page / view / component names at the top level (Dashboard, Settings, Profile)
+                    - Test file names (often describe features: login.test, checkout.test)
+
+                    Infer product capabilities from naming patterns. For example:
+                    - Routes like /api/invoices, /api/clients → 'invoicing product for managing clients and invoices'
+                    - Models like Patient, Appointment, Prescription → 'healthcare management product'
+
+                    **Return a summary with these sections:**
+                    - **Product purpose:** 1-2 sentences
+                    - **Target users:** who uses this (if discoverable)
+                    - **Existing features:** bullet list of key features found
+                    - **Product maturity:** early/growing/mature (based on changelog depth, feature count)
+                    - **Context source:** docs / code / both (so the orchestrator knows confidence level)
+
+                    If a file is too large, skim it — don't read every line. Return ONLY the summary, nothing else.",
+                    subagent_type="general-purpose",
+                    model="haiku",
+                    description="Scan brownfield product context"
+                )
+                ```
+
+                Hold the returned summary as background knowledge for questioning.
+            </substep>
+
+            <!-- ─────────────────────────────────────────────────────────── -->
+            <!-- 2c: DEEP QUESTIONING                                        -->
+            <!-- ─────────────────────────────────────────────────────────── -->
+
+            <substep name="deep-questioning">
+                Display stage banner:
+
+                ```
+                ╔══════════════════════════════════════════════════╗
+                ║  ACE > Product Vision                            ║
+                ╚══════════════════════════════════════════════════╝
+                ```
+
+                Follow the questioning guide from `questioning.xml`. You are a thinking partner, not an interviewer.
+
+                **Opening — adapt based on available context:**
+
+                If user provided a document/text (2a) AND brownfield context found (2b):
+                - Acknowledge both: "I've read through your document and looked at the existing project. Let me make sure I understand where you're headed."
+                - Start with the most interesting gap between what exists and what the document describes
+
+                If user provided a document/text (2a) only:
+                - Acknowledge you've read it: "I've read through your document. Let me make sure I understand what you're after."
+                - Start with the most interesting or ambiguous part — ask a probing question about it
+                - Do NOT regurgitate the document back. Dig into it.
+
+                If brownfield context found (2b) only:
+                - Acknowledge what you found: "I see this project [what it does based on summary]. What's the next chapter?"
+                - Probe what they want to change, add, or rethink
+
+                If greenfield with no document:
+                - Open with: "What do you want to build?"
+                - Wait for their response. This gives you context for intelligent follow-ups.
+
+                **Follow the thread:**
+
+                Based on what they said (and what you absorbed), ask follow-up questions that dig into their response. Use AskUserQuestion with options that probe what they mentioned — interpretations, clarifications, concrete examples.
+
+                Keep following threads. Each answer opens new threads to explore:
+                - What excited them
+                - What problem sparked this
+                - What they mean by vague terms
+                - What it would actually look like
+                - What's already decided vs open
+                - Who specifically will use this
+
+                **Map answers to product-vision.xml template sections (background, not out loud):**
+
+                As you question, mentally track coverage against the template:
+                - [ ] Vision — why does this product exist? (1-2 sentence elevator pitch)
+                - [ ] Target Audience — who specifically is this for?
+                - [ ] Problem Statement — what pain or unmet need?
+                - [ ] Value Proposition — why this over alternatives?
+                - [ ] Key Objectives — measurable outcomes (3-5)
+                - [ ] High-Level Capabilities — broad capability areas
+                - [ ] Constraints — tech, timeline, budget, platform
+                - [ ] Competitive Landscape — what alternatives exist?
+
+                Don't walk through this as a checklist. Weave questions naturally based on the conversation. If gaps remain after the conversation feels complete, probe those specific areas.
+
+                **Decision gate:**
+
+                When you could write a clear product-vision.md, use AskUserQuestion:
+                - header: "Ready?"
+                - question: "I think I understand what you're after. Ready to create the product vision?"
+                - options:
+                  - "Create product vision" — Let's move forward
+                  - "Keep exploring" — I want to share more / ask me more
+
+                If "Keep exploring" — ask what they want to add, or identify gaps and probe naturally.
+
+                Loop until "Create product vision" selected.
+            </substep>
+
+            <!-- ─────────────────────────────────────────────────────────── -->
+            <!-- 2d: WRITE PRODUCT VISION                                    -->
+            <!-- ─────────────────────────────────────────────────────────── -->
+
+            <substep name="write-product-vision">
+                Synthesize ALL context (user-provided document + brownfield summary + questioning conversation) into `.docs/product/product-vision.md` using the template from `product-vision.xml`.
+
+                **Create directory structure:**
+                ```bash
+                mkdir -p .docs/product
+                ```
+
+                **Write the document following template guidelines:**
+
+                - **Vision Statement:** Concise, inspiring, 1-2 sentences. Answers "why does this product exist?"
+                - **Target Audience:** Specific personas defined by behavior and need
+                - **Problem Statement:** Framed from user's perspective. Specific pain, not vague descriptions.
+                - **Value Proposition:** What differentiates this from alternatives. Use Geoffrey Moore's format if it fits.
+                - **Key Objectives:** 3-5 measurable outcomes. "Users can do X" not "Build feature Y".
+                - **High-Level Capabilities:** Broad capability areas that define the product's shape. These inform epic planning downstream.
+                - **Success Metrics:** Quantifiable indicators with targets and measurement method.
+                - **Competitive Landscape:** Honest assessment of alternatives and gaps this product fills.
+                - **Constraints and Assumptions:** Hard limits with rationale. Tech stack, timeline, budget, platform, dependencies.
+                - **Risks:** Key uncertainties with likelihood, impact, and mitigation.
+                - **Last updated:** `after initialization`
+
+                **Do not compress.** Capture everything gathered. If the user said it, it should be reflected somewhere in the document.
+
+                Write the file to `.docs/product/product-vision.md`.
+
+                **Present the document for review:**
+
+                Show the full document content inline, then use AskUserQuestion:
+                - header: "Vision"
+                - question: "Does this capture your product vision?"
+                - options:
+                  - "Approve" — Looks good, continue
+                  - "Adjust" — I want to change some things
+                  - "Redo questioning" — Let's go back and explore more
+
+                **If "Adjust":**
+                - Ask what they want to change
+                - Edit the document in place (use Edit tool, don't rewrite from scratch)
+                - Present again for review
+                - Loop until approved
+
+                **If "Redo questioning":**
+                - Return to substep 2c (deep-questioning)
+                - Preserve what was already discussed as context
+
+                **If "Approve":**
+
+                Commit the document:
+                ```bash
+                git add .docs/product/product-vision.md
+                git commit -m "docs: initialize product vision"
+                ```
+
+                Display completion:
+
+                ```
+                ┌──────────────────────────────────────────────────┐
+                │  ACE > Product Vision Created                    │
+                └──────────────────────────────────────────────────┘
+
+                  +  .docs/product/product-vision.md committed.
+                ```
+            </substep>
+
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- REMAINING STEPS (TODO)                                            -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <!-- TODO: Step 3 — Workflow Preferences (.ace/config.json) -->
+        <!-- TODO: Step 4 — Brownfield Offer (if needs_codebase_map, offer /ace:map-codebase before requirements) -->
+        <!-- TODO: Step 5 — Research (optional, parallel researchers) -->
+        <!-- TODO: Step 6 — Define Requirements / Product Backlog -->
+        <!-- TODO: Step 7 — Create Roadmap (roadmapper agent) -->
+        <!-- TODO: Step 8 — Done (summary + next steps) -->
+
+    </process>
+
+</workflow>

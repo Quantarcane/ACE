@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir:*)",
+      "Bash(findstr:*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(git clone:*)",
+      "Bash(powershell:*)",
+      "Bash(git mv:*)",
+      "Bash(node --test:*)",
+      "WebSearch",
+      "Bash(npm test:*)"
+    ]
+  }
+}

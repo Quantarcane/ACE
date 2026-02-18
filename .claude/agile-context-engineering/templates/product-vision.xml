@@ -1,0 +1,227 @@
+<product-vision>
+   <purpose>Template for `docs/product/product-vision.md` — organic document that aligns the team on what the product is, who it's for, and why it matters.</purpose>
+
+   <template>
+
+      ```markdown
+      # [Product Name]
+
+      ## Vision Statement
+
+      [A concise, inspiring statement of what the product aims to achieve and why it exists.
+      1-2 sentences. This is the elevator pitch — if someone reads nothing else, they read this.]
+
+      ## Target Audience
+
+      [Who is this product for? Define key user personas or segments.
+      Be specific — "everyone" is not a target audience.]
+
+      - **[Persona 1]**: [Who they are — what defines them]
+      - **[Persona 2]**: [Who they are — what defines them]
+
+      ## Problem Statement
+
+      [What specific pain points or unmet needs does this product address?
+      Frame from the user's perspective. What's broken, missing, or frustrating today?]
+
+      ## Value Proposition
+
+      [What unique value does the product deliver? Why would users choose this over alternatives?
+      Use Geoffrey Moore's format if helpful:
+      "For [target user] who [need], [product] is a [category] that [key benefit].
+      Unlike [alternative], our product [differentiator]."]
+
+      ## Key Objectives
+
+      <!-- Measurable business and user outcomes the product should achieve. -->
+      <!-- Tie to OKRs where possible. -->
+
+      - [ ] [Objective 1 — measurable outcome]
+      - [ ] [Objective 2 — measurable outcome]
+      - [ ] [Objective 3 — measurable outcome]
+
+      ## High-Level Capabilities
+
+      <!-- Broad capability areas, not detailed requirements. -->
+      <!-- These define the product's shape, not its spec. -->
+
+      - [Capability area 1]
+      - [Capability area 2]
+      - [Capability area 3]
+
+      ## Success Metrics
+
+      <!-- How will you know the product is achieving its vision? -->
+
+      | Metric | Target | Measurement Method |
+      |--------|--------|--------------------|
+      | [KPI 1] | [Target] | [How measured] |
+      | [KPI 2] | [Target] | [How measured] |
+
+      ## Competitive Landscape
+
+      [How does this product differentiate from existing solutions?
+      What alternatives exist and why aren't they sufficient?]
+
+      | Alternative | Strength | Gap We Fill |
+      |-------------|----------|-------------|
+      | [Competitor/Alternative 1] | [What they do well] | [What they miss] |
+      | [Competitor/Alternative 2] | [What they do well] | [What they miss] |
+
+      ## Constraints and Assumptions
+
+      - **[Type]**: [What] — [Why]
+      - **[Type]**: [What] — [Why]
+
+      Common types: Tech stack, Timeline, Budget, Dependencies, Regulatory, Platform
+
+      ## Risks
+
+      <!-- Key uncertainties that could affect the vision. -->
+
+      | Risk | Likelihood | Impact | Mitigation |
+      |------|-----------|--------|------------|
+      | [Risk 1] | [H/M/L] | [H/M/L] | [Strategy] |
+
+      ---
+      *Last updated: [date] after [trigger]*
+      ```
+
+   </template>
+
+   <guidelines>
+
+      **Vision Statement:**
+      - The north star — concise, inspiring, stable
+      - Should fit in one breath; if it takes a paragraph, it's too long
+      - Answers "why does this product exist?"
+      - Changes rarely; when it does, it's a pivot
+
+      **Target Audience:**
+      - Specific user personas or segments, not demographics
+      - Define by behavior and need, not just job title
+      - Primary vs secondary audiences if relevant
+      - Update as you learn who actually uses the product
+
+      **Problem Statement:**
+      - Frame from the user's perspective, not the builder's
+      - Describe the current pain, not your solution
+      - Be specific — vague problems lead to vague products
+      - Validated problems > assumed problems
+
+      **Value Proposition:**
+      - The bridge between problem and product
+      - Must differentiate from alternatives
+      - "Why this, why now, why us?"
+      - Test: could a competitor say the same thing? If yes, it's not specific enough
+
+      **Key Objectives:**
+      - Measurable outcomes, not features
+      - "Users can do X" not "Build feature Y"
+      - Tie to business goals where possible
+      - 3-5 objectives max — more means no focus
+
+      **High-Level Capabilities:**
+      - Broad strokes of what the product does
+      - Think capability areas, not feature lists
+      - These inform epic and feature planning downstream
+      - Should map clearly to objectives
+
+      **Success Metrics:**
+      - Quantifiable indicators of vision achievement
+      - Include target values and how you'll measure them
+      - Leading indicators (adoption, engagement) and lagging (revenue, retention)
+      - Revisit targets as you learn from real usage
+
+      **Competitive Landscape:**
+      - Honest assessment of alternatives (including "do nothing")
+      - Focus on gaps you fill, not feature comparisons
+      - Update as the market evolves
+
+      **Constraints and Assumptions:**
+      - Hard limits on what's possible
+      - Include the "why" — constraints without rationale get challenged
+      - Assumptions are constraints that haven't been validated yet
+      - Revisit assumptions regularly
+
+      **Risks:**
+      - Uncertainties that could derail the vision
+      - Include mitigation strategies, not just identification
+      - High-impact risks need contingency plans
+      - Update as risks materialize or are resolved
+
+      **Last Updated:**
+      - Always note when and why the document was updated
+      - Format: `after Phase 2` or `after user research round 1`
+      - Triggers review of whether content is still accurate
+
+   </guidelines>
+
+   <evolution>
+
+      product-vision.md evolves throughout the product lifecycle, but slower than most artifacts.
+
+      **After user research or discovery:**
+      1. Problem Statement still accurate? → Refine with evidence
+      2. Target Audience validated? → Update personas with real data
+      3. New risks or assumptions surfaced? → Add them
+      4. Value Proposition resonating? → Sharpen or pivot
+
+      **After each major release:**
+      1. Key Objectives met? → Mark achieved, add new ones
+      2. Success Metrics hitting targets? → Adjust targets or strategy
+      3. Competitive Landscape shifted? → Update positioning
+      4. Vision Statement still inspiring and accurate? → Refine if drifted
+
+      **After a pivot or strategic shift:**
+      1. Full review of all sections
+      2. Vision Statement rewrite
+      3. Problem Statement and Value Proposition realignment
+      4. Archive previous version for reference
+
+   </evolution>
+
+   <brownfield>
+
+      For existing products:
+
+      1. **Map current product** — what does it actually do today?
+
+      2. **Infer Vision and Value Proposition** from existing product:
+      - What problem is it currently solving?
+      - Who is actually using it?
+      - What do users say they value most?
+
+      3. **Gather forward-looking input** from stakeholders:
+      - Where should the product go next?
+      - What's missing from the current vision?
+
+      4. **Initialize:**
+      - Vision Statement = articulation of current + aspirational direction
+      - Target Audience = actual current users + desired future users
+      - Problem Statement = validated from real usage patterns
+      - Key Objectives = mix of "maintain what works" + "build what's next"
+      - Constraints = includes existing technical debt and commitments
+
+   </brownfield>
+
+   <state-reference>
+
+      STATE.md references product-vision.md:
+
+      ```markdown
+      ## Product Vision Reference
+
+      See: .artifacts/product-overview/product-vision.md (updated [date])
+
+      **Vision:** [One-liner from Vision Statement]
+      **Core audience:** [Primary persona]
+      **Current focus:** [Current phase or key objective]
+      ```
+
+      This ensures Claude reads the current product vision context.
+
+   </state-reference>
+
+
+</product-vision>

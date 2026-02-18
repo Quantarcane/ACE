@@ -1,0 +1,38 @@
+{
+  "name": "agile-context-engineering",
+  "version": "0.1.0",
+  "description": "ACE - Agile Context Engineering: A spec-driven development system for Claude Code and OpenCode with Agile workflows",
+  "main": "index.js",
+  "bin": {
+    "agile-context-engineering": "bin/install.js",
+    "ace": "bin/install.js"
+  },
+  "files": [
+    "bin",
+    "commands",
+    "agents",
+    "agile-context-engineering"
+  ],
+  "scripts": {
+    "test": "node --test agile-context-engineering/src/ace-tools.test.js"
+  },
+  "keywords": [
+    "claude-code",
+    "opencode",
+    "anthropic",
+    "agile",
+    "context-engineering",
+    "ai-coding",
+    "spec-driven",
+    "cli"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/agile-context-engineering/ace"
+  },
+  "engines": {
+    "node": ">=16.7.0"
+  }
+}
