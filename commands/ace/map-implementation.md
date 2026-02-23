@@ -1,7 +1,7 @@
 ---
-name: ace:COMMAND_NAME
-description: COMMAND_DESCRIPTION
-argument-hint: ""
+name: ace:map-implementation
+description: Analyze a story implementation (artifacts and code) to create or update .docs/wiki/subsystems/ documents and to update .docs/wiki/system-wide/ documents
+argument-hint: "[artifacts=<path>, commits=x]"
 allowed-tools:
   - Read
   - Bash
@@ -15,6 +15,8 @@ allowed-tools:
 <command>
 	
 	<execution-time>
+        **This command can run:**
+        - After a story has been implemented
 	</execution-time>
 	
     <input>
@@ -23,6 +25,7 @@ allowed-tools:
         
         <parameters>
             <required>
+                **artifacts** TODO take from existing command!.
 			</required>
 			
             <optional>
@@ -43,9 +46,6 @@ allowed-tools:
     
     <process>
     </process>
-
-    <success_criteria>
-    </success_criteria>
     
     <next-steps>
     </next-steps>

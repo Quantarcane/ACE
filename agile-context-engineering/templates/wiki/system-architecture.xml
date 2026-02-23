@@ -1,0 +1,252 @@
+<system-architecture>
+    <purpose>
+        Template for `.docs/wiki/system-wide/system-architecture.md` — the living high-level
+        architecture document. Captures L1/L2 views (C4 model), core runtime flows, and tech stack.
+
+        Complements per-subsystem docs (which cover L3 Component and L4 Code levels).
+        Complements STRUCTURE.md (which shows physical file/folder layout).
+
+        A "subsystem" is any cohesive code unit with a clear responsibility boundary —
+        whether deployed as a microservice, a monolith module, or a library package.
+    </purpose>
+
+    <template>
+        <system-overview>
+            ## System Overview
+
+            [2-3 sentences. What does this system do and who uses it? Product language, not jargon.
+            This orients the reader before they look at any diagrams.]
+        </system-overview>
+
+        <c4-l1-system-context>
+            <diagram lang="mermaid" type="C4Context">
+                ## L1: System Context
+
+                ```mermaid
+                C4Context
+                title System Context - [System Name]
+
+                Person(user1, "[Primary User Role]", "[What they do with the system]")
+                Person(user2, "[Secondary User Role]", "[What they do]")
+
+                System(system, "[System Name]", "[Core purpose - one line]")
+
+                System_Ext(ext1, "[External System 1]", "[What it provides/consumes]")
+                System_Ext(ext2, "[External System 2]", "[What it provides/consumes]")
+
+                Rel(user1, system, "[Uses]", "[HTTPS/WebSocket]")
+                Rel(system, ext1, "[Fetches/Sends]", "[REST/WebSocket]")
+                Rel(ext2, system, "[Pushes]", "[Protocol]")
+                ```
+            </diagram>
+
+            <external-integrations-overview>
+                ### External Integrations
+
+                | External System | Direction | What Flows | Protocol |
+                |----------------|-----------|------------|----------|
+                | [System 1] | Inbound | [Data/events description] | [REST/WS/gRPC] |
+                | [System 2] | Outbound | [Data/events description] | [Protocol] |
+                | [System 3] | Bidirectional | [Data/events description] | [Protocol] |
+            </external-integrations-overview>
+        </c4-l1-system-context>
+
+        <c4-l2-container>
+            <diagram lang="mermaid" type="flowchart LR">
+                ## L2: Subsystem Overview
+
+                ```mermaid
+                flowchart LR
+                    subgraph Users
+                        user([fa:fa-user User Role])
+                    end
+
+                    subgraph Core["Core Services"]
+                        sub1["Subsystem 1<br/><small>Tech · One-line responsibility</small>"]
+                        sub2["Subsystem 2<br/><small>Tech · One-line responsibility</small>"]
+                    end
+
+                    subgraph Workers["Background Workers"]
+                        sub3["Subsystem 3<br/><small>Tech · One-line responsibility</small>"]
+                    end
+
+                    subgraph Data["Data Stores"]
+                        db1[(Data Store<br/><small>Tech</small>)]
+                        cache1[(Cache<br/><small>Tech</small>)]
+                    end
+
+                    subgraph Messaging["Messaging"]
+                        mq1>Message Broker<br/><small>Tech</small>]
+                    end
+
+                    subgraph External["External Systems"]
+                        ext1["External System<br/><small>From L1</small>"]
+                    end
+
+                    user -->|"HTTPS"| sub1
+                    sub1 -->|"HTTP/gRPC"| sub2
+                    sub2 -->|"SQL"| db1
+                    sub2 -->|"Publishes"| mq1
+                    mq1 -->|"Consumes"| sub3
+                    sub3 -->|"R/W"| cache1
+                    sub1 -->|"REST"| ext1
+                ```
+            </diagram>
+
+            <subsystem-responsibility-matrix>
+                ### Subsystem Responsibility Matrix
+
+                | Subsystem | Responsibility | Owns (Data) | Publishes | Consumes | Tech |
+                |-----------|---------------|-------------|-----------|----------|------|
+                | [Sub 1] | [One-line purpose] | [Tables/schemas] | [Events/APIs exposed] | [Events/APIs called] | [Lang + framework] |
+                | [Sub 2] | [One-line purpose] | [Tables/schemas] | [Events/APIs exposed] | [Events/APIs called] | [Lang + framework] |
+            </subsystem-responsibility-matrix>
+
+            <communication-patterns>
+                ### Communication Patterns
+
+                | From | To | Pattern | Protocol | Purpose |
+                |------|----|---------|----------|---------|
+                | [Sub 1] | [Sub 2] | Sync request-response | [HTTP/gRPC] | [Why this call exists] |
+                | [Sub 2] | [Sub 3] | Async event | [Kafka/Redis pub-sub] | [Why async over sync] |
+                | [Sub 3] | [Sub 1] | Real-time push | [SignalR/WebSocket] | [Why push over poll] |
+            </communication-patterns>
+        </c4-l2-container>
+
+        <main-flows>
+            ## Core Flows
+
+            The flows that define this system's core value. Subsystem-to-subsystem level only —
+            internal class-level details belong in per-subsystem docs.
+
+            <diagram lang="mermaid" type="sequenceDiagram">
+                ### Flow: [Flow Name]
+
+                [One sentence: what this achieves and when it triggers.]
+
+                ```mermaid
+                sequenceDiagram
+                participant Actor as [User/External]
+                participant S1 as [Subsystem 1]
+                participant S2 as [Subsystem 2]
+                participant MQ as [Broker]
+                participant S3 as [Subsystem 3]
+                participant DB as [Data Store]
+
+                Actor->>S1: [Trigger]
+                S1->>S2: [What passes]
+                S2->>DB: [Operation]
+                DB-->>S2: [Result]
+                S2->>MQ: [Publish event]
+                MQ-->>S3: [Consume]
+                S3-->>S1: [Push update]
+                S1-->>Actor: [Outcome]
+                ```
+            </diagram>
+        </main-flows>
+
+        <tech-stack>
+            ## Tech Stack
+
+            | Category | Technology | Version | Purpose |
+            |----------|-----------|---------|---------|
+            | Backend | [e.g., .NET] | [8.0] | [API services] |
+            | Frontend | [e.g., Next.js] | [15] | [Web application] |
+            | Database | [e.g., PostgreSQL] | [16] | [Primary store] |
+            | Cache | [e.g., Redis] | [7] | [Caching, pub/sub] |
+            | Messaging | [e.g., Kafka] | [3.x] | [Event streaming] |
+            | Real-time | [e.g., SignalR] | [-] | [Client push] |
+        </tech-stack>
+
+        <key-system-wide-architectural-decisions>
+            ## Key System Wide Architectural Decisions
+
+            System-wide decisions only. Per-subsystem decisions live in per-subsystem docs.
+
+            | Decision | Rationale |
+            |----------|-----------|
+            | [e.g., Clean Architecture per service] | [Consistent boundaries, testability] |
+            | [e.g., Kafka over RabbitMQ] | [Need replay, ordering, high throughput] |
+        </key-system-wide-architectural-decisions>
+    </template>
+
+    <guidelines>
+
+        **System Overview:**
+        - 2-3 sentences maximum. Orients the AI before it reads diagrams
+        - Product language — a PM should understand it
+        - NOT a product vision or mission statement. Just "what this system does and who uses it"
+
+        **L1 System Context (`c4-l1-system-context`):**
+        - The ENTIRE system is ONE box — do NOT show internal subsystems
+        - Show ALL user roles (human actors) and ALL external systems (third-party)
+        - Diagram arrows: label with WHAT flows and WHICH protocol
+        - External = anything your team does NOT deploy. If you deploy it, it's a subsystem in L2
+        - Integrations table: one row per external system. Keep it simple — direction, data, protocol
+
+        **L2 Container (`c4-l2-container`):**
+        - Use `flowchart LR` with small focused subgraphs — data pipeline reads naturally left-to-right
+        - Group related nodes into subgraphs (e.g., "Core Services", "Data Stores", "External Systems")
+        - Keep subgraphs small (2-4 nodes each) — split large groups rather than making one big subgraph
+        - One node per subsystem (see "subsystem" definition in purpose)
+        - Data stores and message brokers are SEPARATE nodes — they are NOT subsystems
+        - Subsystem matrix is the quick-reference — agents scan this FIRST to find "who does what"
+        - Communication patterns table explains WHY each link exists and whether it's sync/async.
+        The diagram shows topology; the table explains rationale
+        - Do NOT show components within subsystems — that's L3, handled by per-subsystem docs
+
+        **Subsystem examples by project type:**
+        - Microservices: each service = one subsystem
+        - Monolith: each bounded context/module = one subsystem
+        - Monorepo packages: each publishable package = one subsystem
+        - Hybrid: mix of all three — anything with a clear boundary is a subsystem
+
+        **Core Flows (`main-flows`):**
+        - Generate however many flows define the system's core value (usually 1-2)
+        - Subsystem-to-subsystem only — NO classes, NO method names, NO file references
+        - If a flow needs internal detail, that belongs in the subsystem's `systems/*.md` doc
+        - These are C4 Dynamic Diagrams at the Container level
+        - Choose flows a NEW TEAM MEMBER must understand to work on the system
+
+        **Tech Stack:**
+        - List what's ACTUALLY in use, not aspirational
+        - One row per technology. Group by category
+        - If a technology is used by only one subsystem, mention it in Purpose
+
+        **Key System Wide Architectural Decisions:**
+        - System-wide only (e.g., "all services use Clean Architecture")
+        - Per-subsystem decisions go in per-subsystem docs
+        - Keep under 10 rows. This is a bird's eye view, not a decision log
+        - Decision + Rationale only. No tracking, no status, no dates
+
+    </guidelines>
+
+    <evolution>
+
+        This document evolves at STRUCTURAL changes only — not every story or bugfix.
+
+        **Update triggers:**
+        - New subsystem added, or existing one split/merged
+        - New external integration added or removed
+        - Core flow fundamentally changed (not just a step added)
+        - Tech stack changed (new database, new framework, migration)
+        - Communication pattern between subsystems changed
+        - New system-wide architectural decision made
+
+        **NOT an update trigger:**
+        - New feature within an existing subsystem (per-subsystem docs)
+        - Bug fixes or internal refactoring
+        - New API endpoints within existing subsystem
+        - New tables within existing subsystem's database
+
+        **After structural change:**
+        1. L1 still accurate? (new external system? removed integration?)
+        2. L2 still accurate? (new subsystem? new data store? new broker?)
+        3. Subsystem matrix need a new row or updated cell?
+        4. Core flow shape changed? (rare)
+        5. Tech stack changed?
+        6. New system-wide decision to log?
+
+    </evolution>
+
+</system-architecture>

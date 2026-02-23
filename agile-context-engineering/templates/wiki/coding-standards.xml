@@ -1,0 +1,493 @@
+<coding-standards>
+
+    <purpose>
+        Template for `.docs/wiki/system-wide/coding-standards.md` — prescriptive rules that
+        ALL code in this project MUST follow. These are NOT descriptive conventions (observed patterns)
+        but MANDATED STANDARDS that prevent common AI and developer mistakes.
+
+        This template is paradigm-aware. It contains modular sections that the generating agent
+        assembles based on the project's detected language(s), paradigm(s), and user preferences.
+
+        Complements system-structure.md (which shows physical layout) and system-architecture.md
+        (which shows conceptual design). Coding standards tell you HOW to write code, not WHERE
+        it goes or WHY the architecture exists.
+
+        Output: `.docs/wiki/system-wide/coding-standards.md`
+    </purpose>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- TEMPLATE SECTIONS                                                      -->
+    <!-- The generating agent assembles applicable sections into the output doc  -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+    <template>
+
+        <!-- ─────────────────────────────────────────────────────────────────── -->
+        <!-- UNIVERSAL — Always included regardless of language or paradigm      -->
+        <!-- ─────────────────────────────────────────────────────────────────── -->
+
+        <universal-standards always-include="true">
+            # Coding Standards
+
+            ## Mandatory Rules — Zero Tolerance
+
+            These rules apply to ALL code. No exceptions. No "just this once."
+
+            ### No Dead Code
+            - **NEVER leave commented-out code** — Git has history. Delete it.
+            - **NEVER leave unused imports, variables, functions, or classes**
+            - **NEVER leave unreachable code paths**
+            - Dead code in a complex codebase misleads developers and AI agents into basing
+              new implementations on obsolete, unused code. It is actively harmful.
+
+            ### No Hardcoded Values
+            - **NEVER hardcode** magic strings, color codes, URLs, config values, numeric
+              thresholds, or any value that could change or has semantic meaning
+            - ALL values come from: constants, configuration, environment, or parameters
+            - Reference: consult `system-structure.md` (`.docs/wiki/system-wide/system-structure.md`)
+              and `[subsystem]-structure.md` (`.docs/wiki/subsystems/[subsystem-name]/structure.md`)
+              for where constants should live in this project
+
+            ### No Silent Failures
+            - **NEVER silently swallow errors** — When an operation fails, LET IT FAIL
+            - Do NOT catch exceptions and return fake/placeholder/garbage objects
+            - Do NOT hide errors by returning empty lists or default values
+            - Do NOT pretend an operation succeeded when it didn't
+            - Fail fast. Propagate up. Log with context if needed, then rethrow or return the error.
+
+            ### No Unimplemented Code
+            - **NEVER leave empty TODO comments** — If it needs doing, do it now or create a tracked issue
+            - **NEVER leave stub implementations** — No `throw NotImplemented`, no `pass`, no `...`
+            - If code exists in the codebase, it must be complete and functional
+
+            ### No Assumptions
+            - **Use LSPs first when available** — Check diagnostics, go-to-definition, and find-references before guessing. The LSP knows the codebase better than a text search.
+            - **NEVER assume** libraries, classes, models, methods, or APIs exist
+            - **ALWAYS verify by reading the codebase** before building on something
+            - **ALWAYS search for existing implementations** before writing new code
+            - If similar code exists, refactor it to support the new requirement instead of duplicating
+
+            ### No Code Duplication
+            - Before writing new code, search for existing implementations
+            - If you find code that does 80% of what you need, refactor it — don't duplicate it
+            - Duplication is a maintainability debt that compounds with every copy
+
+            ## File Organization
+
+            - **One primary [construct] per file** — One class, one module, one component.
+              Do not declare multiple classes, interfaces, or significant types in a single file.
+              [Construct name adapts: "class" for OOP, "module export" for FP, "component" for React,
+              "struct + impl" for Rust, "type + functions" for Go]
+
+            - **Maximum file length: [N] lines** — If a file approaches this limit, it has too many
+              responsibilities. Refactor by extracting. If you're following single responsibility,
+              you should rarely get close to this limit.
+
+            ## Engineering Principles
+
+            - **DRY (Don't Repeat Yourself)** — Every piece of knowledge must have a single,
+              unambiguous, authoritative representation within the system. If you change one thing
+              and have to change it in multiple places, the design is wrong. Extract shared logic.
+
+            - **KISS (Keep It Simple, Stupid)** — The simplest solution that works is the best
+              solution. Avoid over-engineering, excessive abstractions, and clever tricks.
+              Code is read far more often than it is written — optimize for clarity.
+
+            - **YAGNI (You Aren't Gonna Need It)** — Do NOT implement functionality until it is
+              actually needed. Do not design for hypothetical future requirements. Do not add
+              configuration points, extension hooks, or abstractions "just in case."
+
+            - **Separation of Concerns** — Each unit of code (function, class, module) should
+              address one concern. Mixing concerns creates code that is hard to test, hard to
+              change, and hard to understand.
+
+            - **Principle of Least Surprise** — Code should behave as other developers would
+              expect. Method names should describe what they do. Side effects should be obvious.
+              Conventions should be consistent across the codebase.
+
+            - **Fail Fast** — Detect and report errors as early as possible. Validate inputs
+              at boundaries. Assert invariants. The further an error propagates from its source,
+              the harder it is to diagnose.
+
+            ## Code Quality Mindset
+
+            - **Think like an architect operating within a complex codebase** — Every coding
+              decision must consider: will this be easy to extend? Can another developer understand it?
+              Does it follow existing patterns?
+
+            - **No hacks, no shortcuts** — Especially when fixing bugs. The pressure to
+              "just make it work" is strongest during bug fixes. Resist. Fix it properly.
+
+            - **No over-engineering** — Don't add features, abstractions, or configurability
+              beyond what's needed. Three similar lines of code is better than a premature abstraction.
+              The right amount of complexity is the minimum needed for the current task.
+
+            - **All code must be testable** — Structure code so it can be tested in isolation.
+              [Paradigm-specific testability guidance goes in the paradigm section]
+        </universal-standards>
+
+        <!-- ─────────────────────────────────────────────────────────────────── -->
+        <!-- OOP MODULE — Include when project uses object-oriented paradigm     -->
+        <!-- ─────────────────────────────────────────────────────────────────── -->
+
+        <paradigm-oop include-when="Project uses OOP as primary or significant paradigm (C#, Java, TypeScript with classes, Python with classes, Kotlin, Swift, Dart, Ruby, PHP)">
+            ## Object-Oriented Programming Standards
+
+            ### SOLID Principles — Non-Negotiable
+
+            - **Single Responsibility Principle** — Each class has ONE reason to change.
+              If you can describe a class purpose with "and", it does too much. Split it.
+
+            - **Open/Closed Principle** — Open for extension, closed for modification.
+              Use abstractions and composition to add behavior without changing existing code.
+
+            - **Liskov Substitution Principle** — Derived classes must be fully substitutable
+              for their base classes. No surprises, no broken contracts.
+
+            - **Interface Segregation Principle** — No client should depend on interfaces it
+              doesn't use. Prefer many small, focused interfaces over few large ones.
+
+            - **Dependency Inversion Principle** — Depend on abstractions, not concretions.
+              High-level modules must not depend on low-level modules.
+
+            ### Code Against Abstractions
+
+            - **ALWAYS code against interfaces** — Every service, repository, and significant
+              collaborator must have an interface. This enables testing, swapping implementations,
+              and respecting DIP.
+
+            - **Dependency injection for ALL services** — No instantiating dependencies directly
+              inside other services. Wire dependencies through constructors. Register in the
+              DI container.
+              Reference: consult `system-structure.md` (`.docs/wiki/system-wide/system-structure.md`)
+              and `[subsystem]-structure.md` (`.docs/wiki/subsystems/[subsystem-name]/structure.md`)
+              for where DI configuration lives in this project
+
+            ### OOP Best Practices
+
+            - **Composition over inheritance** — Prefer composing behaviors via injected
+              collaborators over deep inheritance hierarchies. Inheritance creates tight coupling.
+
+            - **Encapsulation** — Keep internal state private. Expose behavior through methods,
+              not raw data through public fields and getters.
+
+            - **Polymorphism over conditionals** — When you see `if/switch` checking a type
+              discriminator, consider whether polymorphism is the proper solution.
+
+            - **Small, focused classes** — A class should be easily describable in one sentence.
+              If the description needs "and", extract a collaborator.
+
+            ### Design Patterns — Use Where They Fit
+
+            Apply proven patterns to solve recurring design problems. Do NOT force patterns
+            where a simpler solution exists — a pattern used without justification is an anti-pattern.
+
+            - **Strategy** — Encapsulate interchangeable algorithms behind an interface. Use when
+              behavior varies by context and you want to swap implementations without modifying callers.
+
+            - **Repository** — Mediate between domain and data mapping layers using a collection-like
+              interface. Keeps domain logic ignorant of persistence details.
+
+            - **Factory / Abstract Factory** — Encapsulate object creation when construction is
+              complex or the concrete type depends on runtime conditions. Avoid when a simple
+              constructor call is sufficient.
+
+            - **Observer / Event** — Decouple producers from consumers when one action must trigger
+              multiple reactions. Use for cross-cutting concerns like logging, notifications, or
+              cache invalidation.
+
+            - **Decorator** — Add behavior to objects dynamically without modifying their class.
+              Prefer over inheritance when combining behaviors in varying combinations.
+
+            - **Adapter** — Convert one interface to another so incompatible classes can work together.
+              Use at system boundaries to integrate external libraries or legacy code.
+
+            - **Command** — Encapsulate a request as an object, enabling undo, queuing, logging,
+              or deferred execution. Use when operations need to be treated as first-class objects.
+
+            - **Template Method** — Define the skeleton of an algorithm in a base class, letting
+              subclasses override specific steps. Use sparingly — composition is often better.
+
+            **WARNING:** Do NOT use patterns preemptively. A pattern is justified ONLY when the
+            problem it solves actually exists in your code. "We might need it later" is not
+            justification — that violates YAGNI.
+
+            ### OOP Anti-Patterns — Never Do These
+
+            - **God Class** — A class that knows too much and does too much. If a class name
+              contains "Manager", "Handler", "Processor", or "Service" and it's over 300 lines,
+              it's probably a God Class. Split it by responsibility.
+
+            - **Anemic Domain Model** — Domain objects reduced to mere data containers (getters
+              and setters only) with all logic in separate "service" classes. This is procedural
+              programming disguised as OOP. Put behavior where the data is.
+
+            - **Feature Envy** — A method that uses more data from another class than its own.
+              This means the method belongs in the other class. Move it.
+
+            - **Tight Coupling** — Classes directly instantiating or depending on concrete
+              implementations instead of abstractions. Makes testing impossible and changes ripple
+              across the codebase. Code against interfaces.
+
+            - **Poltergeist / Useless Classes** — Classes with no real responsibility that merely
+              delegate to other classes or add unnecessary abstraction layers. Every class must
+              justify its existence with real behavior.
+
+            - **Singleton Abuse** — Using Singleton as a convenient global variable. Singletons
+              hide dependencies, prevent testing, create concurrency issues, and violate DIP.
+              Use dependency injection instead.
+
+            - **Premature Abstraction** — Creating interfaces, base classes, or generic frameworks
+              before having two concrete use cases. Wait until duplication emerges, then abstract.
+              Wrong abstractions are worse than duplication.
+        </paradigm-oop>
+
+        <!-- ─────────────────────────────────────────────────────────────────── -->
+        <!-- FUNCTIONAL MODULE — Include when project uses functional paradigm   -->
+        <!-- ─────────────────────────────────────────────────────────────────── -->
+
+        <paradigm-functional include-when="Project uses FP as primary or significant paradigm (Elixir, Haskell, Clojure, F#, Elm, OCaml, or FP style in TypeScript/JavaScript/Python/Kotlin/Scala)">
+            ## Functional Programming Standards
+
+            ### Core Principles
+
+            - **Pure functions by default** — Functions should be deterministic: same input →
+              same output, no side effects. Isolate side effects at the boundaries
+              (IO, database, API calls, user interaction).
+
+            - **Immutability by default** — Do not mutate data. Create new values from old ones.
+              Mutable state is opt-in and must be justified with a comment explaining why.
+
+            - **Function composition over imperative flow** — Build complex behavior by composing
+              small, focused functions. Prefer pipelines and transformations over step-by-step
+              mutation.
+
+            ### Data Modeling
+
+            - **Make illegal states unrepresentable** — Use discriminated unions / sum types /
+              algebraic data types to model domain states. The type system should prevent
+              invalid state combinations at compile time.
+
+            - **Pattern matching over conditionals** — Use pattern matching to destructure data
+              and handle variants. It's exhaustive, self-documenting, and catches missing cases.
+
+            - **Data transformation pipelines** — Prefer `map`, `filter`, `reduce`, pipe operators,
+              or function composition over loops with mutable accumulators.
+
+            ### Error Handling
+
+            - **Result/Either types for expected failures** — Reserve exceptions for truly
+              exceptional, unrecoverable conditions. Expected failures (validation, not-found,
+              conflict) should be expressed in the return type.
+
+            - **Railway-oriented error handling** — Chain operations that can fail without nested
+              try/catch. Let the error path carry failures through the pipeline.
+
+            ### Module Design
+
+            - **Modules as namespaces with clear purpose** — Group related functions into modules.
+              Each module has a single, focused responsibility.
+
+            - **Explicit dependencies** — Functions receive dependencies as parameters.
+              No hidden global state, no module-level singletons with side effects.
+
+            - **Public API at module boundary** — Export only what consumers need.
+              Keep internal helpers private.
+        </paradigm-functional>
+
+        <!-- ─────────────────────────────────────────────────────────────────── -->
+        <!-- SYSTEMS MODULE — Include for Rust, Go, C, C++                      -->
+        <!-- ─────────────────────────────────────────────────────────────────── -->
+
+        <paradigm-systems include-when="Project uses systems languages (Rust, Go, C, C++)">
+            ## Systems Programming Standards
+
+            ### Rust (include if Rust project)
+
+            - **Respect the borrow checker** — Do not fight it with unnecessary `clone()` or
+              `Rc&lt;RefCell&lt;&gt;&gt;`. If the borrow checker complains, rethink your data flow.
+
+            - **`Result&lt;T, E&gt;` for all fallible operations** — Use the `?` operator for
+              propagation. Reserve `panic!` for unrecoverable invariant violations only.
+
+            - **No unnecessary `unwrap()`** — Every `unwrap()` is a potential panic. Use `?`,
+              `unwrap_or`, `unwrap_or_else`, `map`, or proper match/if-let handling.
+
+            - **Traits for polymorphism** — Use traits to define behavior contracts. Use
+              `dyn Trait` for dynamic dispatch only when static dispatch won't work.
+
+            - **Derive what you can** — Use `#[derive(...)]` for standard traits. Implement
+              manually only when custom behavior is needed.
+
+            ### Go (include if Go project)
+
+            - **Accept interfaces, return structs** — Function parameters should use interfaces
+              for flexibility. Return concrete types for clarity.
+
+            - **Check every error** — Never ignore `err` returns. Use `fmt.Errorf("context: %w", err)`
+              for wrapping. Use sentinel errors or custom types for typed error handling.
+
+            - **Package-level organization** — Each package has a clear, focused purpose.
+              Avoid mega-packages. Package name should describe what it provides, not what it contains.
+
+            - **No unnecessary interfaces** — Define interfaces where they're consumed, not where
+              they're implemented. Don't create interfaces for single implementations.
+
+            - **Short names for small scopes** — `i`, `ctx`, `err`, `db` for local variables.
+              Longer, descriptive names for package-level and exported identifiers.
+
+            ### C/C++ (include if C/C++ project)
+
+            - **RAII in C++** — Acquire resources in constructors, release in destructors.
+              Use smart pointers (`unique_ptr`, `shared_ptr`) instead of raw `new/delete`.
+
+            - **Bounds checking** — Validate array indices and buffer sizes. Use safe alternatives
+              (`std::array`, `std::vector`, `std::string`) over raw C arrays and `char*`.
+
+            - **No raw `new/delete` in C++** — Use smart pointers and containers.
+              Manual memory management is a bug waiting to happen.
+        </paradigm-systems>
+
+        <!-- ─────────────────────────────────────────────────────────────────── -->
+        <!-- LANGUAGE-SPECIFIC CONVENTIONS — Generated from codebase detection   -->
+        <!-- ─────────────────────────────────────────────────────────────────── -->
+
+        <language-conventions generate-from="codebase detection or user input">
+            ## Language and Framework Conventions
+
+            [Generate this section from detected language, frameworks, and existing configs.
+            Check .prettierrc, .eslintrc, ruff.toml, .editorconfig, etc. for existing rules.
+            Examine 5-10 representative source files for naming patterns.]
+
+            ### Naming Conventions
+            [Document project's actual naming patterns. Be prescriptive:
+            - File naming: kebab-case.ts, PascalCase.cs, snake_case.py, etc.
+            - Functions/methods: camelCase, snake_case, PascalCase depending on language
+            - Variables: language convention
+            - Constants: UPPER_SNAKE_CASE universally
+            - Types/interfaces: PascalCase universally, with/without prefix based on project]
+
+            ### Import / Dependency Organization
+            [Document the project's import ordering and grouping.
+            Check for linter rules enforcing import order.]
+
+            ### Framework-Specific Rules
+            [Only include if project uses a framework with its own patterns:
+            - React: hooks rules, component patterns, state management approach
+            - Angular: module structure, service patterns, change detection
+            - ASP.NET: controller patterns, middleware, model binding
+            - Django: app structure, view patterns, ORM usage
+            - Spring: bean patterns, annotation usage
+            Generate based on what's actually detected, not a generic list.]
+        </language-conventions>
+
+        <!-- ─────────────────────────────────────────────────────────────────── -->
+        <!-- PROJECT-SPECIFIC RULES — From user interview                        -->
+        <!-- ─────────────────────────────────────────────────────────────────── -->
+
+        <project-specific-rules generate-from="user interview">
+            ## Project-Specific Rules
+
+            [Rules from the user interview that don't fit neatly in other sections.
+            These capture the team's hard-won lessons and specific pain points.
+
+            This is often the MOST VALUABLE section because it's unique to this project.
+            Write these with the same emphatic, direct tone as the universal rules.
+
+            Examples of what might go here:
+            - "If a method has LESS than 7 parameters, keep them on ONE line"
+            - "All API responses must use the shared ApiResponse wrapper"
+            - "Never use library X for Y — use Z instead"
+            - "All database queries must go through the repository pattern"
+            - Specific patterns, conventions, or constraints unique to this project]
+        </project-specific-rules>
+
+    </template>
+
+    <guidelines>
+
+        **Assembly rules for the generating agent:**
+
+        1. **ALWAYS include universal-standards** — These apply to every project regardless
+           of language or paradigm. Adapt the [bracketed placeholders] to the detected language.
+
+        2. **Include paradigm modules based on detection AND user preference:**
+           - Project uses OOP → include paradigm-oop
+           - Project uses FP → include paradigm-functional
+           - Project uses systems language → include paradigm-systems
+           - Project uses multi-paradigm → include whichever modules the user prefers
+           - User explicitly declines a paradigm → respect that, do not include it
+
+        3. **Generate language-conventions from codebase analysis** — Read actual config files,
+           examine source files, document what's in use. Be prescriptive, not descriptive.
+
+        4. **Include project-specific-rules from interview** — Capture the user's pain points
+           and custom rules. These are the most unique and valuable part of the document.
+
+        5. **Tone: DIRECT and EMPHATIC** — Use bold for emphasis, caps for critical words.
+           This is not a suggestion document — it's a mandate. AI agents (especially Claude)
+           respect authoritative, unambiguous instructions more than polite suggestions.
+           Match the tone of the universal-standards section.
+
+        6. **Length: 150-350 lines** — Enough to be comprehensive, short enough to be loaded
+           as context without waste. Universal (~60 lines) + one paradigm module (~40 lines) +
+           language conventions (~40 lines) + project-specific (~30 lines) = ~170 lines typical.
+           Two paradigm modules or extensive project rules may push to ~300.
+
+        7. **Be prescriptive** — "NEVER do X" not "We typically avoid X". "ALWAYS do Y" not
+           "It's recommended to do Y". Standards are mandates, not suggestions.
+
+        8. **Include rationale for non-obvious rules** — "No dead code" needs a why
+           (misleads AI and developers into building on obsolete code). "Use camelCase" doesn't
+           need a why (it's a convention, not a principle).
+
+        9. **Use concrete examples for ambiguous rules** — When a rule could be misinterpreted,
+           show a brief good/bad example inline.
+
+        10. **Cross-reference project structure** — Reference actual file paths for constants
+            directories, DI configuration, shared utilities, etc. Use backtick formatting for paths.
+
+        **What does NOT belong in coding-standards.md:**
+        - File/directory structure (that's system-structure.md / subsystem-structure.md)
+        - Architecture decisions and patterns (that's system-architecture.md)
+        - Technology stack choices (that's system-architecture.md tech-stack section)
+        - Test framework setup and patterns (that's a separate testing doc)
+        - Deployment, CI/CD, or infrastructure concerns
+
+        **What DOES belong:**
+        - Rules about HOW to write code (quality, style, patterns)
+        - Rules about code organization WITHIN files (not directory layout)
+        - Rules about naming, formatting, error handling, testability
+        - Rules about paradigm adherence (SOLID, FP principles, systems idioms)
+        - Rules that prevent known AI mistakes (the highest-value rules)
+        - Rules that maintain codebase integrity at scale
+
+    </guidelines>
+
+    <evolution>
+
+        This document evolves when coding standards change — not with every feature or fix.
+
+        **Update triggers:**
+        - New language or paradigm added to the project
+        - New framework that introduces its own coding patterns
+        - Team discovers a recurring mistake → add a rule to prevent it
+        - Existing rule proven too strict or too loose → adjust it
+        - Architecture shift that changes how code should be written
+        - Onboarding feedback reveals ambiguous or missing rules
+
+        **NOT an update trigger:**
+        - New features (should follow existing standards)
+        - Bug fixes (should already follow standards)
+        - Dependency updates (unless they fundamentally change coding patterns)
+        - New files or directories (that's structure docs)
+
+        **After update:**
+        1. Review all paradigm modules — still accurate?
+        2. Review project-specific rules — any new pain points to capture?
+        3. Check line count — still under 350 lines?
+        4. Verify cross-references to file paths are still valid
+
+    </evolution>
+
+</coding-standards>

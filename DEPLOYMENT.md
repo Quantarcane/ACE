@@ -10,6 +10,7 @@ node bin/install.js
 
 # With flags
 node bin/install.js --claude --local
+node bin/install.js --claude --global
 node bin/install.js --all --global
 node bin/install.js --help
 ```

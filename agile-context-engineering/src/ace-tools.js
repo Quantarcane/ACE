@@ -16,7 +16,10 @@
  *   current-timestamp [format]      Get timestamp (full|date|filename)
  *
  * Compound Commands:
- *   init new-project                Environment detection for project init
+ *   init new-project                Environment detection for project init (status dashboard)
+ *   init product-vision             Environment detection for product vision upsert
+ *   init coding-standards           Environment detection for coding standards init
+ *   init map-system                 Environment detection for map-system workflow
  */
 
 const fs = require('fs');
@@ -28,6 +31,7 @@ const MODEL_PROFILES = {
   'ace-product-owner':        { quality: 'opus',   balanced: 'sonnet', budget: 'sonnet' },
   'ace-project-researcher':   { quality: 'opus',   balanced: 'sonnet', budget: 'haiku' },
   'ace-research-synthesizer': { quality: 'sonnet', balanced: 'sonnet', budget: 'haiku' },
+  'ace-code-wiki-mapper':     { quality: 'sonnet', balanced: 'sonnet', budget: 'haiku' },
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -204,16 +208,16 @@ function cmdCurrentTimestamp(format, raw) {
   output({ timestamp: value, format }, raw, value);
 }
 
-// ─── Compound Commands ────────────────────────────────────────────────────────
+// ─── Brownfield Detection (shared) ───────────────────────────────────────────
 
-function cmdInitNewProject(cwd, raw) {
-  const config = loadConfig(cwd);
-
-  // Detect existing code (cross-platform)
+/**
+ * Detect whether the project is brownfield (has existing code/manifests) or greenfield.
+ * Returns a reusable object with detection results.
+ */
+function detectBrownfieldStatus(cwd) {
   const codeFiles = detectCodeFiles(cwd, 3);
-  const hasCode = codeFiles.length > 0;
+  const hasExistingCode = codeFiles.length > 0;
 
-  // Check for project/build manifest files (detects "project exists" even without source code yet)
   const packageFiles = [
     'package.json',       // Node.js
     'requirements.txt',   // Python (pip)
@@ -236,6 +240,21 @@ function cmdInitNewProject(cwd, raw) {
   })();
 
   const hasPackageFile = packageFiles.some(f => pathExistsInternal(cwd, f)) || hasDotnetProject;
+  const isBrownfield = hasExistingCode || hasPackageFile;
+
+  return {
+    has_existing_code: hasExistingCode,
+    has_package_file: hasPackageFile,
+    is_brownfield: isBrownfield,
+    is_greenfield: !isBrownfield,
+  };
+}
+
+// ─── Compound Commands ────────────────────────────────────────────────────────
+
+function cmdInitNewProject(cwd, raw) {
+  const config = loadConfig(cwd);
+  const brownfield = detectBrownfieldStatus(cwd);
 
   const result = {
     // Models (pre-resolved so workflows know which model to spawn each agent with)
@@ -249,18 +268,17 @@ function cmdInitNewProject(cwd, raw) {
 
     // Existing state
     has_product_vision: pathExistsInternal(cwd, '.docs/product/product-vision.md'),
-    //has_system_architecture
-    //has_tech_stack
-    //has_tech_debt
+    has_system_architecture: pathExistsInternal(cwd, '.docs/wiki/system-wide/system-architecture.md'),
+    has_system_structure: pathExistsInternal(cwd, '.docs/wiki/system-wide/system-structure.md'),
+    has_coding_standards: pathExistsInternal(cwd, '.docs/wiki/system-wide/coding-standards.md'),
+    has_testing_framework: pathExistsInternal(cwd, '.docs/wiki/system-wide/testing-framework.md'),
     project_exists: pathExistsInternal(cwd, '.docs/product/product-vision.md'),
     has_codebase_map: pathExistsInternal(cwd, '.ace/codebase'),
     planning_exists: pathExistsInternal(cwd, '.ace'),
 
     // Brownfield detection
-    has_existing_code: hasCode,
-    has_package_file: hasPackageFile,
-    is_brownfield: hasCode || hasPackageFile,
-    needs_codebase_map: (hasCode || hasPackageFile) && !pathExistsInternal(cwd, '.ace/codebase'),
+    ...brownfield,
+    needs_codebase_map: brownfield.is_brownfield && !pathExistsInternal(cwd, '.ace/codebase'),
 
     // Git state
     has_git: pathExistsInternal(cwd, '.git'),
@@ -275,6 +293,107 @@ function cmdInitNewProject(cwd, raw) {
         return false;
       }
     })(),
+  };
+
+  output(result, raw);
+}
+
+function cmdInitCodingStandards(cwd, raw) {
+  const config = loadConfig(cwd);
+  const brownfield = detectBrownfieldStatus(cwd);
+
+  const result = {
+    // Config
+    commit_docs: config.commit_docs,
+
+    // Brownfield detection
+    ...brownfield,
+
+    // Existing coding standards
+    has_coding_standards: pathExistsInternal(cwd, '.docs/wiki/system-wide/coding-standards.md'),
+    wiki_dir_exists: pathExistsInternal(cwd, '.docs/wiki/system-wide'),
+
+    // Existing wiki context (useful for cross-referencing)
+    has_system_architecture: pathExistsInternal(cwd, '.docs/wiki/system-wide/system-architecture.md'),
+    has_system_structure: pathExistsInternal(cwd, '.docs/wiki/system-wide/system-structure.md'),
+
+    // Git state
+    has_git: pathExistsInternal(cwd, '.git'),
+  };
+
+  output(result, raw);
+}
+
+function cmdInitMapSystem(cwd, raw) {
+  const config = loadConfig(cwd);
+  const brownfield = detectBrownfieldStatus(cwd);
+
+  // Check existing wiki documents
+  const wikiDir = '.docs/wiki/system-wide';
+  const wikiDirExists = pathExistsInternal(cwd, wikiDir);
+
+  const has_system_structure = pathExistsInternal(cwd, path.join(wikiDir, 'system-structure.md'));
+  const has_system_architecture = pathExistsInternal(cwd, path.join(wikiDir, 'system-architecture.md'));
+  const has_testing_framework = pathExistsInternal(cwd, path.join(wikiDir, 'testing-framework.md'));
+  const has_coding_standards = pathExistsInternal(cwd, path.join(wikiDir, 'coding-standards.md'));
+
+  // List existing wiki files if directory exists
+  let existing_wiki_files = [];
+  if (wikiDirExists) {
+    try {
+      existing_wiki_files = fs.readdirSync(path.join(cwd, wikiDir)).filter(f => f.endsWith('.md'));
+    } catch {}
+  }
+
+  const result = {
+    // Models
+    mapper_model: resolveModelInternal(cwd, 'ace-code-wiki-mapper'),
+
+    // Config
+    commit_docs: config.commit_docs,
+
+    // Brownfield detection
+    ...brownfield,
+
+    // Wiki directory state
+    wiki_dir_exists: wikiDirExists,
+    existing_wiki_files,
+
+    // Per-document existence
+    has_system_structure,
+    has_system_architecture,
+    has_testing_framework,
+    has_coding_standards,
+
+    // Git state
+    has_git: pathExistsInternal(cwd, '.git'),
+  };
+
+  output(result, raw);
+}
+
+function cmdInitProductVision(cwd, raw) {
+  const config = loadConfig(cwd);
+  const brownfield = detectBrownfieldStatus(cwd);
+
+  const result = {
+    // Models
+    product_owner_model: resolveModelInternal(cwd, 'ace-product-owner'),
+
+    // Config
+    commit_docs: config.commit_docs,
+
+    // Existing state
+    has_product_vision: pathExistsInternal(cwd, '.docs/product/product-vision.md'),
+
+    // Brownfield detection
+    ...brownfield,
+
+    // Architecture context
+    has_system_architecture: pathExistsInternal(cwd, '.docs/wiki/system-wide/system-architecture.md'),
+
+    // Git state
+    has_git: pathExistsInternal(cwd, '.git'),
   };
 
   output(result, raw);
@@ -327,8 +446,17 @@ function main() {
         case 'new-project':
           cmdInitNewProject(cwd, raw);
           break;
+        case 'product-vision':
+          cmdInitProductVision(cwd, raw);
+          break;
+        case 'coding-standards':
+          cmdInitCodingStandards(cwd, raw);
+          break;
+        case 'map-system':
+          cmdInitMapSystem(cwd, raw);
+          break;
         default:
-          error('Unknown init subcommand. Available: new-project');
+          error('Unknown init subcommand. Available: new-project, product-vision, coding-standards, map-system');
       }
       break;
     }

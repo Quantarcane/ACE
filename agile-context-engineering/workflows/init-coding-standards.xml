@@ -1,0 +1,386 @@
+<workflow>
+
+    <purpose>
+        Orchestrate coding standards generation through environment detection, user interview,
+        and document writing. Produces `.docs/wiki/system-wide/coding-standards.md` — a prescriptive,
+        paradigm-aware coding standards document tailored to the project.
+
+        Brownfield projects: detect language/paradigm/frameworks from codebase, then interview.
+        Greenfield projects: gather tech choices from user interview directly.
+    </purpose>
+
+    <mandatory-context>
+        Read all files referenced by the invoking command's execution-context before starting.
+        Also read any document or text passed as parameter ($ARGUMENTS) in the invoking command.
+    </mandatory-context>
+
+    <process>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 1: SETUP                                                     -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="setup" order="1">
+            **MANDATORY FIRST STEP — Execute environment detection before any user interaction:**
+
+            ```bash
+            INIT=$(node ~/.claude/agile-context-engineering/src/ace-tools.js init coding-standards)
+            ```
+
+            Parse JSON for: `commit_docs`, `is_brownfield`, `is_greenfield`, `has_existing_code`,
+            `has_package_file`, `has_coding_standards`, `wiki_dir_exists`, `has_system_architecture`,
+            `has_system_structure`, `has_git`.
+
+            Also resolve the mapper model for spawning the wiki-mapper agent:
+            ```bash
+            MAPPER_MODEL=$(node ~/.claude/agile-context-engineering/src/ace-tools.js resolve-model ace-code-wiki-mapper --raw)
+            ```
+
+            Display stage banner:
+
+            ```
+            ╔══════════════════════════════════════════════════╗
+            ║  ACE > Coding Standards                          ║
+            ╚══════════════════════════════════════════════════╝
+            ```
+
+            **If `has_coding_standards` is true:**
+
+            Use AskUserQuestion:
+            - header: "Standards exist"
+            - question: "Coding standards already exist at `.docs/wiki/system-wide/coding-standards.md`. What would you like to do?"
+            - options:
+              - "Update" — Refine the existing standards through a new interview
+              - "Start fresh" — Discard and create new standards from scratch
+              - "Skip" — Keep the current standards as-is
+
+            If "Update": Read existing file, hold as seed context, continue to step 2
+            If "Start fresh": Ignore existing file, continue to step 2
+            If "Skip": Exit workflow
+
+            **If `has_git` is false:** Initialize git:
+            ```bash
+            git init
+            ```
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 2: DETECT (brownfield) or SKIP (greenfield)                  -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="detect" order="2">
+
+            **If `is_greenfield` is true:**
+
+            There is no codebase to analyze. Skip detection entirely — the interview (step 3)
+            will gather language, paradigm, and framework preferences directly from the user.
+
+            Hold detection results as: `DETECTION = null` (signals greenfield to step 3).
+
+            Continue directly to step 3 (interview).
+
+            **If `is_brownfield` is true:**
+
+            Spawn a detection agent to analyze the existing codebase. Use a Task agent to
+            avoid filling main context with file scanning:
+
+            ```
+            Task(
+                prompt="Analyze this project's technical profile for coding standards generation.
+
+                **Step 1 — Detect languages:**
+                Check for: package.json, tsconfig.json, *.csproj, *.sln, Cargo.toml, go.mod,
+                pyproject.toml, setup.py, requirements.txt, build.gradle, pom.xml, Gemfile,
+                mix.exs, *.cabal, pubspec.yaml, Package.swift, composer.json
+
+                **Step 2 — Detect paradigm:**
+                Scan 5-10 representative source files. Classify as:
+                - OOP-heavy: classes, interfaces, DI containers, inheritance
+                - Functional-heavy: pure functions, pipelines, algebraic types, pattern matching
+                - Multi-paradigm: mix of both
+                - Systems: ownership, manual memory, error-by-return
+
+                **Step 3 — Detect frameworks and tooling:**
+                Check package files and imports for: React, Angular, Vue, Express, ASP.NET,
+                Spring, Django, Phoenix, Gin, Actix, Jest, xUnit, pytest, etc.
+                Check for: .eslintrc, .prettierrc, ruff.toml, .editorconfig, biome.json
+
+                **Step 4 — Detect existing standards:**
+                Check for existing CLAUDE.md, .docs/ standards, lint configs, .editorconfig
+
+                **Step 5 — Detect project structure patterns:**
+                Find where constants, config, DI registration, and shared code live.
+
+                **Return format — structured summary only:**
+                LANGUAGES: [list with confidence]
+                PARADIGM: [OOP / Functional / Multi-paradigm / Systems]
+                FRAMEWORKS: [list]
+                TOOLING: [linters, formatters, configs found]
+                EXISTING_STANDARDS: [any existing standards docs found]
+                CONSTANTS_LOCATION: [where constants/config values live]
+                DI_LOCATION: [where dependency injection is configured, if applicable]
+                PATTERNS_OBSERVED: [3-5 key patterns seen in the code]",
+                subagent_type="Explore",
+                model="{MAPPER_MODEL}",
+                description="Detect project technical profile"
+            )
+            ```
+
+            Hold detection results for the interview step.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 3: INTERVIEW                                                 -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="interview" order="3">
+            Follow the questioning guide from `questioning.xml`. You are a thinking partner
+            helping the user articulate their coding philosophy.
+
+            **Opening — adapt based on greenfield vs brownfield:**
+
+            If BROWNFIELD (detection results available):
+            ```
+            I analyzed your project. Here's what I found:
+
+            - Language(s): [detected]
+            - Paradigm: [detected]
+            - Frameworks: [detected]
+            - Existing tooling: [linters/formatters found]
+            [If existing standards found: "You already have [doc] — I'll build on that."]
+
+            Let me understand your coding standards preferences.
+            ```
+
+            If GREENFIELD (no detection results):
+            ```
+            This is a greenfield project — no existing code to analyze yet.
+            I'll need to understand your plans to create the right standards.
+            ```
+
+            Then ask about the tech stack using AskUserQuestion:
+            - header: "Language"
+            - question: "What language(s) will this project use?"
+            - options: (pick the 3-4 most common, based on context if any)
+              e.g., "TypeScript", "Python", "C#", "Go"
+
+            Follow up with paradigm preference:
+            - header: "Paradigm"
+            - question: "What programming paradigm will you primarily use?"
+            - options adapt to the language chosen:
+              - For TypeScript: "Class-based OOP", "Functional", "React components + hooks"
+              - For Python: "OOP with classes", "Functional/procedural", "Mixed"
+              - For C#/Java: "OOP with SOLID" (only realistic option, confirm don't ask)
+              - For Go: "Go idioms" (Go has its own paradigm, confirm don't ask)
+              - For Rust: "Rust idioms" (traits + ownership, confirm don't ask)
+
+            Then ask about frameworks if not already known.
+
+            **Key areas to explore (adapt based on conversation, don't checklist):**
+
+            1. **Strictness level**
+               "How strict do you want the coding standards to be?"
+               - "Enterprise-grade strict" — Zero tolerance for violations, every rule enforced
+               - "Pragmatic but principled" — Strong guidelines with room for justified exceptions
+               - "Minimal essentials" — Only rules that prevent real problems
+
+            2. **Pain points — THE MOST VALUABLE QUESTION**
+               "What mistakes have you seen Claude or developers make repeatedly?"
+               Follow up on every pain point. Each one becomes an emphatic rule.
+               Examples they might mention:
+               - "Claude puts multiple classes in one file"
+               - "Claude swallows errors silently"
+               - "Claude hardcodes values"
+               - "Claude over-engineers simple things"
+               - "Claude doesn't check what already exists"
+
+            3. **Paradigm preference** (if multi-paradigm language)
+               Already gathered for greenfield; confirm for brownfield if multi-paradigm detected.
+               - For Python: "OOP with classes" / "Functional/procedural" / "Mix"
+               - For TypeScript: "Class-based OOP" / "Functional with types" / "React hooks"
+               - For Kotlin/Scala: "OOP with interfaces" / "Functional with sealed classes" / "Mix"
+
+            4. **Architecture enforcement**
+               "Do you want the standards to enforce architecture patterns?"
+               - SOLID principles, Clean Architecture layers, DI requirements
+               - Or just code-level rules without architectural mandates
+
+            5. **File organization rules**
+               "One class/module per file strictly, or are small related types OK together?"
+               "Max file length preference?"
+
+            6. **Error handling philosophy**
+               "How should errors be handled?"
+               - Fail fast with exceptions
+               - Result/Either types for expected failures
+               - Language-specific patterns
+
+            7. **Testability requirements**
+               "Should the standards mandate testability patterns?"
+               - Always code against interfaces/abstractions
+               - Pure functions where possible
+               - DI for all dependencies
+
+            8. **Custom rules**
+               "Any specific rules from your experience that you want enforced?"
+               Capture these verbatim — they are the user's hard-won lessons.
+
+            If the user provided a context document ($ARGUMENTS), absorb it first and use it
+            to skip questions that are already answered. Probe gaps and ambiguities instead.
+
+            **Decision gate:**
+
+            When you understand their philosophy, pain points, and specific preferences:
+            - header: "Ready?"
+            - question: "I understand your coding philosophy. Ready to generate your coding standards?"
+            - options:
+              - "Generate standards" — Create the document
+              - "Keep exploring" — I have more to share
+
+            Loop until "Generate standards" selected.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 4: GENERATE                                                  -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="generate" order="4">
+            **Create directory structure:**
+            ```bash
+            mkdir -p .docs/wiki/system-wide
+            ```
+
+            **Prepare a context brief (300-500 words) that distills:**
+            - Project type: greenfield or brownfield
+            - Detection results OR user-stated tech choices (languages, paradigm, frameworks, tooling)
+            - User's strictness preference
+            - User's pain points (listed explicitly — these become emphatic rules)
+            - Paradigm preference and which template modules to include
+            - Architecture enforcement preferences
+            - File organization rules (construct per file, max length)
+            - Error handling philosophy
+            - Testability requirements
+            - Custom rules (verbatim from user)
+            - Constants location, DI config location (from detection or "TBD" for greenfield)
+            - If updating existing standards: what to preserve vs. change
+
+            **Spawn the ace-code-wiki-mapper agent to write the document:**
+
+            ```
+            Task(
+                prompt="You are writing a prescriptive coding standards document for the project wiki.
+
+                **Context brief from detection + interview:**
+                {paste the context brief here}
+
+                **Instructions:**
+                1. Read the coding standards template:
+                   ~/.claude/agile-context-engineering/templates/wiki/coding-standards.xml
+                2. Assemble the document following the template's assembly guidelines:
+                   - ALWAYS include universal-standards (adapt placeholders to the project's language)
+                   - Include paradigm modules based on context brief (OOP, functional, systems, or multiple)
+                   - Generate language-conventions section from detection results or user-stated choices
+                   - Include project-specific-rules from user's pain points and custom rules
+                   - For greenfield: use [TBD] markers for project-specific paths (constants dir, DI config)
+                     that will be filled once the codebase exists
+                3. If brownfield: explore the codebase to cross-reference actual file paths for
+                   constants directories, DI configuration, shared utilities, etc.
+                4. Tone: DIRECT and EMPHATIC. Bold for emphasis, caps for critical words.
+                   This is a mandate document, not suggestions.
+                5. Target length: 150-350 lines. Comprehensive but not bloated.
+                6. Write the file to `.docs/wiki/system-wide/coding-standards.md`
+
+                **Return format — ONLY this, nothing else:**
+                DONE
+                - Paradigm modules included: [list]
+                - Total sections: [N]
+                - Line count: [N]
+                - Top 3 emphatic rules: [list the most critical rules]",
+                subagent_type="ace-code-wiki-mapper",
+                model="{MAPPER_MODEL}",
+                description="Write coding standards document"
+            )
+            ```
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 5: REVIEW AND APPROVE                                        -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="review" order="5">
+            Show the agent's returned summary to the user. Then:
+
+            - header: "Standards"
+            - question: "Coding standards written to `.docs/wiki/system-wide/coding-standards.md`. Does this look right? Review the full file in your editor for details."
+            - options:
+              - "Approve" — Looks good, commit it
+              - "Adjust" — I want to change some things
+              - "Redo interview" — Let's go back and discuss more
+
+            **If "Adjust":**
+            - Ask what they want to change
+            - Spawn the ace-code-wiki-mapper agent to adjust:
+              ```
+              Task(
+                  prompt="Read `.docs/wiki/system-wide/coding-standards.md` and make these changes:
+                  {user's requested changes}.
+                  If changes reference codebase paths or patterns, explore the codebase to verify.
+                  Use the Edit tool to modify in place. Return only a confirmation of what changed.",
+                  subagent_type="ace-code-wiki-mapper",
+                  model="{MAPPER_MODEL}",
+                  description="Adjust coding standards"
+              )
+              ```
+            - Present for review again. Loop until approved.
+
+            **If "Redo interview":**
+            - Return to step 3 (interview), preserve detection results
+            - Hold previous answers as context
+
+            **If "Approve":**
+            Continue to commit step.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 6: COMMIT                                                    -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="commit" order="6">
+            Commit the coding standards:
+
+            ```bash
+            git add .docs/wiki/system-wide/coding-standards.md
+            git commit -m "docs: initialize coding standards"
+            ```
+
+            Display completion:
+
+            ```
+            ╔══════════════════════════════════════════════════╗
+            ║  ACE > Coding Standards Created                  ║
+            ╚══════════════════════════════════════════════════╝
+
+              +  .docs/wiki/system-wide/coding-standards.md committed.
+
+              i  These standards will be used as context by ACE commands
+                 when planning and executing stories.
+
+              Next > /ace:map-system
+                     Map your codebase structure and architecture.
+            ```
+        </step>
+
+    </process>
+
+    <success_criteria>
+        - Init function executed (brownfield/greenfield detected, existing standards checked)
+        - Brownfield: project technical profile detected via Explore agent
+        - Greenfield: language, paradigm, frameworks gathered from user interview
+        - User interviewed about coding philosophy and pain points
+        - coding-standards.md written with appropriate paradigm modules
+        - Document is prescriptive and emphatic, not descriptive
+        - User reviewed and approved the document
+        - Document committed to .docs/wiki/system-wide/
+    </success_criteria>
+
+</workflow>

@@ -1,0 +1,639 @@
+<workflow>
+
+    <purpose>
+        Orchestrate system-wide wiki mapping: detect environment, determine which documents need
+        creation or updates, spawn ace-wiki-mapper agents to produce them, and optionally add
+        CLAUDE.md instructions to keep the wiki current.
+
+        Produces documents in `.docs/wiki/system-wide/`:
+        - system-structure.md — physical layout, subsystem index, shared directories
+        - testing-framework.md — test runner, patterns, conventions
+        - system-architecture.md — L1/L2 views, core flows, tech stack
+
+        Brownfield projects get documents filled from codebase analysis.
+        Greenfield projects get system-architecture.md via deep questioning (structure and testing
+        are scaffolded with headings only — filled as code is added).
+    </purpose>
+
+    <mandatory-context>
+        Read all files referenced by the invoking command's execution-context before starting.
+        Also read any document or text passed as parameter ($ARGUMENTS) in the invoking command.
+    </mandatory-context>
+
+    <process>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 1: SETUP                                                     -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="setup" order="1">
+            **MANDATORY FIRST STEP — Execute environment detection before any user interaction:**
+
+            ```bash
+            INIT=$(node ~/.claude/agile-context-engineering/src/ace-tools.js init map-system)
+            ```
+
+            Parse JSON for: `mapper_model`, `commit_docs`, `is_brownfield`, `is_greenfield`,
+            `has_existing_code`, `has_package_file`, `wiki_dir_exists`, `existing_wiki_files`,
+            `has_system_structure`, `has_system_architecture`, `has_testing_framework`,
+            `has_coding_standards`, `has_git`.
+
+            Also resolve the mapper model for spawning agents:
+            ```bash
+            MAPPER_MODEL=$(node ~/.claude/agile-context-engineering/src/ace-tools.js resolve-model ace-code-wiki-mapper --raw)
+            ```
+
+            Display stage banner:
+
+            ```
+            ╔══════════════════════════════════════════════════╗
+            ║  ACE > Map System                                ║
+            ╚══════════════════════════════════════════════════╝
+            ```
+
+            **If `has_git` is false:** Initialize git:
+            ```bash
+            git init
+            ```
+
+            Continue to step 2 (document triage).
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 2: DOCUMENT TRIAGE                                           -->
+        <!-- Determine per-document action: create, update, recreate, or skip  -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="document-triage" order="2">
+
+            Build a **document action plan** — a list of `{ document, action }` entries where
+            action is one of: `create`, `update`, `recreate`, `scaffold`, `skip`.
+
+            Evaluate each document independently:
+
+            <!-- ── system-structure.md ────────────────────────────────────── -->
+
+            **system-structure.md:**
+
+            If `is_greenfield`:
+            - Action: `scaffold` — create with headings and placeholder sections.
+              The document will be filled as subsystems are added.
+
+            If `is_brownfield` AND `has_system_structure` is false:
+            - Action: `create` — analyze codebase and produce full document.
+
+            If `is_brownfield` AND `has_system_structure` is true:
+            - Use AskUserQuestion:
+              - header: "Structure"
+              - question: "System structure document already exists at `.docs/wiki/system-wide/system-structure.md`. What would you like to do?"
+              - options:
+                - "Update" — Refresh the existing document with current codebase state
+                - "Recreate" — Discard and rebuild from scratch
+                - "Skip" — Keep the current document as-is
+            - Map user choice to action: `update`, `recreate`, or `skip`.
+
+            <!-- ── testing-framework.md ───────────────────────────────────── -->
+
+            **testing-framework.md:**
+
+            If `is_greenfield`:
+            - Action: `scaffold` — create with headings and placeholder sections.
+              Filled once a test framework is chosen and tests are written.
+
+            If `is_brownfield` AND `has_testing_framework` is false:
+            - Action: `create` — analyze codebase and produce full document.
+
+            If `is_brownfield` AND `has_testing_framework` is true:
+            - Use AskUserQuestion:
+              - header: "Testing"
+              - question: "Testing framework document already exists at `.docs/wiki/system-wide/testing-framework.md`. What would you like to do?"
+              - options:
+                - "Update" — Refresh the existing document with current codebase state
+                - "Recreate" — Discard and rebuild from scratch
+                - "Skip" — Keep the current document as-is
+            - Map user choice to action: `update`, `recreate`, or `skip`.
+
+            <!-- ── system-architecture.md ─────────────────────────────────── -->
+
+            **system-architecture.md:**
+
+            If `is_greenfield`:
+            - Action: `create_with_interview` — requires deep questioning before writing.
+              Cannot be scaffolded because architecture decisions must be made upfront.
+
+            If `is_brownfield` AND `has_system_architecture` is false:
+            - Action: `create` — analyze codebase and produce full document.
+
+            If `is_brownfield` AND `has_system_architecture` is true:
+            - Use AskUserQuestion:
+              - header: "Architecture"
+              - question: "System architecture document already exists at `.docs/wiki/system-wide/system-architecture.md`. What would you like to do?"
+              - options:
+                - "Update" — Refresh the existing document with current codebase state
+                - "Recreate" — Discard and rebuild from scratch
+                - "Skip" — Keep the current document as-is
+            - Map user choice to action: `update`, `recreate`, or `skip`.
+
+            **IMPORTANT:** Ask all questions that need asking in a SINGLE AskUserQuestion call
+            where possible (up to 4 questions). If multiple documents exist, batch the questions.
+
+            Display the action plan to the user:
+
+            ```
+            ┌──────────────────────────────────────────────────┐
+            │  ACE > Map System > Action Plan                  │
+            └──────────────────────────────────────────────────┘
+
+              Document                  Action
+              ────────────────────────  ──────────
+              system-structure.md       [create/update/recreate/scaffold/skip]
+              testing-framework.md      [create/update/recreate/scaffold/skip]
+              system-architecture.md    [create/update/recreate/scaffold/skip/create_with_interview]
+            ```
+
+            If ALL actions are `skip`, exit workflow with message:
+            ```
+              i  All documents already exist and were skipped. Nothing to do.
+
+              Next > `/clear` first for a fresh context window, then:
+
+                     /ace:map-subsystems
+                     Map individual subsystem internals.
+            ```
+
+            Continue to step 3 (create directory structure).
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 3: CREATE DIRECTORY STRUCTURE                                -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="create-directories" order="3">
+            Create the wiki directory if it doesn't exist:
+
+            ```bash
+            mkdir -p .docs/wiki/system-wide
+            ```
+
+            Continue to step 4.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 4: SYSTEM STRUCTURE                                          -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="system-structure" order="4">
+            Skip this step if system-structure action is `skip`.
+
+            **If action is `scaffold` (greenfield):**
+
+            Create an empty file:
+
+            ```bash
+            touch .docs/wiki/system-wide/system-structure.md
+            ```
+
+            It will be filled by `/ace:map-system` once source code exists.
+
+            **If action is `create` or `recreate`:**
+
+            Spawn ace-wiki-mapper agent:
+
+            ```
+            Task(
+                prompt="Focus: system-structure
+
+                Analyze this codebase and produce the system-wide structure document.
+
+                **Template:** Read ~/.claude/agile-context-engineering/templates/wiki/system-structure.xml
+                **Output:** Write to .docs/wiki/system-wide/system-structure.md
+
+                Follow the template structure. Fill every section with real data from the codebase.
+                Identify all subsystems (microservices, monolith modules, or library packages).
+
+                Return confirmation only — do NOT return document contents.",
+                subagent_type="ace-code-wiki-mapper",
+                model="{MAPPER_MODEL}",
+                description="Map system structure"
+            )
+            ```
+
+            **If action is `update`:**
+
+            Spawn ace-wiki-mapper agent with existing content as context:
+
+            ```
+            Task(
+                prompt="Focus: system-structure
+
+                UPDATE the existing system structure document.
+
+                **Current document:** Read .docs/wiki/system-wide/system-structure.md
+                **Template:** Read ~/.claude/agile-context-engineering/templates/wiki/system-structure.xml
+
+                Compare the current document against the actual codebase state.
+                Update sections that are stale. Add new subsystems or shared directories
+                that were added since the document was written. Remove entries for
+                deleted subsystems or directories.
+
+                Preserve accurate content. Only change what's actually stale.
+
+                Write the updated file to .docs/wiki/system-wide/system-structure.md
+                Return confirmation only — do NOT return document contents.",
+                subagent_type="ace-code-wiki-mapper",
+                model="{MAPPER_MODEL}",
+                description="Update system structure"
+            )
+            ```
+
+            Continue to step 5.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 5: TESTING FRAMEWORK                                         -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="testing-framework" order="5">
+            Skip this step if testing-framework action is `skip`.
+
+            **NOTE:** This step can run IN PARALLEL with step 4 (system-structure) if both
+            need agent work. Use `run_in_background=true` for the agents in steps 4 and 5,
+            then collect results before step 6.
+
+            **If action is `scaffold` (greenfield):**
+
+            Create an empty file:
+
+            ```bash
+            touch .docs/wiki/system-wide/testing-framework.md
+            ```
+
+            It will be filled by `/ace:map-system` once tests exist.
+
+            **If action is `create` or `recreate`:**
+
+            Spawn ace-wiki-mapper agent:
+
+            ```
+            Task(
+                prompt="Focus: testing-framework
+
+                Analyze this codebase and produce the testing framework document.
+
+                **Template:** Read ~/.claude/agile-context-engineering/templates/wiki/testing-framework.xml
+                **Output:** Write to .docs/wiki/system-wide/testing-framework.md
+
+                Check package.json/config files for test runner and scripts.
+                Read 3-5 existing test files for patterns.
+                Look for test utilities, fixtures, factories.
+                If NO tests exist, write a minimal document noting 'No tests found'
+                instead of a document full of placeholders.
+
+                Return confirmation only — do NOT return document contents.",
+                subagent_type="ace-code-wiki-mapper",
+                model="{MAPPER_MODEL}",
+                description="Map testing framework"
+            )
+            ```
+
+            **If action is `update`:**
+
+            Spawn ace-wiki-mapper agent with update instructions:
+
+            ```
+            Task(
+                prompt="Focus: testing-framework
+
+                UPDATE the existing testing framework document.
+
+                **Current document:** Read .docs/wiki/system-wide/testing-framework.md
+                **Template:** Read ~/.claude/agile-context-engineering/templates/wiki/testing-framework.xml
+
+                Compare against current codebase state. Update stale sections only.
+                Check for new test runner config, new test patterns, changed coverage settings.
+
+                Write the updated file to .docs/wiki/system-wide/testing-framework.md
+                Return confirmation only — do NOT return document contents.",
+                subagent_type="ace-code-wiki-mapper",
+                model="{MAPPER_MODEL}",
+                description="Update testing framework"
+            )
+            ```
+
+            Continue to step 6 (wait for parallel agents from steps 4-5 if applicable).
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 5.5: COLLECT PARALLEL RESULTS                                -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="collect-parallel" order="5.5">
+            If steps 4 and 5 spawned background agents, wait for both to complete.
+            Read each agent's output to collect confirmations.
+
+            If any agent failed, note the failure and inform the user.
+            Do NOT re-attempt — let the user decide.
+
+            Continue to step 6.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 6: SYSTEM ARCHITECTURE                                       -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="system-architecture" order="6">
+            Skip this step if system-architecture action is `skip`.
+
+            <!-- ── 6a: BROWNFIELD CREATE / RECREATE ──────────────────────── -->
+
+            **If action is `create` or `recreate` AND `is_brownfield`:**
+
+            Spawn ace-wiki-mapper agent directly (codebase provides all the answers):
+
+            ```
+            Task(
+                prompt="Focus: system-architecture
+
+                Analyze this codebase and produce the system-wide architecture document.
+
+                **Template:** Read ~/.claude/agile-context-engineering/templates/wiki/system-architecture.xml
+                **Output:** Write to .docs/wiki/system-wide/system-architecture.md
+
+                **Also read (if it exists):** .docs/wiki/system-wide/system-structure.md
+                — use the subsystem index from the structure doc to inform the L2 container diagram
+                and subsystem responsibility matrix. Do NOT duplicate content.
+
+                Follow the template structure. Fill every section with real data.
+                Generate C4 L1 and L2 Mermaid diagrams.
+                Trace 1-2 core flows as sequence diagrams.
+                Catalog the tech stack from actual dependency files (versions from lock files).
+
+                Return confirmation only — do NOT return document contents.",
+                subagent_type="ace-code-wiki-mapper",
+                model="{MAPPER_MODEL}",
+                description="Map system architecture"
+            )
+            ```
+
+            <!-- ── 6b: BROWNFIELD UPDATE ─────────────────────────────────── -->
+
+            **If action is `update`:**
+
+            Spawn ace-wiki-mapper agent with update instructions:
+
+            ```
+            Task(
+                prompt="Focus: system-architecture
+
+                UPDATE the existing system architecture document.
+
+                **Current document:** Read .docs/wiki/system-wide/system-architecture.md
+                **Template:** Read ~/.claude/agile-context-engineering/templates/wiki/system-architecture.xml
+                **Also read (if it exists):** .docs/wiki/system-wide/system-structure.md
+
+                Compare against current codebase state. Check:
+                - New subsystems or removed subsystems?
+                - New external integrations?
+                - Tech stack changes (new frameworks, version bumps)?
+                - Core flow shape changes?
+
+                Update only stale sections. Preserve accurate content.
+
+                Write the updated file to .docs/wiki/system-wide/system-architecture.md
+                Return confirmation only — do NOT return document contents.",
+                subagent_type="ace-code-wiki-mapper",
+                model="{MAPPER_MODEL}",
+                description="Update system architecture"
+            )
+            ```
+
+            <!-- ── 6c: GREENFIELD — DEEP QUESTIONING ─────────────────────── -->
+
+            **If action is `create_with_interview` (greenfield):**
+
+            Architecture cannot be inferred from code that doesn't exist yet.
+            Conduct a deep questioning session to gather architecture decisions.
+
+            Follow the questioning guide from `questioning.xml`. You are a thinking partner
+            helping the user articulate their system architecture.
+
+            **Opening:**
+            ```
+            ┌──────────────────────────────────────────────────┐
+            │  ACE > Map System > Architecture Interview        │
+            └──────────────────────────────────────────────────┘
+
+              This is a greenfield project — no codebase to analyze.
+              I need to understand your architecture plans to create
+              the system-architecture document.
+            ```
+
+            **Key areas to explore (adapt based on conversation, don't checklist):**
+
+            1. **System purpose**
+               "In 2-3 sentences, what does this system do and who uses it?"
+
+            2. **Subsystem breakdown**
+               "What are the major components/services/modules?"
+               Use AskUserQuestion:
+               - header: "Topology"
+               - question: "What's your deployment topology?"
+               - options:
+                 - "Monolith" — Single deployable with internal modules
+                 - "Microservices" — Multiple independently deployed services
+                 - "Monorepo packages" — Multiple packages in one repo
+                 - "Hybrid" — Mix of approaches
+
+            3. **External integrations**
+               "What external systems will this integrate with?"
+               (databases, auth providers, third-party APIs, message brokers)
+
+            4. **Communication patterns**
+               If multiple subsystems: "How will they communicate?"
+               - Sync (HTTP/gRPC) vs Async (events/queues) vs Hybrid
+
+            5. **Tech stack**
+               "What technologies are you using?"
+               Use AskUserQuestion:
+               - header: "Backend"
+               - question: "What's your primary backend technology?"
+               - options: (adapt to context, e.g., "Node.js/TypeScript", "C#/.NET", "Python", "Go")
+
+               Follow up for: frontend, database, cache, messaging if applicable.
+
+            6. **Key architectural decisions**
+               "Any architectural patterns you're committed to?"
+               (Clean Architecture, CQRS, Event Sourcing, etc.)
+
+            **Decision gate:**
+            When you understand the architecture:
+            - header: "Ready?"
+            - question: "I have enough to create your architecture document. Ready to generate?"
+            - options:
+              - "Generate" — Create the document
+              - "Keep exploring" — I have more to share
+
+            Loop until "Generate" selected.
+
+            **Then prepare a context brief (300-500 words) that distills:**
+            - System purpose and users
+            - Subsystem breakdown (names, responsibilities)
+            - External integrations (what, direction, protocol)
+            - Communication patterns between subsystems
+            - Tech stack with expected versions
+            - Key architectural decisions
+
+            **Spawn the ace-wiki-mapper agent with the interview context:**
+
+            ```
+            Task(
+                prompt="Focus: system-architecture
+
+                Create the system-wide architecture document for a GREENFIELD project.
+
+                **Architecture brief from user interview:**
+                {paste the context brief here}
+
+                **Template:** Read ~/.claude/agile-context-engineering/templates/wiki/system-architecture.xml
+                **Output:** Write to .docs/wiki/system-wide/system-architecture.md
+
+                **Also read (if it exists):** .docs/wiki/system-wide/system-structure.md
+
+                Follow the template structure. Generate Mermaid C4 diagrams based on the
+                interview data. For greenfield, subsystem boxes in L2 may be planned but
+                not yet implemented — that's fine, document the intended architecture.
+
+                Return confirmation only — do NOT return document contents.",
+                subagent_type="ace-code-wiki-mapper",
+                model="{MAPPER_MODEL}",
+                description="Write system architecture (greenfield)"
+            )
+            ```
+
+            Continue to step 7.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 7: CLAUDE.MD INSTRUCTIONS                                    -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="claude-md-instructions" order="7">
+            **Add wiki maintenance instructions to CLAUDE.md** so that future code changes
+            trigger wiki updates.
+
+            Check if `CLAUDE.md` exists at project root. If not, create it.
+            If it exists, append the wiki section only if it's not already present.
+
+            Search for "Wiki Maintenance" in CLAUDE.md. If found, skip this step.
+
+            **Content to add:**
+
+            ```markdown
+
+            ## Wiki Maintenance
+
+            When adding, removing, or renaming files or directories:
+            - Update `.docs/wiki/system-wide/system-structure.md` if the change affects subsystem boundaries, shared directories, or root config files.
+            - Update `.docs/wiki/subsystems/[subsystem-name]/structure.md` for any subsystem where files changed.
+
+            When adding a new subsystem, external integration, or changing communication patterns:
+            - Update `.docs/wiki/system-wide/system-architecture.md`.
+
+            When changing test framework, runner, mocking approach, or coverage config:
+            - Update `.docs/wiki/system-wide/testing-framework.md`.
+            ```
+
+            Continue to step 8.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 8: VERIFY AND COMMIT                                         -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="verify-and-commit" order="8">
+            **Verify all expected documents exist and are non-empty:**
+
+            For each document where the action was NOT `skip`:
+            - Check file exists
+            - Check file has content (>5 lines for scaffold, >20 lines for create/update/recreate)
+
+            If any document is missing or empty, warn the user.
+
+            **Security scan** before commit:
+
+            ```bash
+            grep -rE "(sk-[a-zA-Z0-9]{20,}|sk_live_|sk_test_|ghp_[a-zA-Z0-9]{36}|AKIA[A-Z0-9]{16}|-----BEGIN.*PRIVATE KEY)" .docs/wiki/system-wide/*.md 2>/dev/null &amp;&amp; echo "SECRETS_FOUND" || echo "CLEAN"
+            ```
+
+            If SECRETS_FOUND: pause and alert user before committing.
+
+            **Commit** (if `commit_docs` is true):
+
+            ```bash
+            git add .docs/wiki/system-wide/
+            ```
+
+            If CLAUDE.md was created or updated:
+            ```bash
+            git add CLAUDE.md
+            ```
+
+            ```bash
+            git commit -m "docs: map system-wide wiki documents"
+            ```
+
+            Continue to step 9.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 9: COMPLETION                                                -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="completion" order="9">
+            Display completion banner and next steps.
+
+            ```
+            ╔══════════════════════════════════════════════════╗
+            ║  ACE > System Mapped                             ║
+            ╚══════════════════════════════════════════════════╝
+
+              Documents:
+              ──────────
+              [For each document, show action taken and line count]
+              +  system-structure.md      ([N] lines) — [created/updated/recreated/scaffolded]
+              +  testing-framework.md     ([N] lines) — [created/updated/recreated/scaffolded]
+              +  system-architecture.md   ([N] lines) — [created/updated/recreated/scaffolded]
+              -  [document]               skipped
+
+              i  Wiki maintenance rules added to CLAUDE.md.
+
+              Next > `/clear` first for a fresh context window, then:
+
+                     /ace:map-subsystems
+                     Map individual subsystem internals.
+
+              Also available (`/clear` first):
+              - /ace:init-coding-standards — Define coding standards
+              - /ace:map-system — Re-run this command to refresh
+              - Review files in .docs/wiki/system-wide/
+            ```
+
+            End workflow.
+        </step>
+
+    </process>
+
+    <success_criteria>
+        - Init function executed (brownfield/greenfield detected, document existence checked)
+        - Each document triaged independently (create/update/recreate/scaffold/skip)
+        - Greenfield: structure and testing scaffolded, architecture created via interview
+        - Brownfield: all documents created/updated by ace-wiki-mapper agents
+        - Agents spawned in parallel where possible (structure + testing)
+        - CLAUDE.md updated with wiki maintenance instructions
+        - All created documents verified for content (non-empty, non-placeholder for brownfield)
+        - Security scan passed (no secrets in generated docs)
+        - Documents committed to .docs/wiki/system-wide/
+        - User sees clear completion summary and next steps
+    </success_criteria>
+
+</workflow>

@@ -1,0 +1,235 @@
+<subsystem-structure>
+    <purpose>
+        Template for `.docs/wiki/subsystems/[subsystem-name]/structure.md` — the physical file
+        organization within a single subsystem. Answers "I'm working in this subsystem, where do I put things?"
+
+        Complements system-structure.md (which shows the system-wide layout and subsystem index).
+        One instance per subsystem — each gets its own structure doc.
+
+        A "subsystem" is any cohesive code unit with a clear responsibility boundary —
+        whether deployed as a microservice, a monolith module, or a library package.
+
+        **Monoliths have subsystems too.** A monolith with bounded contexts, feature modules,
+        or domain packages gets one subsystem-structure doc per module — same as microservices.
+        The only difference is deployment topology, not documentation structure.
+    </purpose>
+
+    <template>
+        <subsystem-overview>
+            ## [Subsystem Name]
+
+            **Root:** `[path from project root]`
+            **Responsibility:** [One-line purpose — what this subsystem owns]
+        </subsystem-overview>
+
+        <directory-layout>
+            ## Directory Layout
+
+            [ASCII box-drawing tree of ALL directories and files with purpose - use ├── └── │ characters for tree structure only]
+
+            Complete file tree of this subsystem. List every file and directory — this is the
+            full inventory. An agent reading this should know exactly what exists without running `ls`.
+
+            ```
+            [subsystem-root]/
+            ├── [dir]/              # [Purpose]
+            │   ├── [subdir]/       # [Purpose]
+            │   │   └── [subdir]/   # [Purpose]
+            │   └── [subdir]/       # [Purpose]
+            ├── [dir]/              # [Purpose]
+            │   ├── [subdir]/       # [Purpose]
+            │   └── [file]          # [Purpose]
+            ├── [dir]/              # [Purpose]
+            └── [file]              # [Purpose]
+            ```
+        </directory-layout>
+
+        <directory-purposes>
+            ## Directory Purposes
+
+            **[Directory Name]:**
+            - Purpose: [What lives here]
+            - Contains: [Types of files: e.g., "*.ts source files", "component directories"]
+            - Key files: `[important files in this directory]`
+            - Subdirectories: [If nested, describe structure]
+
+            **[Directory Name]:**
+            - Purpose: [What lives here]
+            - Contains: [Types of files]
+            - Key files: `[important files]`
+            - Subdirectories: [Structure]
+        </directory-purposes>
+
+        <key-file-locations>
+            ## Key File Locations
+
+            **Entry Points:**
+            - `[path]`: [Purpose — e.g., "HTTP server startup", "CLI entry point"]
+
+            **Configuration:**
+            - `[path]`: [Purpose — e.g., "Module config", "DI container setup"]
+
+            **Core Logic:**
+            - `[path]`: [Purpose — e.g., "Domain services", "Business rules"]
+            - `[path]`: [Purpose — e.g., "Data access", "Repository implementations"]
+
+            **API Surface:**
+            - `[path]`: [Purpose — e.g., "Route definitions", "Controller handlers"]
+            - `[path]`: [Purpose — e.g., "DTOs / request-response types"]
+
+            **Testing:**
+            - `[path]`: [Purpose — e.g., "Unit tests"]
+            - `[path]`: [Purpose — e.g., "Test fixtures / factories"]
+        </key-file-locations>
+
+        <naming-conventions>
+            ## Naming Conventions
+
+            Subsystem-specific patterns. If this subsystem follows system-wide conventions
+            without deviation, state: "Follows system-wide conventions — see system-structure.md"
+
+            **Files:**
+            - [Pattern]: [Example — e.g., "kebab-case.ts for modules"]
+            - [Pattern]: [Example — e.g., "PascalCase.tsx for React components"]
+            - [Pattern]: [Example — e.g., "PascalCase.cs for C# classes"]
+            - [Pattern]: [Example — e.g., "*.test.ts co-located with source"]
+
+            **Directories:**
+            - [Pattern]: [Example — e.g., "kebab-case for feature directories"]
+            - [Pattern]: [Example — e.g., "plural names for collections"]
+
+            **Special Patterns:**
+            - [Pattern]: [Example — e.g., "index.ts barrel exports per directory"]
+            - [Pattern]: [Example — e.g., "__tests__/ for test directories"]
+        </naming-conventions>
+
+        <where-to-add-new-code>
+            ## Where to Add New Code
+
+            **New Feature:**
+            - Primary code: `[directory path]`
+            - Tests: `[directory path]`
+            - Config if needed: `[directory path]`
+
+            **New Component / Module:**
+            - Implementation: `[directory path]`
+            - Types: `[directory path]`
+            - Tests: `[directory path]`
+
+            **New Route / Endpoint / Command:**
+            - Definition: `[directory path]`
+            - Handler: `[directory path]`
+            - Tests: `[directory path]`
+
+            **New Domain Entity / Model:**
+            - Entity: `[directory path]`
+            - Repository: `[directory path]`
+            - Tests: `[directory path]`
+
+            **New Service / Use Case:**
+            - Service: `[directory path]`
+            - Use case / application logic: `[directory path]`
+            - Interface / contract: `[directory path]`
+            - Tests: `[directory path]`
+
+            **New DTO / Request-Response Object:**
+            - DTOs: `[directory path]`
+            - Validators: `[directory path]`
+
+            **New Mapper / Transformer:**
+            - Mappers: `[directory path]`
+
+            **New Constants / Enums:**
+            - Constants: `[directory path]`
+            - Enums: `[directory path]`
+            - Magic values / lookup tables: `[directory path]`
+
+            **New Database Script / Migration:**
+            - Migrations: `[directory path]`
+            - Seeds / fixtures: `[directory path]`
+            - Stored procedures: `[directory path]`
+
+            **Shared Kernel / Cross-Cutting:**
+            - Shared kernel: `[directory path]`
+            - Base classes / interfaces: `[directory path]`
+            - Common exceptions: `[directory path]`
+            - Extension methods / helpers: `[directory path]`
+
+            **Utilities:**
+            - Shared helpers: `[directory path]`
+            - Type definitions: `[directory path]`
+        </where-to-add-new-code>
+
+        <special-directories>
+            ## Special Directories
+
+            Directories with special meaning within this subsystem.
+
+            **[Directory]:**
+            - Purpose: [e.g., "Generated code", "Build output", "Migrations"]
+            - Source: [e.g., "Auto-generated by X", "Manually maintained"]
+            - Committed: [Yes/No]
+        </special-directories>
+    </template>
+
+    <guidelines>
+
+        **Subsystem Overview:**
+        - Root path must be relative to project root — agents use this to navigate
+        - Responsibility is one line. If you need more, it goes in the subsystem architecture doc
+
+        **Directory Layout:**
+        - List EVERY file and directory. This is the complete inventory of the subsystem
+        - Every directory gets a `# Purpose` comment
+        - Every file gets a `# Purpose` comment
+        - Use ASCII box-drawing characters: `├── └── │`
+        - Skip node_modules, build output, and other generated dirs (mention in Special Directories)
+
+        **Directory Purposes:**
+        - One entry per directory that has meaningful content
+        - "Key files" should list the 2-3 most important files a developer would look at first
+        - Skip directories that are obvious from the tree (e.g., don't describe `tests/` if it just has tests)
+
+        **Key File Locations:**
+        - Paths must be relative to subsystem root
+        - Group by role, not by directory
+        - Every entry needs a purpose — `user.service.ts` tells you nothing; "Core user CRUD operations" does
+        - Focus on files a developer touches when working on this subsystem
+
+        **Where to Add New Code:**
+        - This is the most actionable section. An agent reads this when creating new files
+        - Be specific — `src/features/[feature-name]/` not "the features directory"
+        - Cover the common cases for this subsystem's domain
+
+        **Naming Conventions:**
+        - Only document if this subsystem has patterns different from system-wide conventions
+        - If it follows system-wide conventions exactly, say so and link to system-structure.md
+        - Show actual examples from the codebase, not theoretical patterns
+
+        **What does NOT belong here:**
+        - Conceptual architecture (that's the subsystem architecture doc)
+        - Technology stack (that's system-architecture.md)
+        - Code conventions like formatting rules (that's a conventions doc)
+        - Other subsystems' structure (each has its own doc)
+
+    </guidelines>
+
+    <evolution>
+
+        Update when the physical layout of this subsystem changes.
+
+        **Update triggers:**
+        - New top-level directory added within subsystem
+        - Directory renamed, moved, or removed
+        - New entry point or configuration file added
+        - Naming convention changed
+        - "Where to add new code" guidance no longer accurate
+
+        **NOT an update trigger:**
+        - New files added within existing directories
+        - New features that follow existing structure
+        - Bug fixes or internal refactoring
+
+    </evolution>
+
+</subsystem-structure>

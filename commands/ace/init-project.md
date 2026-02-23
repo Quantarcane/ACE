@@ -1,62 +1,68 @@
 ---
-name: gsd:init-project
-description: Initialize a new project with deep context gathering and product-vision.xml
-argument-hint: "[--auto]"
+name: ace:init-project
+description: Check project initialization status and suggest next steps
+argument-hint: ""
 allowed-tools:
   - Read
   - Bash
-  - Write
-  - Task
   - AskUserQuestion
 ---
 
 ```xml
 <command>
 
-    <execution-time></execution-time>
-    
+    <execution-time>
+        **This command can run:**
+        - At any time — to check which ACE documents exist and what to do next
+        - At the start of a new project — to see the initialization checklist
+
+        **Use this command when:**
+        - Starting a new project and want to see what needs to be set up
+        - Returning to a project and want to check initialization status
+        - Unsure which ACE command to run next
+    </execution-time>
+
     <input>
-        <flags></flags>
+        <flags>
+        </flags>
+
         <parameters>
-            <required></required>
+            <required>
+            </required>
+
             <optional>
-                - **context** (file|text) Context text or file containing initial specs as a starting point that need to be refined by this command
             </optional>
         </parameters>
     </input>
 
+    <execution-context>
+        <init-project-workflow>@~/.claude/agile-context-engineering/workflows/init-project.xml</init-project-workflow>
+        <ui-formatting>@~/.claude/agile-context-engineering/utils/ui-formatting.md</ui-formatting>
+    </execution-context>
+
     <output>
         <objective>
-            Initialize the project following the flow: questioning → [TODO]research (optional) → [TODO]requirements → [TODO]roadmap.
-            Create the documents outlined in "artifacts" tag.
+            Detect which ACE documents exist (product vision, system architecture, system structure,
+            coding standards, testing framework). Display a status dashboard showing what's done
+            and what's missing. Suggest the next command to run based on gaps.
         </objective>
-        
+
         <artifacts>
-            <product-vision>.docs/product/product-vision.md</product-vision>
-            <config-settings>.ace/settings.json</config-settings>
-            <domain-research>.ace/artifacts/research/ [TODO]</domain-research>
-            <state>.ace/artifacts/state.md [TODO]</state>
+            No artifacts created — this is a read-only status check.
         </artifacts>
     </output>
 
-    <execution-context>
-        <init-project>@~/.claude/agile-context-engineering/workflows/init-project.xml</init-project>
-        <questioning>@~/.claude/agile-context-engineering/utils/questioning.xml</questioning>
-        <ui-formatting>@~/.claude/agile-context-engineering/utils/ui-formatting.md</ui-formatting>
-        <product-vision>@~/.claude/agile-context-engineering/templates/product-vision.xml</product-vision>
-        <product-vision></product-vision>
-    </execution-context>
-    
     <process>
-        Execute the init-project workflow from `@~/.claude/agile-context-engineering/workflows/init-project.xml` end-to-end.
-        Preserve all workflow gates (validation, approvals, commits, routing).
+        Execute the init-project workflow from
+        `@~/.claude/agile-context-engineering/workflows/init-project.xml` end-to-end.
+        This is a lightweight state-check and routing workflow.
     </process>
 
-    <success_criteria>
-    </success_criteria>
-    
     <next-steps>
-        **After this command:** Run `/ace:plan-phase 1` to start execution. [TODO] 
+        **Specialized commands for each document:**
+        - `/ace:upsert-product-vision` — Create or update the product vision
+        - `/ace:map-system` — Map codebase structure, architecture, and testing framework
+        - `/ace:init-coding-standards` — Generate tailored coding standards
     </next-steps>
 
 </command>

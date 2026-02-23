@@ -1,16 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(dir:*)",
-      "Bash(findstr:*)",
-      "WebFetch(domain:github.com)",
-      "WebFetch(domain:raw.githubusercontent.com)",
-      "Bash(git clone:*)",
-      "Bash(powershell:*)",
-      "Bash(git mv:*)",
-      "Bash(node --test:*)",
-      "WebSearch",
-      "Bash(npm test:*)"
+      "Bash(node agile-context-engineering/src/ace-tools.js init product-vision:*)",
+      "Bash(node:*)"
     ]
   }
 }
