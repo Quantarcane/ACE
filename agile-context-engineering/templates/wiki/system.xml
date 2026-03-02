@@ -1,0 +1,350 @@
+<system>
+    <purpose>
+        Template for `.docs/wiki/subsystems/[subsystem-name]/systems/<system-name>.md` — a coherent
+        domain system within a codebase subsystem. Answers "How does this system work RIGHT NOW?"
+
+        Each system doc describes WHAT exists, HOW it works, and WHERE things live for one
+        domain concern. It is the primary document an AI agent reads before implementing a
+        related story.
+
+        A "system" is a logical grouping of components that together deliver one domain capability
+        (e.g., Drawing System, User Management, Order Processing). A codebase subsystem may
+        contain multiple systems.
+
+        Complements:
+        - patterns/ docs (HOW to apply reusable implementation patterns)
+        - cross-cutting/ docs (concerns spanning multiple systems)
+        - guides/ docs (step-by-step recipes combining multiple patterns)
+        - decisions/ docs (WHY significant choices were made)
+    </purpose>
+
+    <template>
+        <overview>
+            # [System Name]
+
+            ## Overview
+            One paragraph: what this system does, why it exists.
+        </overview>
+
+        <file-tree>
+            ## File Tree
+
+            All files belonging to this system with purpose annotations.
+            Update when new files are added by a story.
+
+            ```
+            src/[layer]/[area]/
+            |-- FileA.ts                    # Brief purpose
+            |-- FileB.ts                    # Brief purpose
+            `-- subfolder/
+                |-- FileC.ts                # Brief purpose
+                `-- FileD.ts                # Brief purpose
+            ```
+        </file-tree>
+
+        <system-boundary>
+            ## System Boundary
+
+            Mermaid diagram showing what is INSIDE this system vs what it connects to OUTSIDE.
+            Helps agents understand scope — what to touch, what NOT to touch.
+
+            ```mermaid
+            graph TB
+                subgraph "System Name"
+                    A[Component A]
+                    B[Component B]
+                    C[Component C]
+                end
+                External[External System]
+                B --&gt; External
+            ```
+        </system-boundary>
+
+        <class-and-interface-hierarchy>
+            ## Class and Interface Hierarchy
+
+            Inheritance chains and interface implementations.
+
+            ```mermaid
+            classDiagram
+                class IExample {
+                    &lt;&lt;interface&gt;&gt;
+                }
+                class BaseClass {
+                    &lt;&lt;abstract&gt;&gt;
+                }
+                IExample &lt;|.. BaseClass
+                BaseClass &lt;|-- ConcreteA
+                BaseClass &lt;|-- ConcreteB
+            ```
+
+            Key contracts INLINE (only interfaces/types that define the API shape):
+
+            ```typescript
+            export interface IExample {
+                // Only the contract shape — not implementation code
+            }
+            ```
+        </class-and-interface-hierarchy>
+
+        <entry-points>
+            ## Entry Points
+
+            Where flows begin. Each entry point is a "front door" into this system.
+            - User action: Click on chart -&gt; `file:MouseHandler.onClick`
+            - API endpoint: POST /api/resource -&gt; `file:ResourceController.create`
+            - Event handler: onTimeframeChange -&gt; `file:VisibilityManager.handleTimeframeChange`
+        </entry-points>
+
+        <data-flow-and-sequence-diagrams required="true">
+            ## Data Flow and Sequence Diagrams
+
+            **MANDATORY — every system doc MUST have at least one mermaid sequenceDiagram.**
+            This is the most critical section. Without E2E flow diagrams, an agent cannot
+            understand how data moves through the system.
+
+            How data moves through this system for each key behavior.
+            Use mermaid sequence diagrams showing the complete flow through all layers.
+
+            ### Flow: [Behavior Name]
+
+            ```mermaid
+            sequenceDiagram
+                participant User
+                participant Entry as EntryPoint
+                participant Svc as Service
+                participant Domain as DomainEntity
+                participant Repo as Repository
+                participant DB as DataStore
+
+                User-&gt;&gt;Entry: action
+                Entry-&gt;&gt;Svc: command/query
+                Svc-&gt;&gt;Domain: business logic
+                Domain--&gt;&gt;Svc: result
+                Svc-&gt;&gt;Repo: persist/retrieve
+                Repo-&gt;&gt;DB: SQL/query
+                DB--&gt;&gt;Repo: result
+                Repo--&gt;&gt;Svc: domain object
+                Svc--&gt;&gt;Entry: response
+                Entry--&gt;&gt;User: feedback
+            ```
+        </data-flow-and-sequence-diagrams>
+
+        <components>
+            ## Components
+
+            ### [Component A]
+            - **Location**: `src/infrastructure/primitives/trend-line/TrendLine.ts:TrendLine`
+            - **Purpose**: One line
+            - **Key interface**: `src/domain/interfaces/IDrawing.ts:IDrawing`
+            - **Implements**: ISeriesPrimitive, IDrawing
+
+            ### [Component B]
+            ...
+        </components>
+
+        <key-behaviors>
+            ## Key Behaviors
+
+            ### [Behavior 1]
+            - **Trigger**: What causes this behavior
+            - **Logic**: Where the logic lives (`file:ClassName.method`), brief description
+            - **Effect**: What happens as a result
+
+            ### [Behavior 2]
+            ...
+        </key-behaviors>
+
+        <state-management>
+            ## State Management
+
+            What state this system owns, where it lives, how it flows.
+            - **State location**: Redux store at `file:drawingSlice` / local state in `file:DrawingManager`
+            - **Key state shape**: (inline only if non-obvious)
+            - **State transitions**: What actions/events cause state changes
+        </state-management>
+
+        <error-propagation>
+            ## Error Propagation
+
+            What errors this system throws/handles and how they propagate through layers.
+            - `DrawingValidationError` at `file:Path.validate` -&gt; caught by `file:DrawingFactory` -&gt; user notification
+            - `RepositoryError` at `file:ResourceRepository.save` -&gt; propagates to controller -&gt; HTTP 500
+        </error-propagation>
+
+        <constants-and-enums>
+            ## Constants and Enums
+
+            Where constants and enums for this system are defined. Agent MUST use these, never hardcode.
+            - **Constants**: `src/domain/constants/DrawingConstants.ts:DrawingConstants`
+            - **Enums**: `src/domain/enums/DrawingType.ts:DrawingType`
+            - **Config lookup**: `src/domain/configs/DrawingConfigLookup.ts:DrawingConfigLookup`
+        </constants-and-enums>
+
+        <related-systems>
+            ## Related Systems
+
+            What other systems this one interacts with. Agent should read these docs before modifying.
+            - [Event System](../cross-cutting/event-system.md) — publishes/subscribes to events
+            - [Settings System](./settings-system.md) — configuration modal
+        </related-systems>
+
+        <integration-points>
+            ## Integration Points
+
+            - Connects to: [other system] via [mechanism] at `file:ClassName.method`
+            - Consumed by: [component] at `file:ClassName.method`
+        </integration-points>
+
+        <configuration-and-options>
+            ## Configuration and Options
+
+            Options interface shape and defaults. Agent needs this to implement new variants.
+
+            ```typescript
+            export interface ISystemOptions {
+                // Contract shape — what options this system accepts
+            }
+            ```
+
+            Default values: `file:SystemDefaults.ts:SYSTEM_DEFAULTS`
+        </configuration-and-options>
+
+        <database>
+            ## Database
+
+            Include ONLY if this system has database interactions. Omit entirely for pure frontend systems.
+
+            - **Table**: `table_name` — migration at `file:migrations/20240101_CreateTable.sql`
+            - **Key columns**: id, type, data (jsonb), created_at
+            - **Indexes**: `idx_table_column` on `column`
+        </database>
+
+        <gotchas>
+            ## Gotchas
+
+            Things that commonly go wrong or are easy to forget when working with this system.
+            - Constructor timing: factory methods called from `super()` BEFORE subclass fields initialize
+            - Button IDs have NO hyphens, registry types DO have hyphens
+        </gotchas>
+    </template>
+
+    <guidelines>
+
+        **Documentation Style:**
+        - EXTREMELY SUCCINCT — every word must add value
+        - NO FLUFF — direct, actionable information only
+        - Bullet points over paragraphs
+        - File trees: ASCII only (`|--`, backtick-dash-dash) — never Unicode box-drawing characters
+        - **ALL visual representations of architecture, dependencies, flows, or relationships MUST be ```mermaid fenced code blocks. NO ASCII arrows (->), NO dependency trees, NO PlantUML. Only mermaid. The ONLY ASCII exception is file trees (directory listings).**
+        - Code references as `file-path:ClassName.methodName` or `file-path:functionName` (not line numbers)
+        - Inline snippets ONLY for interfaces, types, and short patterns that define contracts
+        - When referencing a whole class/module: `file-path:ClassName`
+        - When referencing a specific method: `file-path:ClassName.methodName`
+        - When referencing a standalone function: `file-path:functionName`
+        - When referencing a type/interface: `file-path:InterfaceName`
+
+        **Overview:**
+        - ONE paragraph. If you need more, the system boundary is too large — split it.
+        - State what the system DOES, not what it IS.
+
+        **File Tree:**
+        - List ALL files belonging to this system, grouped by directory.
+        - Every file gets a `# Brief purpose` comment.
+        - Use ASCII only: `|--` for branches, backtick-dash-dash for last item, `|` for continuation.
+        - Paths relative to subsystem root.
+
+        **System Boundary:**
+        - The mermaid diagram must clearly separate INSIDE from OUTSIDE.
+        - An agent reading this knows: "If my change touches something inside, I'm in scope.
+          If it touches something outside, I need to read that system's doc too."
+
+        **Class and Interface Hierarchy:**
+        - Use mermaid `classDiagram` for inheritance and interface implementation.
+        - Inline code snippets ONLY for interface/type contracts — never implementation code.
+        - If the hierarchy is trivial (1 class, no inheritance), omit this section.
+
+        **Entry Points:**
+        - Every "front door" into this system. An agent needs to know WHERE flows start.
+        - Use `file:ClassName.methodName` references.
+
+        **Data Flow and Sequence Diagrams (MANDATORY — never skip):**
+        - Every system doc MUST have at least one ```mermaid sequenceDiagram.
+        - One sequence diagram per key behavior (1-5 behaviors typically).
+        - Show COMPLETE E2E flow through all layers — entry to data store and back.
+        - Participants = components, not files. Keep it at the right abstraction level.
+        - If you cannot trace the flow, read more source files until you can. Do NOT skip.
+
+        **Components:**
+        - One subsection per major component. Location + Purpose + Key interface.
+        - Skip trivial components (DTOs, simple value objects) unless they define important contracts.
+
+        **Key Behaviors:**
+        - Trigger -&gt; Logic -&gt; Effect format. Concise.
+        - Reference code locations with `file:ClassName.method`.
+
+        **State Management:**
+        - Where state lives (Redux, local, database) and what causes transitions.
+        - Omit if the system is stateless or state is trivial.
+
+        **Error Propagation:**
+        - How errors flow through layers. What gets caught where.
+        - Omit if error handling follows a system-wide pattern documented in cross-cutting.
+
+        **Constants and Enums:**
+        - CRITICAL for AI agents — they must NEVER hardcode values.
+        - Always list the exact file paths where constants and enums are defined.
+
+        **Related Systems:**
+        - Cross-reference with markdown links to other docs.
+        - Agent should read these before modifying this system.
+
+        **Section Inclusion:**
+        - Include ALL sections that are relevant to the system.
+        - OMIT sections that genuinely don't apply (e.g., no Database for pure frontend).
+        - **NEVER omit Data Flow and Sequence Diagrams** — this section is always required.
+        - When updating, ADD or expand sections — don't rewrite sections that haven't changed.
+
+        **What does NOT belong here:**
+        - Story numbers, sprint context, or agile artifacts
+        - Planned vs Actual comparisons
+        - Acceptance criteria checklists
+        - Revision history (git handles this)
+        - Duplicated implementation code (reference it, don't copy it)
+        - Line numbers in references (they go stale)
+        - Testing docs, coverage metrics, test code
+        - Performance benchmarks
+        - Debugging utilities
+        - ASCII arrows or dependency trees (use mermaid; exception: file trees use ASCII)
+
+    </guidelines>
+
+    <evolution>
+
+        This is a LIVING document — updated after each story that touches this system.
+
+        **Update triggers:**
+        - New component added to this system
+        - New behavior or entry point introduced
+        - Existing behavior changed significantly
+        - New integration point or dependency added
+        - Class hierarchy changed (new subclass, interface change)
+        - State management approach changed
+        - New constants or enums added
+        - File tree changed (new files, removed files, moved files)
+
+        **NOT an update trigger:**
+        - Bug fixes that don't change system behavior
+        - Internal refactoring within existing components
+        - New test files
+        - Style/formatting changes
+
+        **Update rules:**
+        - ADD new sections or expand existing ones — don't rewrite unchanged sections
+        - UPDATE file tree to reflect current state
+        - REMOVE references to deleted files or components
+        - The document must always reflect the CURRENT state, not history
+
+    </evolution>
+
+</system>

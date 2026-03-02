@@ -40,7 +40,7 @@
 
             Also resolve the mapper model for spawning agents:
             ```bash
-            MAPPER_MODEL=$(node ~/.claude/agile-context-engineering/src/ace-tools.js resolve-model ace-code-wiki-mapper --raw)
+            MAPPER_MODEL=$(node ~/.claude/agile-context-engineering/src/ace-tools.js resolve-model ace-wiki-mapper --raw)
             ```
 
             Display stage banner:
@@ -212,7 +212,7 @@
                 Identify all subsystems (microservices, monolith modules, or library packages).
 
                 Return confirmation only — do NOT return document contents.",
-                subagent_type="ace-code-wiki-mapper",
+                subagent_type="ace-wiki-mapper",
                 model="{MAPPER_MODEL}",
                 description="Map system structure"
             )
@@ -240,7 +240,7 @@
 
                 Write the updated file to .docs/wiki/system-wide/system-structure.md
                 Return confirmation only — do NOT return document contents.",
-                subagent_type="ace-code-wiki-mapper",
+                subagent_type="ace-wiki-mapper",
                 model="{MAPPER_MODEL}",
                 description="Update system structure"
             )
@@ -290,7 +290,7 @@
                 instead of a document full of placeholders.
 
                 Return confirmation only — do NOT return document contents.",
-                subagent_type="ace-code-wiki-mapper",
+                subagent_type="ace-wiki-mapper",
                 model="{MAPPER_MODEL}",
                 description="Map testing framework"
             )
@@ -314,7 +314,7 @@
 
                 Write the updated file to .docs/wiki/system-wide/testing-framework.md
                 Return confirmation only — do NOT return document contents.",
-                subagent_type="ace-code-wiki-mapper",
+                subagent_type="ace-wiki-mapper",
                 model="{MAPPER_MODEL}",
                 description="Update testing framework"
             )
@@ -369,7 +369,7 @@
                 Catalog the tech stack from actual dependency files (versions from lock files).
 
                 Return confirmation only — do NOT return document contents.",
-                subagent_type="ace-code-wiki-mapper",
+                subagent_type="ace-wiki-mapper",
                 model="{MAPPER_MODEL}",
                 description="Map system architecture"
             )
@@ -401,7 +401,7 @@
 
                 Write the updated file to .docs/wiki/system-wide/system-architecture.md
                 Return confirmation only — do NOT return document contents.",
-                subagent_type="ace-code-wiki-mapper",
+                subagent_type="ace-wiki-mapper",
                 model="{MAPPER_MODEL}",
                 description="Update system architecture"
             )
@@ -504,7 +504,7 @@
                 not yet implemented — that's fine, document the intended architecture.
 
                 Return confirmation only — do NOT return document contents.",
-                subagent_type="ace-code-wiki-mapper",
+                subagent_type="ace-wiki-mapper",
                 model="{MAPPER_MODEL}",
                 description="Write system architecture (greenfield)"
             )
@@ -559,11 +559,19 @@
 
             If any document is missing or empty, warn the user.
 
-            **Security scan** before commit:
+            **Security scan** before commit — use the Grep tool (NOT bash grep):
 
-            ```bash
-            grep -rE "(sk-[a-zA-Z0-9]{20,}|sk_live_|sk_test_|ghp_[a-zA-Z0-9]{36}|AKIA[A-Z0-9]{16}|-----BEGIN.*PRIVATE KEY)" .docs/wiki/system-wide/*.md 2>/dev/null &amp;&amp; echo "SECRETS_FOUND" || echo "CLEAN"
             ```
+            Grep(
+                pattern="(sk-[a-zA-Z0-9]{20,}|sk_live_|sk_test_|ghp_[a-zA-Z0-9]{36}|AKIA[A-Z0-9]{16}|-----BEGIN.*PRIVATE KEY)",
+                path=".docs/wiki/system-wide/",
+                glob="*.md",
+                output_mode="content"
+            )
+            ```
+
+            If matches found: SECRETS_FOUND — pause and alert user.
+            If no matches: CLEAN.
 
             If SECRETS_FOUND: pause and alert user before committing.
 

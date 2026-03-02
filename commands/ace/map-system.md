@@ -16,16 +16,17 @@ allowed-tools:
 <command>
 
     <execution-time>
-        **This command can run:**
-        - Before /ace:init-project (brownfield codebases) — understand existing code first
-        - After /ace:init-project (greenfield codebases) — document architecture decisions
-        - Anytime to refresh system-wide wiki documents
-
-        **Use this command when:**
-        - Onboarding to an existing codebase (brownfield — analyzes code automatically)
-        - Starting a new project and need to document architecture decisions (greenfield — interviews you)
-        - System-wide documents are stale or missing
-        - After major refactoring that changed subsystem boundaries or tech stack
+        <runs-after>
+            <trigger>Before /ace:init-project (brownfield codebases) — understand existing code first</trigger>
+            <trigger>After /ace:init-project (greenfield codebases) — document architecture decisions</trigger>
+            <trigger>Anytime to refresh system-wide wiki documents</trigger>
+        </runs-after>
+        <use-when>
+            <condition>Onboarding to an existing codebase (brownfield — analyzes code automatically)</condition>
+            <condition>Starting a new project and need to document architecture decisions (greenfield — interviews you)</condition>
+            <condition>System-wide documents are stale or missing</condition>
+            <condition>After major refactoring that changed subsystem boundaries or tech stack</condition>
+        </use-when>
     </execution-time>
 
     <input>
@@ -37,8 +38,10 @@ allowed-tools:
             </required>
 
             <optional>
-                - **references** (file|text) — Existing architecture docs, ADRs, or design notes
-                  to consider alongside the codebase analysis. Absorbed before analysis begins.
+                <param name="references" type="file | text">
+                    Existing architecture docs, ADRs, or design notes
+                    to consider alongside the codebase analysis. Absorbed before analysis begins.
+                </param>
             </optional>
         </parameters>
     </input>

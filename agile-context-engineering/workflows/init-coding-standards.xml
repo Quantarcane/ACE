@@ -33,7 +33,7 @@
 
             Also resolve the mapper model for spawning the wiki-mapper agent:
             ```bash
-            MAPPER_MODEL=$(node ~/.claude/agile-context-engineering/src/ace-tools.js resolve-model ace-code-wiki-mapper --raw)
+            MAPPER_MODEL=$(node ~/.claude/agile-context-engineering/src/ace-tools.js resolve-model ace-wiki-mapper --raw)
             ```
 
             Display stage banner:
@@ -264,7 +264,7 @@
             - Constants location, DI config location (from detection or "TBD" for greenfield)
             - If updating existing standards: what to preserve vs. change
 
-            **Spawn the ace-code-wiki-mapper agent to write the document:**
+            **Spawn the ace-wiki-mapper agent to write the document:**
 
             ```
             Task(
@@ -296,7 +296,7 @@
                 - Total sections: [N]
                 - Line count: [N]
                 - Top 3 emphatic rules: [list the most critical rules]",
-                subagent_type="ace-code-wiki-mapper",
+                subagent_type="ace-wiki-mapper",
                 model="{MAPPER_MODEL}",
                 description="Write coding standards document"
             )
@@ -319,14 +319,14 @@
 
             **If "Adjust":**
             - Ask what they want to change
-            - Spawn the ace-code-wiki-mapper agent to adjust:
+            - Spawn the ace-wiki-mapper agent to adjust:
               ```
               Task(
                   prompt="Read `.docs/wiki/system-wide/coding-standards.md` and make these changes:
                   {user's requested changes}.
                   If changes reference codebase paths or patterns, explore the codebase to verify.
                   Use the Edit tool to modify in place. Return only a confirmation of what changed.",
-                  subagent_type="ace-code-wiki-mapper",
+                  subagent_type="ace-wiki-mapper",
                   model="{MAPPER_MODEL}",
                   description="Adjust coding standards"
               )

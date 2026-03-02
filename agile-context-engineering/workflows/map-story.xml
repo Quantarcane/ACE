@@ -1,0 +1,693 @@
+<workflow>
+
+    <purpose>
+        Orchestrate living knowledge documentation: analyze what was built (story mode) or what
+        exists (file mode), then create or update topic-scoped documents in
+        `.docs/wiki/subsystems/[subsystem-name]/`.
+
+        Produces documents across five categories:
+        - systems/       — WHAT exists (domain subsystems and their current state)
+        - patterns/      — HOW things work (reusable implementation patterns)
+        - cross-cutting/ — concerns spanning multiple systems
+        - guides/        — step-by-step recipes for common implementation tasks
+        - decisions/     — WHY significant choices were made (ADRs)
+
+        Two input modes that converge into ONE execution flow:
+        - **Story mode** (user-invoked): Analyzes git changes after story implementation,
+          detects affected subsystem(s), spawns one agent per subsystem.
+        - **File mode** (invoked by map-subsystem step 8.7): Receives a file list for one
+          module in one subsystem, spawns one agent for that subsystem.
+
+        Both modes produce the same output: `{ subsystem: files }` map fed to per-subsystem
+        agents. The agents are identical regardless of mode — they read all source files,
+        read ALL existing wiki docs, and make thorough create-vs-update decisions.
+    </purpose>
+
+    <mandatory-context>
+        The orchestrator reads ONLY this workflow — it stays lightweight.
+        Each sub-agent reads the five document templates itself before writing.
+        Also read any parameters passed as $ARGUMENTS in the invoking command.
+    </mandatory-context>
+
+    <process>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 1: SETUP AND MODE DETECTION                                  -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="setup" order="1">
+
+            <substep order="1.1" name="detect-mode">
+                Parse $ARGUMENTS to determine execution mode:
+
+                <mode-rules>
+                    <rule condition="files parameter provided" result="file mode" />
+                    <rule condition="story-context parameter provided" result="story mode" />
+                    <rule condition="neither parameter provided" result="story mode (analyze staged + unstaged changes)" />
+                </mode-rules>
+            </substep>
+
+            <substep order="1.2" name="parse-parameters">
+                <parameters mode="story">
+                    <param name="story-context" required="false" type="path">Path to story artifacts folder</param>
+                    <param name="commits" required="false" type="string">Number of recent commits OR comma-separated SHAs</param>
+                </parameters>
+
+                <parameters mode="file">
+                    <param name="files" required="true" type="csv">Comma-separated source file paths</param>
+                    <param name="module-name" required="true" type="string">Human-readable module name</param>
+                    <param name="subsystem-name" required="true" type="string">Subsystem this module belongs to</param>
+                    <param name="existing-docs" required="false" type="csv">Comma-separated file paths and/or directory paths to pre-existing documentation</param>
+                    <param name="existing-docs-inventory" required="false" type="path">Path to a pre-built inventory file (existing-docs-inventory.md) that indexes a large doc directory. When provided, the curation agent reads this inventory instead of re-scanning the directory.</param>
+                </parameters>
+            </substep>
+
+            <substep order="1.3" name="display-banner">
+                Display stage banner:
+
+                ```
+                ┌──────────────────────────────────────────────────┐
+                │  ACE > Map Story > [story mode | file mode]       │
+                └──────────────────────────────────────────────────┘
+                ```
+            </substep>
+
+            Continue to step 2.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 2: BUILD SUBSYSTEM WORK MAP                                  -->
+        <!--                                                                    -->
+        <!-- This is the ONLY step that differs by mode.                        -->
+        <!-- Both modes produce the same output: a subsystem_work map.          -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="build-work-map" order="2">
+
+            <output-schema>
+                ```
+                subsystem_work = {
+                    "[subsystem-name]": {
+                        "files": [list of source file paths],
+                        "file_statuses": { "path": "A|M|D" },   // story mode only
+                        "story_summary": "...",                   // story mode only
+                        "module_name": "...",                     // file mode only
+                        "existing_docs": [...]                    // file mode only, if provided
+                    }
+                }
+                ```
+            </output-schema>
+
+            <!-- ── Story Mode ─────────────────────────────────────────────── -->
+
+            <mode name="story">
+
+                <substep order="2a" name="collect-changes">
+                    Collect changed file names and statuses.
+
+                    Determine the diff range:
+
+                    <variant condition="commits is a number N">
+                        ```bash
+                        git log --name-status -n [N]
+                        git diff --name-status HEAD~[N]..HEAD
+                        ```
+                    </variant>
+
+                    <variant condition="commits is comma-separated SHAs">
+                        ```bash
+                        git log --name-status [first-sha]^..[last-sha]
+                        git diff --name-status [first-sha]^..[last-sha]
+                        ```
+                    </variant>
+
+                    <variant condition="commits not provided">
+                        ```bash
+                        git diff --name-status
+                        git diff --name-status --cached
+                        ```
+                    </variant>
+
+                    Collect every changed file with its status (A = added, M = modified, D = deleted).
+                </substep>
+
+                <substep order="2b" name="group-by-subsystem">
+                    Map each changed file path to its subsystem:
+
+                    <mapping-rules>
+                        <rule path="src/Qarc/Web/qarc-charts-v2/" subsystem="qarc-charts-v2" />
+                        <rule path="src/Qarc/Web/qarc-workspace/" subsystem="qarc-workspace" />
+                        <rule path="src/Qarc/Web/qarc-web/" subsystem="qarc-web" />
+                        <rule path="src/Qarc/Engine/" subsystem="engine" />
+                        <rule path="src/Qarc/DataIngestion/" subsystem="data-ingestion" />
+                        <rule path="src/Qarc/DataStreaming/" subsystem="data-streaming" />
+                        <rule path="src/Qarc/ChartManagement/" subsystem="chart-management" />
+                        <rule path="src/Qarc/Gateway/" subsystem="gateway" />
+                        <rule path="src/Qarc/[ServiceName]/" subsystem="[service-name] (kebab-case)" />
+                        <rule path="outside src/Qarc/" subsystem="skip" />
+                    </mapping-rules>
+
+                    Build one entry per subsystem in `subsystem_work`.
+                </substep>
+
+                <substep order="2c" name="read-story-context">
+                    Read story context (if provided) and produce a brief summary.
+
+                    <variant condition="story-context parameter was provided">
+                        <task-list>
+                            <task>Read all markdown files in the story artifacts folder</task>
+                            <task>Extract a summary (10-15 lines max): what the story intended, key acceptance
+                                criteria, significant decisions mentioned</task>
+                            <task>Attach the same summary to every subsystem entry (shared intent context)</task>
+                        </task-list>
+                        NOTE: The implementation may deviate from the plan — agents document
+                        what WAS built, not what was planned.
+                    </variant>
+
+                    <variant condition="no story-context">
+                        Set story_summary = "No story artifacts. Document from code changes."
+                    </variant>
+
+                    Display to user:
+                    ```
+                    Affected subsystems:
+                      - [subsystem]  ([N] files changed)
+                      - [subsystem]  ([M] files changed)
+                    ```
+                </substep>
+
+            </mode>
+
+            <!-- ── File Mode ──────────────────────────────────────────────── -->
+
+            <mode name="file">
+
+                <substep order="2a" name="resolve-existing-docs">
+                    Resolve existing-docs entries.
+
+                    Split the `existing-docs` parameter into individual entries. Classify each entry:
+
+                    <classification>
+                        <type name="file-path">Keep as-is (already curated by the caller)</type>
+                        <type name="directory-path">Needs curation (may contain hundreds of irrelevant files)</type>
+                    </classification>
+
+                    <variant condition="ANY entry is a directory">
+                        Spawn a curation agent to select only relevant docs.
+                        If `existing-docs-inventory` was provided (not `none`), pass it to the agent
+                        so it reads the pre-built inventory instead of re-scanning the directory.
+
+                        ```
+                        Task(
+                            prompt="You are a documentation curation agent. Your job is to select ONLY the
+                            documentation files relevant to a specific code module from a large doc directory.
+
+                            **Module name:** [module-name param]
+                            **Source files in this module:** [files param]
+                            **Documentation directory:** [directory path]
+                            **Pre-built inventory (if available):** [existing-docs-inventory path, or 'none']
+
+                            Process:
+
+                            IF a pre-built inventory file was provided (not 'none'):
+                            1. Read the inventory file — it contains file paths, titles, and summaries
+                               for every doc in the directory, already indexed
+                            2. Compare each inventory entry against the module's source files and name
+                            3. Select ONLY entries whose subject matter is relevant to this module
+                            4. Return the file paths from the selected inventory entries
+                            (Do NOT re-scan the directory — the inventory is the source of truth)
+
+                            IF no inventory file is available:
+                            1. Recursively list ALL files in the documentation directory down to every leaf
+                               subdirectory. Use Glob(pattern='**/*', path='[directory path]') to ensure
+                               no nesting level is missed. Do NOT use shallow ls or single-level globs.
+                            2. For each file, read its title and first 10-20 lines to understand its subject
+                            3. Compare against the module's source files and module name
+                            4. Select ONLY files whose subject matter is relevant to this module
+
+                            Relevance criteria (both paths):
+                            - Documents describing the same domain concepts
+                            - Architecture docs covering systems these files participate in
+                            - API docs for interfaces these files implement or consume
+                            - Decision records about choices visible in this code
+                            Be SELECTIVE — fewer relevant docs is better than many tangential ones.
+
+                            Return ONLY a comma-separated list of relevant file paths (absolute or relative).
+                            If no docs are relevant, return 'none'.
+                            Do NOT return explanations — just the file list.",
+                            subagent_type="ace-wiki-mapper",
+                            description="Curate relevant docs for [module-name]"
+                        )
+                        ```
+
+                        Replace the directory entry with the curated file list returned by the agent.
+                        Merge with any file-path entries that were already curated.
+                        The final `existing_docs` is a flat list of relevant file paths only.
+
+                        Display curated docs to user:
+
+                        ```
+                        ┌──────────────────────────────────────────────────┐
+                        │  Curated Existing Docs for [module-name]          │
+                        └──────────────────────────────────────────────────┘
+
+                          Directory scanned: [directory path]
+                          Relevant docs selected ([N] of [total] files):
+
+                            - [file path 1]
+                            - [file path 2]
+                            - ...
+
+                          [If none selected: "No relevant docs found in directory."]
+                        ```
+                    </variant>
+
+                    <variant condition="ALL entries are file paths">
+                        Skip curation — use them directly.
+                    </variant>
+                </substep>
+
+                <substep order="2b" name="build-work-map">
+                    Build the work map:
+
+                    ```
+                    subsystem_work = {
+                        "[subsystem-name param]": {
+                            "files": [split files param into list],
+                            "module_name": "[module-name param]",
+                            "existing_docs": [resolved flat list of curated file paths, or empty]
+                        }
+                    }
+                    ```
+                </substep>
+
+            </mode>
+
+            Continue to step 3.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 3: SPAWN PER-SUBSYSTEM AGENTS                                -->
+        <!--                                                                    -->
+        <!-- From here, story mode and file mode are IDENTICAL.                 -->
+        <!-- One agent per subsystem. Same agent logic. Same thoroughness.      -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="spawn-agents" order="3">
+
+            <substep order="3.1" name="determine-parallelism">
+                <rule condition="1 subsystem">Run agent in foreground.</rule>
+                <rule condition="2+ subsystems">Run ALL agents with `run_in_background=true`.</rule>
+            </substep>
+
+            <substep order="3.2" name="spawn-agent-per-subsystem">
+                For each entry in `subsystem_work`, spawn one ace-wiki-mapper agent.
+
+                Each agent receives a self-contained prompt. The prompt MUST include all the
+                instructions below — the agent has no other source of truth for how to work.
+
+                ```
+                Task(
+                    prompt="You are creating or updating living knowledge documentation for the
+                    [subsystem_name] subsystem.
+
+                    <agent-instructions>
+
+                        <instruction order="0" name="read-templates">
+                            TEMPLATES — Read ALL of these before writing ANY docs:
+
+                            - System docs:        .claude/templates/system.xml
+                            - Pattern docs:       .claude/templates/pattern.xml
+                            - Cross-cutting docs: .claude/templates/system-cross-cutting.xml
+                            - Guide docs:         .claude/templates/guide.xml
+                            - Decision docs:      .claude/templates/decizions.xml
+                        </instruction>
+
+                        <instruction order="0" name="inputs">
+                            YOUR INPUTS:
+
+                            **Subsystem:** [subsystem_name]
+                            **Wiki directory:** .docs/wiki/subsystems/[subsystem_name]/
+
+                            **Source files to analyze:**
+                            [list every file path with its A/M/D status (story mode) or just paths (file mode)]
+
+                            <variant condition="story mode">
+                                **Story context:**
+                                [story_summary from step 2c]
+                            </variant>
+
+                            <variant condition="file mode">
+                                **Module name:** [module_name]
+                                **Pre-existing documentation:** [existing_docs paths, or 'none']
+                            </variant>
+                        </instruction>
+
+                        <instruction order="A" name="read-source-files">
+                            Read EVERY source file listed above (skip deleted files — note them for
+                            removal from existing docs). For each file, understand:
+
+                            <checklist>
+                                <item>Class hierarchies and interface implementations</item>
+                                <item>Function signatures and contracts</item>
+                                <item>State management (Redux slices, local state, database)</item>
+                                <item>Constants, enums, and configuration</item>
+                                <item>Integration points (imports from other systems, event handling)</item>
+                                <item>Error handling patterns</item>
+                                <item>DI registrations, factory/registry entries</item>
+                            </checklist>
+
+                            THE ACTUAL CODE IS THE SOURCE OF TRUTH. Story docs and existing docs
+                            are context for intent — the code is what gets documented.
+
+                            <variant condition="file mode and existing_docs is not 'none'">
+                                Also read the pre-existing documentation files. These contain prior
+                                knowledge about intent, decisions, and history. Use them to understand
+                                WHY things were built a certain way, but the source code always wins
+                                when there is a conflict.
+                            </variant>
+                        </instruction>
+
+                        <instruction order="B" name="read-existing-wiki">
+                            READ ALL EXISTING WIKI DOCS (MANDATORY — NO SHORTCUTS)
+
+                            Before writing ANYTHING, you MUST read ALL existing wiki documents for
+                            this subsystem. Not titles. Not summaries. THE FULL CONTENT of every
+                            single document.
+
+                            <substep order="B.1">
+                                Scan for existing docs — use the Glob tool (NOT bash find):
+                                ```
+                                Glob(pattern='**/*.md', path='.docs/wiki/subsystems/[subsystem_name]')
+                                ```
+                            </substep>
+
+                            <substep order="B.2">
+                                Read EVERY document found — fully:
+                                <checklist>
+                                    <item>systems/*.md — every system document, complete</item>
+                                    <item>patterns/*.md — every pattern document, complete</item>
+                                    <item>cross-cutting/*.md — every cross-cutting document, complete</item>
+                                    <item>guides/*.md — every guide document, complete</item>
+                                    <item>decisions/*.md — every ADR, complete</item>
+                                </checklist>
+                            </substep>
+
+                            <substep order="B.3">
+                                Build a mental map of what is ALREADY documented:
+                                <checklist>
+                                    <item>Which systems already have docs? What sections do they cover?</item>
+                                    <item>Which patterns are already documented? What implementations are listed?</item>
+                                    <item>Which cross-cutting concerns are documented? What registrations are listed?</item>
+                                    <item>Which guides exist? Are the steps still accurate?</item>
+                                    <item>Which decisions are recorded?</item>
+                                </checklist>
+                            </substep>
+
+                            This map is your ANTI-DUPLICATION defense. You cannot avoid creating
+                            duplicate content if you have not read what already exists.
+
+                            If the wiki directory does not exist:
+                            ```bash
+                            mkdir -p .docs/wiki/subsystems/[subsystem_name]/{systems,patterns,cross-cutting,guides,decisions}
+                            ```
+                        </instruction>
+
+                        <instruction order="C" name="analyze-and-categorize">
+                            ANALYZE AND CATEGORIZE
+
+                            <substep order="C.1" name="classify-code">
+                                For each significant component/change in the source files, determine
+                                which doc category it affects:
+
+                                <categorization-rules>
+                                    <rule pattern="Coherent domain system (E2E flow)" target="systems/" />
+                                    <rule pattern="Reusable structural pattern (2+ similar)" target="patterns/" />
+                                    <rule pattern="Shared infrastructure (DI, events, registry)" target="cross-cutting/" />
+                                    <rule pattern="Common repeatable task recipe" target="guides/" />
+                                    <rule pattern="Significant architectural 'why' decision" target="decisions/" />
+                                </categorization-rules>
+                            </substep>
+
+                            <substep order="C.2" name="create-vs-update">
+                                CREATE vs UPDATE — the critical decision.
+
+                                For EACH item you want to document, check your mental map from Step B:
+
+                                <decision-tree>
+                                    <question ask="Does an existing doc ALREADY cover this topic?">
+                                        <answer value="yes">UPDATE that doc. Add/expand sections. Do NOT create a new doc.</answer>
+                                        <answer value="no">CREATE a new doc. But ONLY if this is a genuinely new topic.</answer>
+                                    </question>
+                                    <question ask="Could this content be a new SECTION in an existing system/pattern doc?">
+                                        <answer value="yes">Add the section there. Do NOT create a separate doc.</answer>
+                                    </question>
+                                    <question ask="Is there ANY overlap with existing docs?">
+                                        <answer value="yes">Merge into the existing doc. NEVER create parallel docs about the same concern.</answer>
+                                    </question>
+                                </decision-tree>
+
+                                NEVER create a story-scoped or module-scoped document.
+                                All docs are TOPIC-scoped — about the concern, not about the story or module.
+
+                                When updating: ADD new sections or expand existing ones. Do NOT rewrite
+                                sections that have not changed. UPDATE file trees to reflect current state.
+                                REMOVE references to deleted files or components.
+                            </substep>
+                        </instruction>
+
+                        <instruction order="D" name="write-documentation">
+                            WRITE DOCUMENTATION
+
+                            For each item in your action plan:
+
+                            <substep order="D.1" name="apply-template">
+                                Read the appropriate template XML (from the list above).
+                                <variant condition="CREATE">Follow the template structure, fill all relevant sections,
+                                    omit sections that genuinely don't apply.</variant>
+                                <variant condition="UPDATE">Read the existing doc, add/expand sections, preserve
+                                    unchanged content, match existing style.</variant>
+                            </substep>
+
+                            <substep order="D.2" name="diagram-rules">
+                                DIAGRAM RULE — ALL visual representations of architecture, dependencies, flows,
+                                or relationships MUST use ```mermaid fenced code blocks.
+                                This means: NO ASCII arrows (->), NO tree structures for dependencies, NO PlantUML,
+                                NO custom notation. If you would write `A -> B -> C`, write a mermaid flowchart instead.
+                                The ONLY exception for ASCII is file trees (directory listings).
+                            </substep>
+
+                            <substep order="D.3" name="e2e-flow-rule">
+                                E2E FLOW RULE — Every systems/*.md doc MUST have at least one ```mermaid sequenceDiagram.
+                                This is non-negotiable. Trace the complete E2E flow from entry point through all layers
+                                to data store and back. If you cannot trace it, read more source files until you can.
+                            </substep>
+
+                            <substep order="D.4" name="style-guidelines">
+                                Documentation style (ALL docs):
+                                <checklist>
+                                    <item>EXTREMELY SUCCINCT — every word must add value</item>
+                                    <item>NO FLUFF — direct, actionable information only</item>
+                                    <item>Bullet points over paragraphs</item>
+                                    <item>File trees: ASCII only (|-- and backtick-dash-dash) — NEVER Unicode box-drawing</item>
+                                    <item>Diagrams (sequence, class, boundary): MUST be ```mermaid fenced blocks</item>
+                                    <item>Code references: `file-path:ClassName.methodName` or `file-path:functionName`
+                                        NEVER use line numbers (they go stale with every edit)</item>
+                                    <item>Inline snippets ONLY for interfaces, types, and contracts that define API shape</item>
+                                    <item>When referencing a class/module: `file-path:ClassName`</item>
+                                    <item>When referencing a method: `file-path:ClassName.methodName`</item>
+                                    <item>When referencing a function: `file-path:functionName`</item>
+                                    <item>When referencing a type/interface: `file-path:InterfaceName`</item>
+                                    <item>Cross-reference related docs with markdown links</item>
+                                </checklist>
+                            </substep>
+
+                            <substep order="D.5" name="exclusions">
+                                What NOT to document:
+                                <exclusion-list>
+                                    <exclude>Story numbers, sprint context, or agile artifacts</exclude>
+                                    <exclude>Planned vs Actual comparisons</exclude>
+                                    <exclude>Acceptance criteria checklists</exclude>
+                                    <exclude>Revision history (git handles this)</exclude>
+                                    <exclude>Duplicated implementation code (reference it, don't copy it)</exclude>
+                                    <exclude>Line numbers in references (they go stale)</exclude>
+                                    <exclude>Testing docs, coverage metrics, test code</exclude>
+                                    <exclude>Performance benchmarks</exclude>
+                                    <exclude>Debugging utilities or monitoring code</exclude>
+                                    <exclude>ASCII art for diagrams (ALL diagrams MUST be ```mermaid blocks; exception: file trees use ASCII)</exclude>
+                                </exclusion-list>
+                            </substep>
+                        </instruction>
+
+                        <instruction order="E" name="quality-verification">
+                            QUALITY VERIFICATION
+
+                            After writing all docs, verify each one:
+
+                            <verification-checklist>
+                                <check>File exists and has substantial content (>10 lines for new docs)</check>
+                                <check>Code references use `file:Symbol` format — no line numbers</check>
+                                <check>No document is story-scoped or module-scoped in its title or structure</check>
+                                <check>Related systems/patterns/cross-cutting docs are cross-referenced with links</check>
+                                <check>File trees use ASCII only — no Unicode box-drawing characters</check>
+                                <check>Constants and enums locations are documented (agents must never hardcode)</check>
+                                <check>No content duplicated from another existing doc in this subsystem</check>
+                                <check>Every doc answers ONE clear question about how the system works</check>
+                            </verification-checklist>
+                        </instruction>
+
+                        <instruction order="F" name="report">
+                            YOUR REPORT (return this)
+
+                            Return a structured report:
+
+                            Subsystem: [subsystem_name]
+
+                            Documents created:
+                            - [path] ([line count] lines) — [what this doc covers]
+
+                            Documents updated:
+                            - [path] — [what sections were added/changed]
+
+                            Documents unchanged:
+                            - [path] — [why no change was needed]
+
+                            Issues found (if any):
+                            - [description of any problems encountered]
+                        </instruction>
+
+                    </agent-instructions>
+                    ",
+
+                    subagent_type="ace-wiki-mapper",
+                    description="Document [subsystem_name] subsystem"
+                )
+                ```
+            </substep>
+
+            Continue to step 4.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 4: COLLECT RESULTS                                            -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="collect-results" order="4">
+
+            <substep order="4.1" name="wait-for-agents">
+                If agents were spawned in background, wait for all to complete.
+                Read each agent's report.
+            </substep>
+
+            <substep order="4.2" name="handle-failures">
+                If any agent failed:
+                <task-list>
+                    <task>Note the failure and the subsystem affected</task>
+                    <task>Do NOT re-attempt — inform the user and let them decide</task>
+                </task-list>
+            </substep>
+
+            <substep order="4.3" name="merge-reports">
+                Merge all agent reports into a combined result.
+            </substep>
+
+            Continue to step 5.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 5: SECURITY SCAN AND REPORT                                  -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="report" order="5">
+
+            <substep order="5.1" name="security-scan">
+                Security scan across all affected subsystems — use the Grep tool (NOT bash grep):
+
+                ```
+                Grep(
+                    pattern="(sk-[a-zA-Z0-9]{20,}|sk_live_|sk_test_|ghp_[a-zA-Z0-9]{36}|AKIA[A-Z0-9]{16}|-----BEGIN.*PRIVATE KEY)",
+                    path=".docs/wiki/subsystems/",
+                    output_mode="content"
+                )
+                ```
+
+                <variant condition="matches found">SECRETS_FOUND — pause and alert user.</variant>
+                <variant condition="no matches">CLEAN.</variant>
+            </substep>
+
+            <substep order="5.2" name="display-report">
+
+                <!-- ── Story Mode Report ──────────────────────────────────────── -->
+
+                <mode name="story">
+                    Display the combined report:
+
+                    ```
+                    ┌──────────────────────────────────────────────────┐
+                    │  ACE > Map Story > Complete                       │
+                    └──────────────────────────────────────────────────┘
+
+                    ## Documentation Update Report
+
+                    **Story**: [story name from artifacts, or "Git changes"]
+                    **Affected Subsystems**: [list]
+
+                    [For each subsystem, include the agent's report:]
+
+                    ### [subsystem_name]
+
+                    Documents created:
+                    - [path] ([line count] lines) — [description]
+
+                    Documents updated:
+                    - [path] — [what changed]
+
+                    [If any agent failures:]
+                    ### Failures
+                    - [subsystem]: [error]
+
+                    Next > `/clear` first for a fresh context window, then:
+
+                           /ace:map-story — document another story
+                           /ace:map-subsystem [subsystem] — map or refresh an entire subsystem
+                           Review files in .docs/wiki/subsystems/
+                    ```
+                </mode>
+
+                <!-- ── File Mode Report ───────────────────────────────────────── -->
+
+                <mode name="file">
+                    Return the agent's report directly to the calling workflow
+                    (map-subsystem step 8.7). Do NOT display banners or next steps —
+                    the calling workflow handles presentation.
+                </mode>
+
+            </substep>
+
+            End workflow.
+        </step>
+
+    </process>
+
+    <success_criteria>
+        <criterion>Mode correctly detected from parameters</criterion>
+        <criterion>subsystem_work map built correctly from either mode's inputs</criterion>
+        <criterion>One agent spawned per subsystem (parallel when 2+)</criterion>
+        <criterion>Each agent reads ALL source files for its subsystem (not just names)</criterion>
+        <criterion>Each agent reads ALL existing wiki docs for its subsystem FULLY (not summaries, not titles — complete content)</criterion>
+        <criterion>Each agent checks every existing doc before deciding create vs update</criterion>
+        <criterion>No duplicate documentation created — agent merges into existing docs when topic overlaps</criterion>
+        <criterion>No story-scoped or module-scoped documents created (all topic-scoped)</criterion>
+        <criterion>Each document follows its template structure from the XML templates</criterion>
+        <criterion>Updates ADD to existing docs rather than rewriting unchanged sections</criterion>
+        <criterion>Code references use `file:Symbol` format (not line numbers)</criterion>
+        <criterion>File trees use ASCII only (no Unicode box-drawing)</criterion>
+        <criterion>Diagrams use mermaid (not ASCII art)</criterion>
+        <criterion>Every systems/*.md doc has at least one mermaid sequenceDiagram (E2E flow is mandatory)</criterion>
+        <criterion>Inline code only for interface/type contracts</criterion>
+        <criterion>Related systems cross-referenced with markdown links</criterion>
+        <criterion>Security scan passed (no secrets in generated docs)</criterion>
+        <criterion>Clear structured report from each agent, merged into final report</criterion>
+    </success_criteria>
+
+</workflow>

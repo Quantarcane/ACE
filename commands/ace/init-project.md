@@ -12,14 +12,15 @@ allowed-tools:
 <command>
 
     <execution-time>
-        **This command can run:**
-        - At any time — to check which ACE documents exist and what to do next
-        - At the start of a new project — to see the initialization checklist
-
-        **Use this command when:**
-        - Starting a new project and want to see what needs to be set up
-        - Returning to a project and want to check initialization status
-        - Unsure which ACE command to run next
+        <runs-after>
+            <trigger>At any time — to check which ACE documents exist and what to do next</trigger>
+            <trigger>At the start of a new project — to see the initialization checklist</trigger>
+        </runs-after>
+        <use-when>
+            <condition>Starting a new project and want to see what needs to be set up</condition>
+            <condition>Returning to a project and want to check initialization status</condition>
+            <condition>Unsure which ACE command to run next</condition>
+        </use-when>
     </execution-time>
 
     <input>

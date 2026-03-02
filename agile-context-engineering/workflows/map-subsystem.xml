@@ -1,0 +1,1177 @@
+<workflow>
+
+    <purpose>
+        Orchestrate subsystem wiki mapping: resolve the target subsystem, load system-wide context,
+        determine which documents need creation or updates, spawn ace-wiki-mapper agents to produce
+        them, run module discovery, and generate knowledge documentation via map-story.
+
+        Produces documents in `.docs/wiki/subsystems/[subsystem-name]/`:
+        - structure.md — physical file layout within the subsystem
+        - architecture.md — L3 component view, flows, dependencies, data ownership
+        - systems/*.md — domain system documentation (via map-story)
+        - patterns/*.md — reusable implementation patterns (via map-story)
+        - cross-cutting/*.md — concerns spanning multiple systems (via map-story)
+        - guides/*.md — step-by-step recipes for common tasks (via map-story)
+        - decisions/*.md — architecture decision records (via map-story)
+
+        Also produces `.ace/artifacts/subsystems/[subsystem-name]/module-discovery/module-discovery.md`.
+
+        May also update `.docs/wiki/system-wide/system-structure.md` if this subsystem
+        is not yet listed there, and `.docs/wiki/system-wide/system-architecture.md` if
+        the subsystem is missing from the Subsystem Responsibility Matrix.
+    </purpose>
+
+    <mandatory-context>
+        Read all files referenced by the invoking command's execution-context before starting.
+        Also read any document or text passed as parameter ($ARGUMENTS) in the invoking command.
+    </mandatory-context>
+
+    <process>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 1: SETUP                                                     -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="setup" order="1">
+
+            <substep order="1.1" name="environment-detection">
+                MANDATORY FIRST STEP — Execute environment detection before any user interaction:
+
+                ```bash
+                INIT=$(node ~/.claude/agile-context-engineering/src/ace-tools.js init map-subsystem)
+                ```
+
+                Parse JSON for: `mapper_model`, `commit_docs`, `is_brownfield`, `wiki_dir_exists`, `has_git`.
+            </substep>
+
+            <substep order="1.2" name="resolve-mapper-model">
+                Resolve the mapper model for spawning agents:
+
+                ```bash
+                MAPPER_MODEL=$(node ~/.claude/agile-context-engineering/src/ace-tools.js resolve-model ace-wiki-mapper --raw)
+                ```
+            </substep>
+
+            <substep order="1.3" name="display-banner">
+                Display stage banner:
+
+                ```
+                ╔══════════════════════════════════════════════════╗
+                ║  ACE > Map Subsystem                             ║
+                ╚══════════════════════════════════════════════════╝
+                ```
+            </substep>
+
+            <substep order="1.4" name="resolve-input">
+                <variant condition="subsystem was NOT provided in $ARGUMENTS">
+                    List top-level directories to offer as options, then use AskUserQuestion:
+                    - header: "Subsystem"
+                    - question: "Which subsystem would you like to map? Provide the path (e.g., `src/api`) or its name."
+                    - options: (top 3 candidate paths from the codebase, plus a free-text prompt)
+                </variant>
+            </substep>
+
+            Continue to step 2.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 2: LOAD SYSTEM-WIDE CONTEXT                                 -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="load-context" order="2">
+            Read system-wide documents for context before analyzing the subsystem.
+            These orient the mapper agent and prevent repeating system-level content
+            in the subsystem docs.
+
+            <substep order="2.1" name="read-system-docs">
+                Read (if they exist):
+                <file-list>
+                    <file path=".docs/wiki/system-wide/system-structure.md" />
+                    <file path=".docs/wiki/system-wide/system-architecture.md" />
+                </file-list>
+            </substep>
+
+            <substep order="2.2" name="check-subsystem-index">
+                While reading `system-structure.md`, check whether the target subsystem is already
+                listed in the Subsystem Index. Set `is_new_subsystem = true` if it is NOT found.
+            </substep>
+
+            <substep order="2.3" name="check-responsibility-matrix">
+                While reading `system-architecture.md`, check whether the target subsystem appears
+                in the Subsystem Responsibility Matrix. Set `is_missing_from_matrix = true` if it
+                is NOT found.
+
+                <variant condition="system-architecture.md does not exist">
+                    Set `is_missing_from_matrix = false` and note to the user that
+                    system-architecture.md should be created via `/ace:map-system`.
+                </variant>
+            </substep>
+
+            Continue to step 3.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 3: RESOLVE SUBSYSTEM                                        -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="resolve-subsystem" order="3">
+
+            <substep order="3.1" name="normalize-input">
+                Normalize the subsystem input to:
+                <output-fields>
+                    <field name="subsystem_path">Relative path from project root (e.g., `src/api`)</field>
+                    <field name="subsystem_name">Slug for the wiki directory (e.g., `api`, `user-service`)</field>
+                </output-fields>
+            </substep>
+
+            <substep order="3.2" name="validate-path">
+                Validate that `subsystem_path` exists in the codebase.
+
+                <variant condition="path not found">
+                    Use AskUserQuestion to clarify — list candidate paths matching the input.
+                </variant>
+
+                <variant condition="input is ambiguous (name matches multiple directories)">
+                    Use AskUserQuestion with the candidates as options.
+                </variant>
+            </substep>
+
+            <substep order="3.3" name="set-output-dir">
+                Determine wiki output directory: `.docs/wiki/subsystems/[subsystem_name]/`
+            </substep>
+
+            Continue to step 4.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 4: DOCUMENT TRIAGE                                           -->
+        <!-- Determine per-document action: create, update, recreate, or skip  -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="document-triage" order="4">
+
+            <substep order="4.1" name="check-existing">
+                Check for existing documents in `.docs/wiki/subsystems/[subsystem_name]/`:
+                <flags>
+                    <flag name="has_structure">Does `structure.md` exist?</flag>
+                    <flag name="has_architecture">Does `architecture.md` exist?</flag>
+                </flags>
+            </substep>
+
+            <substep order="4.2" name="triage-structure">
+                Evaluate structure.md:
+
+                <variant condition="has_structure is false">
+                    Action: `create` — analyze subsystem and produce full document.
+                </variant>
+
+                <variant condition="has_structure is true">
+                    Use AskUserQuestion:
+                    - header: "Structure"
+                    - question: "Structure document already exists at `.docs/wiki/subsystems/[subsystem_name]/structure.md`. What would you like to do?"
+                    - options:
+                      - "Update" — Refresh the existing document with current codebase state
+                      - "Recreate" — Discard and rebuild from scratch
+                      - "Skip" — Keep the current document as-is
+                    Map user choice to action: `update`, `recreate`, or `skip`.
+                </variant>
+            </substep>
+
+            <substep order="4.3" name="triage-architecture">
+                Evaluate architecture.md:
+
+                <variant condition="has_architecture is false">
+                    Action: `create` — analyze subsystem and produce full document.
+                </variant>
+
+                <variant condition="has_architecture is true">
+                    Use AskUserQuestion:
+                    - header: "Architecture"
+                    - question: "Architecture document already exists at `.docs/wiki/subsystems/[subsystem_name]/architecture.md`. What would you like to do?"
+                    - options:
+                      - "Update" — Refresh the existing document with current codebase state
+                      - "Recreate" — Discard and rebuild from scratch
+                      - "Skip" — Keep the current document as-is
+                    Map user choice to action: `update`, `recreate`, or `skip`.
+                </variant>
+            </substep>
+
+            <substep order="4.4" name="batch-questions">
+                IMPORTANT: Ask all questions that need asking in a SINGLE AskUserQuestion call
+                where possible (up to 4 questions). If both documents exist, batch the questions.
+
+                NEVER pass `answers` or `annotations` parameters in AskUserQuestion — only pass `questions`.
+                The user must answer interactively. If the response comes back empty, re-ask.
+            </substep>
+
+            <substep order="4.5" name="display-action-plan">
+                Display the action plan to the user:
+
+                ```
+                ┌──────────────────────────────────────────────────┐
+                │  ACE > Map Subsystem > Action Plan               │
+                └──────────────────────────────────────────────────┘
+
+                  Subsystem   [subsystem_name]  ([subsystem_path])
+                  ──────────────────────────────────────────────────
+                  Document             Action
+                  ───────────────────  ──────────────────────────
+                  structure.md         [create/update/recreate/skip]
+                  architecture.md      [create/update/recreate/skip]
+                ```
+
+                <variant condition="ALL actions are skip">
+                    Exit workflow with message:
+                    ```
+                      i  All documents already exist and were skipped. Nothing to do.
+
+                      Next > `/clear` first for a fresh context window, then:
+
+                             /ace:map-subsystem [next-subsystem]
+                             Map another subsystem.
+                    ```
+                </variant>
+            </substep>
+
+            Continue to step 5.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 5: CREATE DIRECTORY STRUCTURE                                -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="create-directory" order="5">
+            Create the subsystem wiki directory if it doesn't exist:
+
+            ```bash
+            mkdir -p .docs/wiki/subsystems/[subsystem_name]
+            ```
+
+            Continue to step 6.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 6: SUBSYSTEM STRUCTURE                                       -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="subsystem-structure" order="6">
+            Skip this step if structure action is `skip`.
+
+            NOTE: This step can run IN PARALLEL with step 7 (architecture) if both
+            need agent work. Use `run_in_background=true` for both agents in steps 6 and 7,
+            then collect results in step 8.
+
+            <variant condition="action is create or recreate">
+                Spawn ace-wiki-mapper agent:
+
+                ```
+                Task(
+                    prompt="Focus: subsystem-structure
+
+                    Analyze this subsystem and produce its structure document.
+
+                    **Subsystem path:** [subsystem_path]
+                    **Subsystem name:** [subsystem_name]
+
+                    **Template:** Read ~/.claude/agile-context-engineering/templates/wiki/subsystem-structure.xml
+                    **System context (if exists):** Read .docs/wiki/system-wide/system-structure.md
+                    **Output:** Write to .docs/wiki/subsystems/[subsystem_name]/structure.md
+
+                    <agent-instructions>
+                        <instruction order="1" name="explore">
+                            Explore every file and directory within [subsystem_path].
+                        </instruction>
+                        <instruction order="2" name="write-sections">
+                            Follow the template and produce:
+                            <checklist>
+                                <item>Subsystem overview (root path, one-line responsibility)</item>
+                                <item>Full directory layout (ASCII tree of ALL files and directories with purpose comments)</item>
+                                <item>Directory purposes (one entry per meaningful directory)</item>
+                                <item>Key file locations grouped by role: entry points, config, core logic, API, tests</item>
+                                <item>Naming conventions (if different from system-wide; otherwise reference system-structure.md)</item>
+                                <item>Where to add new code (specific paths for each code type)</item>
+                                <item>Special directories (generated, build output, migrations, etc.)</item>
+                            </checklist>
+                        </instruction>
+                    </agent-instructions>
+
+                    Return confirmation only — do NOT return document contents.",
+                    subagent_type="ace-wiki-mapper",
+                    model="{MAPPER_MODEL}",
+                    description="Map subsystem structure"
+                )
+                ```
+            </variant>
+
+            <variant condition="action is update">
+                Spawn ace-wiki-mapper agent with existing content as context:
+
+                ```
+                Task(
+                    prompt="Focus: subsystem-structure
+
+                    UPDATE the existing structure document for this subsystem.
+
+                    **Subsystem path:** [subsystem_path]
+                    **Current document:** Read .docs/wiki/subsystems/[subsystem_name]/structure.md
+                    **Template:** Read ~/.claude/agile-context-engineering/templates/wiki/subsystem-structure.xml
+
+                    <agent-instructions>
+                        <instruction order="1" name="compare">
+                            Compare the current document against the actual codebase state.
+                        </instruction>
+                        <instruction order="2" name="update-sections">
+                            <checklist>
+                                <item>Update the directory tree for any new or removed files and directories</item>
+                                <item>Update key file locations if entry points or core files have changed</item>
+                                <item>Update 'Where to add new code' if new directories or patterns were introduced</item>
+                                <item>Remove entries for deleted directories or files</item>
+                            </checklist>
+                        </instruction>
+                        <instruction order="3" name="preserve">
+                            Preserve accurate content. Only change what is actually stale.
+                        </instruction>
+                    </agent-instructions>
+
+                    Write the updated file to .docs/wiki/subsystems/[subsystem_name]/structure.md
+                    Return confirmation only — do NOT return document contents.",
+                    subagent_type="ace-wiki-mapper",
+                    model="{MAPPER_MODEL}",
+                    description="Update subsystem structure"
+                )
+                ```
+            </variant>
+
+            Continue to step 7.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 7: SUBSYSTEM ARCHITECTURE                                    -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="subsystem-architecture" order="7">
+            Skip this step if architecture action is `skip`.
+
+            <variant condition="action is create or recreate">
+                Spawn ace-wiki-mapper agent:
+
+                ```
+                Task(
+                    prompt="Focus: subsystem-architecture
+
+                    Analyze this subsystem and produce its architecture document.
+
+                    **Subsystem path:** [subsystem_path]
+                    **Subsystem name:** [subsystem_name]
+
+                    **Template:** Read ~/.claude/agile-context-engineering/templates/wiki/subsystem-architecture.xml
+                    **System context (if exists):** Read .docs/wiki/system-wide/system-architecture.md
+                    **Structure doc (if exists):** Read .docs/wiki/subsystems/[subsystem_name]/structure.md
+                    **Output:** Write to .docs/wiki/subsystems/[subsystem_name]/architecture.md
+
+                    <agent-instructions>
+                        <instruction order="1" name="analyze">
+                            Follow the template structure. Fill every section with real data from the subsystem.
+                        </instruction>
+                        <instruction order="2" name="write-sections">
+                            <checklist>
+                                <item>Subsystem context: one-line responsibility and system connections (inbound/outbound)</item>
+                                <item>L3 component diagram: internal layers (API -> Application -> Domain -> Infrastructure -> Data)</item>
+                                <item>Component responsibilities table with key file paths</item>
+                                <item>Key internal flows: 1-3 sequence diagrams for the core operations</item>
+                                <item>Dependency inventory: inbound callers, outbound dependencies with failure handling</item>
+                                <item>Data ownership: tables, schemas, topics this subsystem owns</item>
+                                <item>Subsystem architectural decisions</item>
+                            </checklist>
+                        </instruction>
+                        <instruction order="3" name="avoid-duplication">
+                            Do NOT repeat system-wide architecture content. Reference system-architecture.md where appropriate.
+                        </instruction>
+                    </agent-instructions>
+
+                    Return confirmation only — do NOT return document contents.",
+                    subagent_type="ace-wiki-mapper",
+                    model="{MAPPER_MODEL}",
+                    description="Map subsystem architecture"
+                )
+                ```
+            </variant>
+
+            <variant condition="action is update">
+                Spawn ace-wiki-mapper agent with update instructions:
+
+                ```
+                Task(
+                    prompt="Focus: subsystem-architecture
+
+                    UPDATE the existing architecture document for this subsystem.
+
+                    **Subsystem path:** [subsystem_path]
+                    **Current document:** Read .docs/wiki/subsystems/[subsystem_name]/architecture.md
+                    **Template:** Read ~/.claude/agile-context-engineering/templates/wiki/subsystem-architecture.xml
+                    **System context (if exists):** Read .docs/wiki/system-wide/system-architecture.md
+
+                    <agent-instructions>
+                        <instruction order="1" name="compare">
+                            Compare against current codebase state. Check for:
+                            <checklist>
+                                <item>New or removed internal components?</item>
+                                <item>New inbound callers or outbound dependencies?</item>
+                                <item>Data ownership changes (new tables, schemas, topics)?</item>
+                                <item>Core internal flows changed shape?</item>
+                                <item>New subsystem-specific architectural decisions?</item>
+                            </checklist>
+                        </instruction>
+                        <instruction order="2" name="apply-updates">
+                            Update only stale sections. Preserve accurate content.
+                        </instruction>
+                    </agent-instructions>
+
+                    Write the updated file to .docs/wiki/subsystems/[subsystem_name]/architecture.md
+                    Return confirmation only — do NOT return document contents.",
+                    subagent_type="ace-wiki-mapper",
+                    model="{MAPPER_MODEL}",
+                    description="Update subsystem architecture"
+                )
+                ```
+            </variant>
+
+            Continue to step 8.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 8: COLLECT PARALLEL RESULTS                                  -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="collect-parallel" order="8">
+
+            <substep order="8.1" name="wait-for-agents">
+                If steps 6 and 7 spawned background agents, wait for both to complete.
+                Read each agent's output to collect confirmations.
+            </substep>
+
+            <substep order="8.2" name="handle-failures">
+                If any agent failed, note the failure and inform the user.
+                Do NOT re-attempt — let the user decide.
+            </substep>
+
+            Continue to step 9.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 9: UPDATE SYSTEM-WIDE STRUCTURE                              -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="update-system-wide" order="9">
+            Execute all applicable sub-steps. Both agents can run IN PARALLEL if both are needed —
+            use `run_in_background=true` and collect results before step 10.
+
+            <substep order="9a" name="update-system-structure" condition="is_new_subsystem is true">
+                Only execute if `is_new_subsystem` is true.
+
+                <variant condition="system-structure.md does not exist">
+                    Skip 9a and note to the user that system-structure.md should be created via `/ace:map-system`.
+                </variant>
+
+                <variant condition="system-structure.md exists">
+                    ```
+                    Task(
+                        prompt="Focus: system-structure (partial update — add new subsystem entry)
+
+                        A new subsystem has just been documented. Add it to the system-wide structure document.
+
+                        **New subsystem:** [subsystem_name] at [subsystem_path]
+                        **Current document:** Read .docs/wiki/system-wide/system-structure.md
+                        **Newly created docs:** Read .docs/wiki/subsystems/[subsystem_name]/structure.md
+                          and .docs/wiki/subsystems/[subsystem_name]/architecture.md to infer responsibility.
+
+                        <agent-instructions>
+                            <instruction order="1" name="add-row">
+                                Add this subsystem to the Subsystem Index table with:
+                                <checklist>
+                                    <item>Name, path, one-line responsibility (inferred from the subsystem code and its new docs)</item>
+                                    <item>Wiki doc link: `.docs/wiki/subsystems/[subsystem_name]/`</item>
+                                </checklist>
+                            </instruction>
+                            <instruction order="2" name="preserve">
+                                Do NOT restructure or rewrite the existing document. Only add the new row.
+                            </instruction>
+                        </agent-instructions>
+
+                        Write the updated file to .docs/wiki/system-wide/system-structure.md
+                        Return confirmation only — do NOT return document contents.",
+                        subagent_type="ace-wiki-mapper",
+                        model="{MAPPER_MODEL}",
+                        description="Add subsystem to system structure"
+                    )
+                    ```
+                </variant>
+            </substep>
+
+            <substep order="9b" name="update-system-architecture" condition="is_missing_from_matrix is true">
+                Only execute if `is_missing_from_matrix` is true.
+
+                ```
+                Task(
+                    prompt="Focus: system-architecture (partial update — add subsystem to responsibility matrix)
+
+                    A subsystem has just been documented and is missing from the Subsystem Responsibility Matrix.
+                    Add it to the matrix in the system-wide architecture document.
+
+                    **Subsystem:** [subsystem_name] at [subsystem_path]
+                    **Current document:** Read .docs/wiki/system-wide/system-architecture.md
+                    **Subsystem docs:** Read .docs/wiki/subsystems/[subsystem_name]/structure.md
+                      and .docs/wiki/subsystems/[subsystem_name]/architecture.md to populate the row.
+
+                    <agent-instructions>
+                        <instruction order="1" name="add-matrix-row">
+                            Add one row to the Subsystem Responsibility Matrix table with:
+                            <checklist>
+                                <item>Subsystem name, one-line responsibility</item>
+                                <item>Data it owns</item>
+                                <item>Events/APIs it publishes</item>
+                                <item>Events/APIs it consumes</item>
+                                <item>Its tech stack</item>
+                            </checklist>
+                        </instruction>
+                        <instruction order="2" name="preserve">
+                            Do NOT restructure or rewrite any other part of the document. Only add the new row.
+                        </instruction>
+                    </agent-instructions>
+
+                    Write the updated file to .docs/wiki/system-wide/system-architecture.md
+                    Return confirmation only — do NOT return document contents.",
+                    subagent_type="ace-wiki-mapper",
+                    model="{MAPPER_MODEL}",
+                    description="Add subsystem to architecture matrix"
+                )
+                ```
+            </substep>
+
+            Continue to step 10.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 10: MODULE DISCOVERY                                         -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="module-discovery" order="10">
+            Discover the subsystem's documentation modules by reading the actual source code —
+            NOT just the wiki docs. This step traces E2E flows, identifies patterns, and finds
+            cross-cutting concerns by reading real implementation files.
+
+            Uses THREE parallel discovery agents followed by ONE synthesis agent.
+
+            <substep order="10.1" name="read-template">
+                Read the module-discovery template first:
+                `.claude/templates/module-discovery.xml`
+            </substep>
+
+            <substep order="10.2" name="create-artifacts-dir">
+                Create artifacts directory:
+
+                ```bash
+                mkdir -p .ace/artifacts/subsystems/[subsystem_name]/module-discovery
+                ```
+            </substep>
+
+            <substep order="10.3" name="launch-flow-discovery" parallel="true">
+                Launch with run_in_background=true:
+
+                ```
+                Task(
+                    prompt="Focus: flow-discovery
+
+                    Discover the E2E domain flows in this subsystem by reading the actual source code.
+                    Do NOT rely on wiki docs alone — trace the code.
+
+                    **Subsystem path:** [subsystem_path]
+                    **Subsystem name:** [subsystem_name]
+                    **File inventory:** Read .docs/wiki/subsystems/[subsystem_name]/structure.md
+
+                    <agent-instructions>
+                        <instruction order="1" name="read-inventory">
+                            Read structure.md for the complete file inventory.
+                        </instruction>
+                        <instruction order="2" name="identify-entry-points">
+                            Identify ALL entry points: HTTP controllers, CLI handlers, event consumers,
+                            background jobs, gRPC services, scheduled tasks.
+                        </instruction>
+                        <instruction order="3" name="trace-flows">
+                            For EACH entry point, open and read the file — then trace its COMPLETE E2E flow:
+                            <checklist>
+                                <item>Follow all imports/dependencies downward layer by layer</item>
+                                <item>Collect every file that participates:
+                                    entry point, DTO/viewmodel, mapper, service/use-case, domain entity,
+                                    value objects, repository interface, repository implementation,
+                                    DB scripts/migrations, constants/enums</item>
+                                <item>A domain model shared across flows belongs in ALL of them — do NOT exclude it</item>
+                                <item>Read each file you encounter before moving on</item>
+                            </checklist>
+                        </instruction>
+                        <instruction order="4" name="group-systems">
+                            Group related entry points into one system when they share the same domain concern:
+                            CreateUser + GetUser + UpdateUser + DeleteUser = 'User Management' (not 4 systems)
+                        </instruction>
+                    </agent-instructions>
+
+                    Output to .ace/artifacts/subsystems/[subsystem_name]/module-discovery/discovery-flows.md:
+
+                    ```markdown
+                    # Flow Discovery: [subsystem_name]
+
+                    ## Systems Found
+
+                    | # | System Name | Entry Points | All Participating Files |
+                    |---|-------------|--------------|------------------------|
+                    | 1 | [name] | [entry file paths] | [ALL files in this E2E flow] |
+                    ```
+
+                    Return: count of systems found + list of any entry points you could not fully trace.",
+                    subagent_type="ace-wiki-mapper",
+                    model="{MAPPER_MODEL}",
+                    run_in_background=true,
+                    description="Discover E2E system flows"
+                )
+                ```
+            </substep>
+
+            <substep order="10.4" name="launch-pattern-discovery" parallel="true">
+                Launch with run_in_background=true:
+
+                ```
+                Task(
+                    prompt="Focus: pattern-discovery
+
+                    Discover reusable implementation patterns in this subsystem by reading multiple
+                    similar files and comparing their structure.
+
+                    **Subsystem path:** [subsystem_path]
+                    **File inventory:** Read .docs/wiki/subsystems/[subsystem_name]/structure.md
+
+                    <agent-instructions>
+                        <instruction order="1" name="read-inventory">
+                            Read structure.md for the complete file inventory.
+                        </instruction>
+                        <instruction order="2" name="identify-groups">
+                            Identify groups of structurally similar files:
+                            repositories, mappers, handlers, command/query objects, factories, validators.
+                        </instruction>
+                        <instruction order="3" name="compare-files">
+                            Read 3+ files from each group.
+                        </instruction>
+                        <instruction order="4" name="classify-patterns">
+                            When files follow the same structural template, that is a pattern.
+                            Name the pattern by what it achieves, not by structural form.
+
+                            Examples of patterns to look for:
+                            <pattern-examples>
+                                <pattern>Repository Pattern (multiple repo implementations of one interface)</pattern>
+                                <pattern>CQRS Command/Query (separate handler per command/query)</pattern>
+                                <pattern>Template Method (abstract base class with overridable steps)</pattern>
+                                <pattern>Factory / Registry (lookup table for creating objects by type)</pattern>
+                                <pattern>Mapper Pattern (bidirectional DTO &lt;-&gt; domain conversion)</pattern>
+                                <pattern>Strategy Pattern (interchangeable algorithm implementations)</pattern>
+                            </pattern-examples>
+                        </instruction>
+                    </agent-instructions>
+
+                    Output to .ace/artifacts/subsystems/[subsystem_name]/module-discovery/discovery-patterns.md:
+
+                    ```markdown
+                    # Pattern Discovery: [subsystem_name]
+
+                    ## Patterns Found
+
+                    | # | Pattern Name | Representative Files (2-4 examples that demonstrate the pattern) |
+                    |---|--------------|------------------------------------------------------------------|
+                    | 1 | [name] | [2-4 file paths] |
+                    ```
+
+                    Return: count of patterns found.",
+                    subagent_type="ace-wiki-mapper",
+                    model="{MAPPER_MODEL}",
+                    run_in_background=true,
+                    description="Discover implementation patterns"
+                )
+                ```
+            </substep>
+
+            <substep order="10.5" name="launch-cross-cutting-discovery" parallel="true">
+                Launch with run_in_background=true:
+
+                ```
+                Task(
+                    prompt="Focus: cross-cutting-discovery
+
+                    Discover cross-cutting concerns and common implementation tasks in this subsystem
+                    by reading shared infrastructure files.
+
+                    **Subsystem path:** [subsystem_path]
+                    **File inventory:** Read .docs/wiki/subsystems/[subsystem_name]/structure.md
+                    **Architecture doc:** .docs/wiki/subsystems/[subsystem_name]/architecture.md
+
+                    <agent-instructions>
+                        <instruction order="1" name="read-context">
+                            Read structure.md and architecture.md for context.
+                        </instruction>
+                        <instruction order="2" name="identify-shared-infra">
+                            Identify shared infrastructure that multiple domain flows depend on — then read it:
+                            <checklist>
+                                <item>DI container / service registration files</item>
+                                <item>Event bus, message broker, pub/sub infrastructure</item>
+                                <item>Cache / invalidation infrastructure</item>
+                                <item>Authentication / authorization middleware</item>
+                                <item>Shared abstract base classes</item>
+                                <item>Error handling and logging infrastructure</item>
+                                <item>Registry / factory lookup tables</item>
+                            </checklist>
+                        </instruction>
+                        <instruction order="3" name="assess-scope">
+                            For each shared infrastructure file, read it to understand its scope.
+                        </instruction>
+                        <instruction order="4" name="identify-guides">
+                            Identify guide candidates — common tasks a developer would repeat:
+                            <guide-derivation-rules>
+                                <rule source="Repository Pattern" guide="How to Add a New Repository" />
+                                <rule source="CRUD system exists" guide="How to Add a New CRUD Endpoint" />
+                            </guide-derivation-rules>
+                        </instruction>
+                    </agent-instructions>
+
+                    Output to .ace/artifacts/subsystems/[subsystem_name]/module-discovery/discovery-cross-cutting.md:
+
+                    ```markdown
+                    # Cross-Cutting Discovery: [subsystem_name]
+
+                    ## Cross-Cutting Concerns
+
+                    | # | Concern Name | Files |
+                    |---|--------------|-------|
+                    | 1 | [name] | [all files implementing this concern] |
+
+                    ## Guide Candidates
+
+                    | # | Guide Name | Reference Files |
+                    |---|------------|----------------|
+                    | 1 | [e.g., How to Add a New CRUD Endpoint] | [files demonstrating the recipe] |
+                    ```
+
+                    Return: count of cross-cutting concerns + count of guide candidates.",
+                    subagent_type="ace-wiki-mapper",
+                    model="{MAPPER_MODEL}",
+                    run_in_background=true,
+                    description="Discover cross-cutting concerns and guides"
+                )
+                ```
+            </substep>
+
+            <substep order="10.6" name="wait-for-discovery">
+                Wait for all three discovery agents to complete.
+            </substep>
+
+            <substep order="10.7" name="doc-inventory" condition="existing-docs contains a directory">
+                Only spawned if existing-docs contains a directory.
+
+                Spawn a doc inventory agent to produce a compact index of the external docs.
+                This runs BEFORE the synthesis agent so that synthesis has a lightweight
+                inventory to work with instead of reading hundreds of files itself.
+
+                ```
+                Task(
+                    prompt="You are a documentation inventory agent. Produce a compact index of all
+                    documentation files in a directory so downstream agents can match docs to modules
+                    without reading every file themselves.
+
+                    **Documentation directory to scan:** [directory path from existing-docs]
+                    **Output file:** .ace/artifacts/subsystems/[subsystem_name]/module-discovery/existing-docs-inventory.md
+
+                    <agent-instructions>
+                        <instruction order="1" name="list-files">
+                            Recursively list ALL files in the directory down to every leaf subdirectory.
+                            Use Glob(pattern='**/*', path='[directory path]') to ensure no nesting level
+                            is missed. Do NOT use shallow ls or single-level globs.
+                        </instruction>
+                        <instruction order="2" name="determine-depth">
+                            Count total files to determine summary depth:
+                            <depth-rules>
+                                <rule range="up to 50 files" read-lines="30-50" summary-lines="up to 10" />
+                                <rule range="51-150 files" read-lines="20-30" summary-lines="up to 5" />
+                                <rule range="151-300 files" read-lines="15-20" summary-lines="up to 3" />
+                                <rule range="300+ files" read-lines="10" summary-lines="1-2" />
+                            </depth-rules>
+                        </instruction>
+                        <instruction order="3" name="read-and-summarize">
+                            For each file, read the adaptive number of lines determined above.
+                        </instruction>
+                        <instruction order="4" name="write-inventory">
+                            Write the inventory to the output file in this format:
+
+                            ```markdown
+                            # Existing Documentation Inventory
+
+                            Source directory: [directory path]
+                            Total files: [count]
+                            Summary depth: [lines per file based on count]
+
+                            ## [File Path]
+                            **Title:** [first heading or filename]
+                            **Summary:**
+                            [Adaptive-length summary: key topics, domain concepts, APIs/interfaces described,
+                             architectural decisions mentioned. Enough detail for a downstream agent to
+                             determine which code modules this doc is relevant to.]
+
+                            ## [Next File Path]
+                            ...
+                            ```
+
+                            Be thorough — every file must appear in the inventory.
+                        </instruction>
+                    </agent-instructions>
+
+                    Return: total file count.",
+                    subagent_type="ace-wiki-mapper",
+                    model="{MAPPER_MODEL}",
+                    description="Inventory existing docs"
+                )
+                ```
+
+                Display to user:
+                ```
+                  Existing docs inventory: [N] files indexed from [directory path]
+                  Saved to .ace/artifacts/subsystems/[subsystem_name]/module-discovery/existing-docs-inventory.md
+                ```
+            </substep>
+
+            <substep order="10.8" name="synthesis" sequential="true">
+                Synthesis Agent (sequential — runs after all above complete):
+
+                ```
+                Task(
+                    prompt="Focus: module-discovery synthesis
+
+                    Synthesize three discovery reports into the final module-discovery.md artifact.
+
+                    **Output template:** Read ~/.claude/agile-context-engineering/templates/wiki/module-discovery.xml
+                    **Discovery inputs (read all three):**
+                    - .ace/artifacts/subsystems/[subsystem_name]/module-discovery/discovery-flows.md       (systems)
+                    - .ace/artifacts/subsystems/[subsystem_name]/module-discovery/discovery-patterns.md    (patterns)
+                    - .ace/artifacts/subsystems/[subsystem_name]/module-discovery/discovery-cross-cutting.md (cross-cutting + guides)
+                    **File inventory:** .docs/wiki/subsystems/[subsystem_name]/structure.md
+                    **External docs inventory (if exists):** .ace/artifacts/subsystems/[subsystem_name]/module-discovery/existing-docs-inventory.md
+
+                    <agent-instructions>
+                        <instruction order="1" name="read-inputs">
+                            Read all three discovery inputs.
+                        </instruction>
+                        <instruction order="2" name="discover-existing-docs">
+                            Discover existing documentation:
+                            <checklist>
+                                <item>Scan the subsystem directory ([subsystem_path]) recursively for *.md files</item>
+                                <item>Also scan common doc locations: docs/, documentation/, .docs/</item>
+                                <item>If existing-docs-inventory.md exists, read it and INCLUDE all entries
+                                    in the Existing Documentation Inventory table (these are external docs
+                                    already indexed — do NOT re-scan the original directory)</item>
+                                <item>Read each locally-discovered doc's title and first few lines to understand its subject</item>
+                                <item>Build the Existing Documentation Inventory table (local + external combined)</item>
+                            </checklist>
+                        </instruction>
+                        <instruction order="3" name="merge-modules">
+                            Merge all discovery results into ONE flat Modules table:
+                            <checklist>
+                                <item>E2E flows from discovery-flows.md become modules</item>
+                                <item>Patterns from discovery-patterns.md become modules</item>
+                                <item>Cross-cutting concerns from discovery-cross-cutting.md become modules</item>
+                                <item>Do NOT categorize by type — map-story decides what docs to produce</item>
+                            </checklist>
+                        </instruction>
+                        <instruction order="4" name="curate-docs-to-modules">
+                            Curate docs to modules (populate the Relevant Docs column):
+                            <checklist>
+                                <item>Match each discovered doc to the module(s) whose domain it describes</item>
+                                <item>A doc can appear in multiple modules</item>
+                                <item>Architecture docs and READMEs are typically relevant to all flow modules</item>
+                                <item>Implementation docs match the module they describe</item>
+                                <item>Mark unmatched docs in the inventory table</item>
+                            </checklist>
+                        </instruction>
+                        <instruction order="5" name="file-coverage-check">
+                            File coverage check:
+                            <checklist>
+                                <item>Read structure.md for the complete file inventory</item>
+                                <item>Every non-trivial file must appear in at least one module</item>
+                                <item>List any uncovered files; create new modules for files with meaningful logic</item>
+                                <item>Exclude only: index re-exports, empty stubs, generated code, test files</item>
+                            </checklist>
+                        </instruction>
+                        <instruction order="6" name="preserve-overlaps">
+                            Preserve overlaps — files appearing in multiple modules are correct.
+                        </instruction>
+                    </agent-instructions>
+
+                    Write to .ace/artifacts/subsystems/[subsystem_name]/module-discovery/module-discovery.md
+
+                    Return: total module count + uncovered file count + existing docs found count.",
+                    subagent_type="ace-wiki-mapper",
+                    model="{MAPPER_MODEL}",
+                    description="Synthesize module discovery"
+                )
+                ```
+            </substep>
+
+            Continue to step 11.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 11: KNOWLEDGE DOCUMENTATION VIA MAP-STORY                    -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="knowledge-documentation" order="11">
+            For each module row in module-discovery.md, spawn one ace-wiki-mapper agent
+            that follows the map-story workflow in file mode.
+
+            Run agents SEQUENTIALLY — wait for each to complete before starting the next.
+            Sequential prevents write conflicts: map-story writes multiple doc files per call
+            and two concurrent agents could clash on the same file.
+
+            <substep order="11.1" name="read-module-discovery">
+                Read .ace/artifacts/subsystems/[subsystem_name]/module-discovery/module-discovery.md.
+
+                The file has one Modules table.
+                Each row has: # | Module Name | Files | Relevant Docs
+            </substep>
+
+            <substep order="11.2" name="merge-existing-docs">
+                If the `existing-docs` parameter was provided to map-subsystem,
+                merge those entries (files and/or directories, as-is) with each row's Relevant Docs
+                column.
+
+                <merge-rules>
+                    <rule>For each module row, the final existing-docs list =
+                        (command-level existing-docs) + (row's Relevant Docs)</rule>
+                    <rule>Deduplicate any overlapping paths</rule>
+                    <rule>If both are empty, use `none`</rule>
+                    <rule>Do NOT expand directories here — map-story handles directory resolution internally
+                        by spinning up a curation agent that selects only relevant docs</rule>
+                </merge-rules>
+
+                If existing-docs-inventory.md was produced in step 10, also pass its path to
+                each map-story invocation so the curation agent can use the pre-built inventory
+                instead of re-scanning the directory from scratch for every module.
+            </substep>
+
+            <substep order="11.3" name="iterate-modules">
+                Iterate ALL rows (one at a time, sequential):
+
+                ```
+                Task(
+                    prompt="Load and follow the map-story workflow in file mode.
+
+                    **Workflow:** Read and follow ~/.claude/agile-context-engineering/workflows/map-story.xml
+                    **Mode:** file mode — document existing code (no git diff)
+
+                    **Module name:** [Module Name from row]
+                    **Files to document:** [comma-separated file list from Files column]
+                    **Existing docs context:** [merged existing-docs: command-level + row Relevant Docs, deduplicated, or `none`]
+                    **Existing docs inventory:** [path to existing-docs-inventory.md if it was produced, or `none`]
+                    **Subsystem name:** [subsystem_name]
+
+                    **TEMPLATES — Read ALL of these before writing ANY docs:**
+                    - System docs:        .claude/templates/system.xml
+                    - Pattern docs:       .claude/templates/pattern.xml
+                    - Cross-cutting docs: .claude/templates/system-cross-cutting.xml
+                    - Guide docs:         .claude/templates/guide.xml
+                    - Decision docs:      .claude/templates/decizions.xml
+
+                    <agent-instructions>
+                        <instruction order="1" name="read-source">
+                            Read ALL source files listed in Files. Understand the actual code — classes,
+                            interfaces, patterns, state, flows, DI registrations, constants, error handling.
+                        </instruction>
+
+                        <instruction order="2" name="read-existing-docs">
+                            If Existing docs context is not `none`, read those documents FIRST —
+                            they contain prior knowledge, intent, and decisions about this module's domain.
+                            Use them as additional context when writing, but the actual source code is
+                            always the source of truth.
+                        </instruction>
+
+                        <instruction order="3" name="read-wiki">
+                            Read ALL existing wiki docs under .docs/wiki/subsystems/[subsystem_name]/ —
+                            EVERY .md file, FULLY. Not titles. Not summaries. THE COMPLETE CONTENT.
+                            Build a mental map of what is already documented so you do NOT create
+                            duplicate documentation. This is MANDATORY.
+                        </instruction>
+
+                        <instruction order="4" name="decide-docs">
+                            You decide what docs to create or update — systems/, patterns/, cross-cutting/,
+                            guides/, decisions/ — based on what you find in the code files. One call may
+                            produce multiple docs across different categories.
+                        </instruction>
+
+                        <instruction order="5" name="update-vs-create">
+                            When an existing doc already covers a topic, UPDATE it (add/expand sections).
+                            Only CREATE new docs for genuinely new topics not covered anywhere.
+                        </instruction>
+
+                        <instruction order="6" name="topic-scoped-only">
+                            NEVER create a story-scoped or module-scoped document.
+                            All docs are TOPIC-scoped — about the concern, not about the module.
+                        </instruction>
+                    </agent-instructions>
+
+                    Return: list of all docs created/updated with line counts.",
+                    subagent_type="ace-wiki-mapper",
+                    model="{MAPPER_MODEL}",
+                    description="Document [module_name]"
+                )
+                ```
+
+                Collect each agent's report before spawning the next.
+            </substep>
+
+            <substep order="11.4" name="compile-report">
+                After all rows are processed, compile the full knowledge docs report.
+            </substep>
+
+            Continue to step 12.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 12: VERIFY AND COMMIT                                        -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="verify-and-commit" order="12">
+
+            <substep order="12.1" name="verify-documents">
+                Verify all expected documents exist and are non-empty.
+
+                For each document where the action was NOT `skip`:
+                <verification-checks>
+                    <check>File exists</check>
+                    <check>File has content (>20 lines for create/update/recreate)</check>
+                </verification-checks>
+
+                If any document is missing or empty, warn the user.
+            </substep>
+
+            <substep order="12.2" name="security-scan">
+                Security scan before commit — use the Grep tool (NOT bash grep):
+
+                ```
+                Grep(
+                    pattern="(sk-[a-zA-Z0-9]{20,}|sk_live_|sk_test_|ghp_[a-zA-Z0-9]{36}|AKIA[A-Z0-9]{16}|-----BEGIN.*PRIVATE KEY)",
+                    path=".docs/wiki/subsystems/[subsystem_name]/",
+                    output_mode="content"
+                )
+                ```
+
+                <variant condition="matches found">SECRETS_FOUND — pause and alert user.</variant>
+                <variant condition="no matches">CLEAN.</variant>
+            </substep>
+
+            <substep order="12.3" name="commit" condition="commit_docs is true">
+                Commit (if `commit_docs` is true):
+
+                <stage-files>
+                    <always>
+                        ```bash
+                        git add .docs/wiki/subsystems/[subsystem_name]/
+                        ```
+                    </always>
+
+                    <conditional condition="system-structure.md was updated in step 9a">
+                        ```bash
+                        git add .docs/wiki/system-wide/system-structure.md
+                        ```
+                    </conditional>
+
+                    <conditional condition="system-architecture.md was updated in step 9b">
+                        ```bash
+                        git add .docs/wiki/system-wide/system-architecture.md
+                        ```
+                    </conditional>
+
+                    <conditional condition="module-discovery artifacts were written in step 10">
+                        ```bash
+                        git add .ace/artifacts/subsystems/[subsystem_name]/module-discovery/
+                        ```
+                    </conditional>
+                </stage-files>
+
+                ```bash
+                git commit -m "docs: map [subsystem_name] subsystem wiki and knowledge base"
+                ```
+            </substep>
+
+            Continue to step 13.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 13: COMPLETION                                               -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="completion" order="13">
+            Display completion banner and next steps.
+
+            ```
+            ╔══════════════════════════════════════════════════╗
+            ║  ACE > Subsystem Mapped                          ║
+            ╚══════════════════════════════════════════════════╝
+
+              Subsystem: [subsystem_name]  ([subsystem_path])
+
+              Documents:
+              ──────────
+              [For each document, show action taken and line count]
+              +  structure.md      ([N] lines) — [created/updated/recreated]
+              +  architecture.md   ([N] lines) — [created/updated/recreated]
+              -  [document]         skipped
+
+              [If system-structure.md was updated in step 9a:]
+              ~  system-structure.md — subsystem entry added
+
+              [If system-architecture.md was updated in step 9b:]
+              ~  system-architecture.md — subsystem responsibility matrix updated
+
+              [If knowledge docs were produced in step 11:]
+              Knowledge Docs (.docs/wiki/subsystems/[subsystem_name]/):
+              ──────────────────────────────────────────────────────────
+              [For each doc written by map-story: show filename and line count]
+
+              Next > `/clear` first for a fresh context window, then:
+
+                     /ace:map-subsystem [next-subsystem]
+                     Map another subsystem.
+
+              Also available (`/clear` first):
+              - /ace:map-system — Re-run to refresh system-wide documents
+              - /ace:init-coding-standards — Define coding standards
+              - Review files in .docs/wiki/subsystems/[subsystem_name]/
+            ```
+
+            End workflow.
+        </step>
+
+    </process>
+
+    <success_criteria>
+        <criterion>Init function executed (environment detected, mapper model resolved)</criterion>
+        <criterion>Subsystem path resolved and validated against the codebase</criterion>
+        <criterion>System-wide docs read for context before analysis begins</criterion>
+        <criterion>Each document triaged independently (create/update/recreate/skip)</criterion>
+        <criterion>Agents spawned in parallel (structure + architecture) where possible</criterion>
+        <criterion>system-structure.md updated if this is a previously undocumented subsystem</criterion>
+        <criterion>system-architecture.md subsystem responsibility matrix updated if subsystem was missing</criterion>
+        <criterion>All created documents verified for content (non-empty, >20 lines)</criterion>
+        <criterion>Security scan passed (no secrets in generated docs)</criterion>
+        <criterion>Documents committed to .docs/wiki/subsystems/[subsystem_name]/</criterion>
+        <criterion>Module discovery completed; .ace/artifacts/subsystems/[subsystem_name]/module-discovery/module-discovery.md written</criterion>
+        <criterion>map-story called sequentially for each module row; all completed</criterion>
+        <criterion>Each map-story agent reads ALL existing wiki docs FULLY before writing (no duplication)</criterion>
+        <criterion>Knowledge docs written to .docs/wiki/subsystems/[subsystem_name]/</criterion>
+        <criterion>module-discovery.md staged and committed</criterion>
+        <criterion>User sees clear completion summary with next steps</criterion>
+    </success_criteria>
+
+</workflow>

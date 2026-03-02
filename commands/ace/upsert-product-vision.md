@@ -14,16 +14,17 @@ allowed-tools:
 <command>
 
     <execution-time>
-        **This command can run:**
-        - During /ace:init-project — as part of initial project setup
-        - After /ace:map-system — once codebase is mapped, leverage architecture context
-        - Anytime — to create or refresh the product vision for a project
-
-        **Use this command when:**
-        - Starting a new project and want to define the product vision (greenfield or brownfield)
-        - Existing product vision is outdated or missing
-        - System architecture has been mapped and you want to align vision with subsystem capabilities
-        - Pivoting the product direction and need to rewrite the vision
+        <runs-after>
+            <trigger>During /ace:init-project — as part of initial project setup</trigger>
+            <trigger>After /ace:map-system — once codebase is mapped, leverage architecture context</trigger>
+            <trigger>Anytime — to create or refresh the product vision for a project</trigger>
+        </runs-after>
+        <use-when>
+            <condition>Starting a new project and want to define the product vision (greenfield or brownfield)</condition>
+            <condition>Existing product vision is outdated or missing</condition>
+            <condition>System architecture has been mapped and you want to align vision with subsystem capabilities</condition>
+            <condition>Pivoting the product direction and need to rewrite the vision</condition>
+        </use-when>
     </execution-time>
 
     <input>
@@ -35,8 +36,10 @@ allowed-tools:
             </required>
 
             <optional>
-                - **context** (file|text) — Existing PRD, specs, or notes to use as a starting point.
-                  Will be refined through the interview process, not used as-is.
+                <param name="context" type="file | text">
+                    Existing PRD, specs, or notes to use as a starting point.
+                    Will be refined through the interview process, not used as-is.
+                </param>
             </optional>
         </parameters>
     </input>

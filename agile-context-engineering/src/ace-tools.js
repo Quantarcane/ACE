@@ -31,7 +31,7 @@ const MODEL_PROFILES = {
   'ace-product-owner':        { quality: 'opus',   balanced: 'sonnet', budget: 'sonnet' },
   'ace-project-researcher':   { quality: 'opus',   balanced: 'sonnet', budget: 'haiku' },
   'ace-research-synthesizer': { quality: 'sonnet', balanced: 'sonnet', budget: 'haiku' },
-  'ace-code-wiki-mapper':     { quality: 'sonnet', balanced: 'sonnet', budget: 'haiku' },
+  'ace-wiki-mapper':     { quality: 'sonnet', balanced: 'sonnet', budget: 'haiku' },
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -347,7 +347,7 @@ function cmdInitMapSystem(cwd, raw) {
 
   const result = {
     // Models
-    mapper_model: resolveModelInternal(cwd, 'ace-code-wiki-mapper'),
+    mapper_model: resolveModelInternal(cwd, 'ace-wiki-mapper'),
 
     // Config
     commit_docs: config.commit_docs,
@@ -364,6 +364,33 @@ function cmdInitMapSystem(cwd, raw) {
     has_system_architecture,
     has_testing_framework,
     has_coding_standards,
+
+    // Git state
+    has_git: pathExistsInternal(cwd, '.git'),
+  };
+
+  output(result, raw);
+}
+
+function cmdInitMapSubsystem(cwd, raw) {
+  const config = loadConfig(cwd);
+  const brownfield = detectBrownfieldStatus(cwd);
+
+  const wikiDir = '.docs/wiki/subsystems';
+  const wikiDirExists = pathExistsInternal(cwd, wikiDir);
+
+  const result = {
+    // Models
+    mapper_model: resolveModelInternal(cwd, 'ace-wiki-mapper'),
+
+    // Config
+    commit_docs: config.commit_docs,
+
+    // Brownfield detection
+    ...brownfield,
+
+    // Wiki directory state
+    wiki_dir_exists: wikiDirExists,
 
     // Git state
     has_git: pathExistsInternal(cwd, '.git'),
@@ -455,8 +482,11 @@ function main() {
         case 'map-system':
           cmdInitMapSystem(cwd, raw);
           break;
+        case 'map-subsystem':
+          cmdInitMapSubsystem(cwd, raw);
+          break;
         default:
-          error('Unknown init subcommand. Available: new-project, product-vision, coding-standards, map-system');
+          error('Unknown init subcommand. Available: new-project, product-vision, coding-standards, map-system, map-subsystem');
       }
       break;
     }

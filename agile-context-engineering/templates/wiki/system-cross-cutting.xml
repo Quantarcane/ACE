@@ -1,0 +1,165 @@
+<system-cross-cutting>
+    <purpose>
+        Template for `.docs/wiki/subsystems/[subsystem-name]/cross-cutting/<concern-name>.md` — a
+        concern that spans multiple systems within a codebase subsystem. Answers "How does this
+        shared infrastructure/concern work, and how do I plug into it?"
+
+        Each cross-cutting doc describes shared infrastructure or mechanisms that multiple domain
+        systems depend on. It is the document an AI agent reads to understand how to register,
+        configure, or interact with shared concerns.
+
+        Examples of cross-cutting concerns:
+        - Dependency injection and container registration
+        - Factory/registry registration patterns
+        - Event systems, invalidation, pub/sub
+        - Serialization/deserialization
+        - Error handling and logging infrastructure
+        - Authentication/authorization middleware
+        - Cache/invalidation infrastructure
+        - Shared abstract base classes
+
+        Complements:
+        - systems/ docs (domain systems that USE these cross-cutting concerns)
+        - patterns/ docs (reusable structural patterns, not shared infrastructure)
+        - guides/ docs (task recipes that reference cross-cutting setup steps)
+    </purpose>
+
+    <template>
+        <overview>
+            # [Cross-Cutting Concern]
+
+            ## Overview
+            What this concern addresses, why it exists. One paragraph.
+        </overview>
+
+        <how-it-works>
+            ## How It Works
+
+            The pattern/mechanism used. Reference actual code locations.
+
+            1. **Step**: Description at `file:ClassName.method`
+            2. **Step**: Description at `file:ClassName.method`
+            3. **Step**: Description at `file:ClassName.method`
+        </how-it-works>
+
+        <registration-and-setup>
+            ## Registration / Setup
+
+            Where and how components register with this concern.
+            - **Container**: `file:container.ts:registerServices`
+            - **Factory**: `file:DrawingFactory.ts:DrawingFactory`
+            - **Registry**: `file:DrawingRegistry.ts:DrawingRegistry`
+        </registration-and-setup>
+
+        <usage>
+            ## Usage
+
+            How other systems interact with this concern.
+
+            ```typescript
+            // Usage pattern (inline only if non-obvious)
+            ```
+        </usage>
+
+        <current-registrations>
+            ## Current Registrations / Implementations
+
+            What is currently registered/using this concern:
+            - `TrendLine` registered at `file:container.ts:registerDrawings`
+            - `ParallelChannel` registered at `file:container.ts:registerDrawings`
+            - ...
+        </current-registrations>
+
+        <integration-points>
+            ## Integration Points
+
+            Where this concern connects to other systems.
+            - [System A](../systems/system-a.md) — uses this for [purpose]
+            - [System B](../systems/system-b.md) — uses this for [purpose]
+        </integration-points>
+
+        <gotchas>
+            ## Gotchas
+
+            Common mistakes when working with this concern.
+            - [Common mistake 1]
+            - [Common mistake 2]
+        </gotchas>
+    </template>
+
+    <guidelines>
+
+        **Documentation Style:**
+        - EXTREMELY SUCCINCT — every word must add value
+        - NO FLUFF — direct, actionable information only
+        - Bullet points over paragraphs
+        - Code references as `file-path:ClassName.methodName` (not line numbers)
+        - Inline snippets ONLY for usage patterns and registration examples
+        - **ALL visual representations of architecture, dependencies, flows, or relationships MUST be ```mermaid fenced code blocks. NO ASCII arrows (->), NO dependency trees, NO PlantUML. Only mermaid. The ONLY ASCII exception is file trees.**
+
+        **Overview:**
+        - ONE paragraph. What the concern does and why it exists.
+        - Focus on what an agent needs to know to interact with this concern.
+
+        **How It Works:**
+        - Numbered steps explaining the mechanism.
+        - Reference actual code locations — not theoretical descriptions.
+        - If the mechanism has a flow (event dispatching, DI resolution), show a mermaid sequence diagram.
+
+        **Registration / Setup:**
+        - The MOST CRITICAL section for AI agents. They need to know WHERE to register new things.
+        - List every registration point with exact file paths.
+        - Show the registration pattern (inline code only if non-obvious).
+
+        **Usage:**
+        - How consuming code interacts with this concern.
+        - Inline code snippet ONLY if the usage pattern is non-obvious.
+        - If usage is straightforward (e.g., inject via constructor), a one-liner suffices.
+
+        **Current Registrations / Implementations:**
+        - Complete list of everything currently registered/using this concern.
+        - Agent uses this to verify its new registration is consistent with existing ones.
+        - Update when new registrations are added.
+
+        **Integration Points:**
+        - Cross-reference with markdown links to system docs that depend on this concern.
+        - Helps agents understand the blast radius of changes to this concern.
+
+        **Gotchas:**
+        - Registration order dependencies, naming conventions, initialization timing.
+        - Anything that silently fails if done wrong.
+
+        **What does NOT belong here:**
+        - Domain-specific logic (that's in systems/ docs)
+        - Reusable structural patterns (that's in patterns/ docs)
+        - Step-by-step task recipes (that's in guides/ docs)
+        - Story numbers, sprint context, revision history
+        - Testing instructions, performance benchmarks
+
+    </guidelines>
+
+    <evolution>
+
+        This is a LIVING document — updated when the cross-cutting concern changes.
+
+        **Update triggers:**
+        - New registration added (update Current Registrations list)
+        - Registration mechanism changed (new file, new pattern)
+        - New integration point discovered
+        - New gotcha discovered
+        - Setup/initialization process changed
+
+        **NOT an update trigger:**
+        - New feature that registers with existing mechanism without changing it
+        - Bug fix in one registered component
+        - Internal refactoring of the mechanism that doesn't change the external API
+
+        **Update rules:**
+        - ADD new registrations to the list
+        - UPDATE Registration / Setup if the process changed
+        - ADD new gotchas as they are discovered
+        - REMOVE registrations for deleted components
+
+    </evolution>
+
+</system-cross-cutting>

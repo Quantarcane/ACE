@@ -16,16 +16,17 @@ allowed-tools:
 <command>
 
     <execution-time>
-        **This command can run:**
-        - During /ace:init-project — as part of initial project setup
-        - After /ace:map-system — once codebase is mapped, add prescriptive standards
-        - Anytime — to create or refresh coding standards for a project
-
-        **Use this command when:**
-        - Starting a new project and want to establish coding standards upfront (greenfield or brownfield)
-        - Onboarding AI agents to an existing codebase (prevents common AI mistakes)
-        - Current coding standards are outdated or missing
-        - Team has pain points with AI-generated code quality
+        <runs-after>
+            <trigger>During /ace:init-project — as part of initial project setup</trigger>
+            <trigger>After /ace:map-system — once codebase is mapped, add prescriptive standards</trigger>
+            <trigger>Anytime — to create or refresh coding standards for a project</trigger>
+        </runs-after>
+        <use-when>
+            <condition>Starting a new project and want to establish coding standards upfront (greenfield or brownfield)</condition>
+            <condition>Onboarding AI agents to an existing codebase (prevents common AI mistakes)</condition>
+            <condition>Current coding standards are outdated or missing</condition>
+            <condition>Team has pain points with AI-generated code quality</condition>
+        </use-when>
     </execution-time>
 
     <input>
@@ -37,8 +38,10 @@ allowed-tools:
             </required>
 
             <optional>
-                - **context** (file|text) — Existing coding standards document, style guide, or notes
-                  to use as a starting point. Will be refined through the interview process.
+                <param name="context" type="file | text">
+                    Existing coding standards document, style guide, or notes
+                    to use as a starting point. Will be refined through the interview process.
+                </param>
             </optional>
         </parameters>
     </input>

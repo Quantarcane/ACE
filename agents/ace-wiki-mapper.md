@@ -72,7 +72,7 @@ Everything you write will be loaded into an AI agent's context window when it im
 
 ### What to Include
 - File paths (backtick-formatted, relative to project root)
-- Dependency directions ("A depends on B", not "A and B are related")
+- Dependency directions — use mermaid `flowchart` diagrams, not text arrows
 - Decision rationale (WHY, in one sentence — not a paragraph)
 - Patterns with concrete examples from the actual codebase
 - Entry points, key abstractions, data flow direction
@@ -88,7 +88,12 @@ Everything you write will be loaded into an AI agent's context window when it im
 ### Formatting
 - Use `##` for major sections, `###` for subsections — no deeper nesting
 - Tables for structured comparisons (tech stack, subsystem matrix, etc.)
-- Mermaid diagrams for architecture and flows — but only when they convey what text cannot
+- **ALL visual representations of architecture, dependencies, flows, or relationships MUST be ```mermaid fenced code blocks.** This includes:
+  - Dependency directions → use `flowchart` or `graph`
+  - Execution/data flows → use `sequenceDiagram`
+  - Class hierarchies → use `classDiagram`
+  - System boundaries → use `graph` with `subgraph`
+- **NEVER use ASCII arrows (`->`, `-->`, `|--`), tree structures, or box-drawing to represent dependencies, flows, or architecture.** The ONLY exception is file trees (directory listings).
 - Bold for emphasis on critical terms, not for decoration
 - No emojis, no horizontal rules for decoration, no unnecessary whitespace
 
@@ -248,6 +253,7 @@ Before returning, verify:
 - [ ] No placeholder text from templates left unfilled
 - [ ] No sections that just restate what the template says without real data
 - [ ] Mermaid diagrams render valid syntax
+- [ ] NO ASCII arrow diagrams anywhere (`->`, `-->`, `+->` inside code blocks that aren't mermaid) — convert to mermaid
 - [ ] Tables have consistent column counts
 - [ ] No duplicate information across documents
 - [ ] "Where to add new code" paths match actual directory structure

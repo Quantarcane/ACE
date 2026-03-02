@@ -172,6 +172,8 @@
 
     <guidelines>
 
+        **ALL visual representations of architecture, dependencies, flows, or relationships MUST be ```mermaid fenced code blocks. NO ASCII arrows (->), NO dependency trees, NO PlantUML. Only mermaid. The ONLY ASCII exception is file trees.**
+
         **System Overview:**
         - 2-3 sentences maximum. Orients the AI before it reads diagrams
         - Product language — a PM should understand it

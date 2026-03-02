@@ -1,0 +1,343 @@
+<subsystem-architecture>
+    <purpose>
+        Template for `.docs/wiki/subsystems/[subsystem-name]/architecture.md` — the internal
+        architecture view of a single subsystem. Captures component structure (C4 L3), internal
+        flows, dependency contracts, data ownership, and subsystem-specific decisions.
+
+        Complements system-architecture.md (which shows system-wide L1/L2 views).
+        Complements subsystem-structure.md (which shows physical file/folder layout).
+
+        One instance per subsystem — each gets its own architecture doc.
+
+        A "subsystem" is any cohesive code unit with a clear responsibility boundary —
+        whether deployed as a microservice, a monolith module, or a library package.
+    </purpose>
+
+    <template>
+        <subsystem-context>
+            ## [Subsystem Name]
+
+            **Responsibility:** [One-line — what this subsystem owns and does]
+            **Root:** `[path from project root]`
+
+            ### System Context
+
+            How this subsystem connects to the rest of the system:
+
+            | Relationship | Counterpart | Pattern | What Flows |
+            |-------------|-------------|---------|------------|
+            | Inbound | [Caller subsystem / external] | [Sync/Async, HTTP/gRPC/event] | [Data/command description] |
+            | Outbound | [Callee subsystem / external] | [Sync/Async, HTTP/gRPC/event] | [Data/command description] |
+        </subsystem-context>
+
+        <architectural-pattern>
+            ## Architectural Pattern
+
+            **Pattern:** [N-Tier / Clean Architecture / Onion / Hexagonal / Vertical Slice / CQRS / MVC / Simple Layered / Other]
+            **Detected from:** [e.g., "Domain/, Application/, Infrastructure/ folder hierarchy", "IRepository interfaces in core project", "Feature-first directory layout with per-slice handlers"]
+
+            [1-2 sentences: how the pattern manifests in this subsystem — what the layers are called,
+            how dependencies flow, and any notable deviations from the canonical pattern.]
+        </architectural-pattern>
+
+        <c4-l3-component>
+            ## L3: Internal Components
+
+            Shape this diagram to match the detected architectural pattern. Use the reference diagrams
+            in the guidelines section. Below is the Clean Architecture default — replace with the
+            appropriate structure for the actual pattern.
+
+            ```mermaid
+            flowchart TD
+                subgraph Entry["Entry Point(s)"]
+                    api["[API Layer]<br/><small>[Router/Controller/Handler]</small>"]
+                end
+
+                subgraph App["Application Layer"]
+                    svc["[Service / Use Case]<br/><small>[Orchestrates domain]</small>"]
+                end
+
+                subgraph Domain["Domain"]
+                    entity["[Domain Entity / Aggregate]<br/><small>[Core business logic]</small>"]
+                end
+
+                subgraph Infra["Infrastructure"]
+                    repo["[Repository]<br/><small>[Data access]</small>"]
+                    client["[External Client]<br/><small>[3rd-party / other subsystem]</small>"]
+                end
+
+                subgraph Data["Data"]
+                    db[("Data Store")]
+                end
+
+                api --> svc
+                svc --> entity
+                svc --> repo
+                svc --> client
+                repo --> db
+            ```
+
+            ### Component Responsibilities
+
+            | Component | Responsibility | Key Files |
+            |-----------|---------------|-----------|
+            | [API Layer] | [Receives and validates requests, maps to use cases] | `[path]` |
+            | [Service] | [Orchestrates domain logic and infrastructure] | `[path]` |
+            | [Domain] | [Business rules, entities, value objects] | `[path]` |
+            | [Repository] | [Persists and retrieves domain objects] | `[path]` |
+            | [External Client] | [Communicates with external system/subsystem] | `[path]` |
+        </c4-l3-component>
+
+        <internal-flows>
+            ## Key Internal Flows
+
+            The flows that define this subsystem's core operations.
+
+            ### Flow: [Flow Name]
+
+            [One sentence: what this achieves and when it triggers.]
+
+            ```mermaid
+            sequenceDiagram
+            participant Caller as [Caller / Entry]
+            participant Svc as [Service]
+            participant Domain as [Domain]
+            participant Repo as [Repository]
+            participant DB as [Data Store]
+
+            Caller->>Svc: [Request / command]
+            Svc->>Domain: [What is passed]
+            Domain-->>Svc: [Result / validated object]
+            Svc->>Repo: [Persist / query]
+            Repo->>DB: [SQL / query]
+            DB-->>Repo: [Result]
+            Repo-->>Svc: [Domain object]
+            Svc-->>Caller: [Response]
+            ```
+        </internal-flows>
+
+        <dependency-inventory>
+            ## Dependency Inventory
+
+            ### Inbound (Who calls this subsystem)
+
+            | Caller | Call Type | Contract | Notes |
+            |--------|-----------|----------|-------|
+            | [Subsystem / External] | [HTTP GET /path, Event: topic-name] | [OpenAPI / schema / event type] | [e.g., "authenticated calls only"] |
+
+            ### Outbound (What this subsystem calls)
+
+            | Dependency | Call Type | Contract | Failure Handling |
+            |------------|-----------|----------|-----------------|
+            | [Subsystem / External] | [HTTP / gRPC / SQL / event publish] | [OpenAPI / schema / event type] | [Retry, fallback, fail fast] |
+        </dependency-inventory>
+
+        <data-ownership>
+            ## Data Ownership
+
+            This subsystem owns the following data stores and schemas. Other subsystems MUST NOT
+            write directly — they interact through this subsystem's API or events.
+
+            | Store | Type | Schema / Namespace | Key Entities |
+            |-------|------|--------------------|--------------|
+            | [Table/collection/topic] | [Postgres/Mongo/Kafka] | [Schema name or prefix] | [Primary entities stored] |
+
+            **Data NOT owned here:** [Any data this subsystem reads but doesn't own, with note of true owner]
+        </data-ownership>
+
+        <subsystem-architectural-decisions>
+            ## Subsystem Architectural Decisions
+
+            Decisions specific to this subsystem. System-wide decisions live in system-architecture.md.
+
+            | Decision | Rationale |
+            |----------|-----------|
+            | [e.g., CQRS for this service] | [High read/write asymmetry — separate models] |
+            | [e.g., Repository pattern over direct ORM] | [Testability, ability to swap data store] |
+        </subsystem-architectural-decisions>
+    </template>
+
+    <guidelines>
+
+        **ALL visual representations of architecture, dependencies, flows, or relationships MUST be ```mermaid fenced code blocks. NO ASCII arrows (->), NO dependency trees, NO PlantUML. Only mermaid. The ONLY ASCII exception is file trees.**
+
+        **Architectural Pattern — How to Detect:**
+
+        Examine folder structure, namespaces, class names, and dependency directions. Match against
+        these signals — the first clear match wins. When signals overlap, note the hybrid.
+
+        - **N-Tier / Simple Layered** — Folders named `Controllers/`, `Services/` (or `BLL/`),
+          `Repositories/` (or `DAL/`). Direct downward dependencies: controller → service → repo.
+          No interface inversion — concrete classes reference each other directly.
+
+        - **MVC** — Framework-scaffolded `Models/`, `Views/`, `Controllers/` (or `Pages/` for
+          Razor Pages). Route handlers return views or JSON directly. Thin or no service layer.
+
+        - **Clean Architecture** — Explicit `Domain/`, `Application/`, `Infrastructure/`,
+          `Presentation/` (or `Web/`, `API/`) projects or folders. Domain has zero outgoing
+          dependencies. Application references Domain only. Infrastructure implements interfaces
+          defined in Application or Domain. Dependency rule strictly inward.
+
+        - **Onion Architecture** — Similar signals to Clean but layered as concentric rings:
+          `Core/` (domain model + domain services + application services), `Infrastructure/`,
+          optional `UI/`. Interfaces (ports) defined in Core; implementations in outer rings.
+
+        - **Hexagonal / Ports & Adapters** — Explicit `ports/` or `interfaces/` alongside
+          `adapters/` or `infrastructure/`. Primary adapters (HTTP, CLI) on one side; secondary
+          adapters (DB, messaging) on the other. Domain core has no framework imports.
+
+        - **Vertical Slice / Feature-First** — Feature-named top-level folders:
+          `Features/CreateOrder/`, `Features/ListOrders/`. Each slice contains its own handler,
+          validator, model, and tests. No shared service layer across features. Often uses a
+          mediator (MediatR, similar) — look for `IRequest`/`IRequestHandler` or equivalent.
+
+        - **CQRS** — Separate `Commands/` and `Queries/` (or `Read/` and `Write/`) directories.
+          Distinct models for reads vs. writes. May be combined with Event Sourcing
+          (`Events/`, `EventStore`, `Projections/`).
+
+        **Architectural Pattern — Diagram shapes per pattern:**
+
+        Use the reference below to choose the right diagram structure. Replace the default
+        Clean Architecture diagram in the template with the one matching the detected pattern.
+
+        *N-Tier:*
+        ```
+        flowchart TD
+            ctrl["Controller / Presenter"] --> svc["Service / Business Logic"]
+            svc --> repo["Repository / DAO"]
+            repo --> db[("Data Store")]
+        ```
+
+        *Clean Architecture / Onion:*
+        ```
+        flowchart TD
+            subgraph Presentation; api["Controller / Handler"]; end
+            subgraph Application; uc["Use Case / App Service"]; end
+            subgraph Domain; ent["Entity / Aggregate"]; port["Port Interface"]; end
+            subgraph Infrastructure; impl["Repository Impl"]; adapter["External Adapter"]; end
+            api --> uc
+            uc --> ent
+            uc --> port
+            impl -.->|implements| port
+            adapter -.->|implements| port
+        ```
+
+        *Hexagonal / Ports & Adapters:*
+        ```
+        flowchart LR
+            subgraph Primary["Primary Adapters (Driving)"]
+                http["HTTP Controller"]
+                cli["CLI Handler"]
+            end
+            subgraph Core["Domain Core"]
+                domain["Domain Logic"]
+                inport["Input Port"]
+                outport["Output Port"]
+            end
+            subgraph Secondary["Secondary Adapters (Driven)"]
+                dbrepo["DB Repository"]
+                msgclient["Messaging Client"]
+            end
+            http --> inport
+            cli --> inport
+            inport --> domain
+            domain --> outport
+            outport -.->|implements| dbrepo
+            outport -.->|implements| msgclient
+        ```
+
+        *Vertical Slice / Feature-First:*
+        ```
+        flowchart LR
+            subgraph SliceA["Feature: [Name A]"]
+                ha["Handler A"] --> va["Validator A"]
+                ha --> dba[("DB")]
+            end
+            subgraph SliceB["Feature: [Name B]"]
+                hb["Handler B"] --> vb["Validator B"]
+                hb --> dbb[("DB")]
+            end
+            entry["Entry / Mediator"] --> ha
+            entry --> hb
+        ```
+
+        *CQRS:*
+        ```
+        flowchart TD
+            entry["Entry / Mediator"]
+            subgraph Commands
+                ch["Command Handler"] --> domain["Domain / Aggregate"]
+                domain --> writedb[("Write Store")]
+            end
+            subgraph Queries
+                qh["Query Handler"] --> readdb[("Read Store / Projection")]
+            end
+            entry --> ch
+            entry --> qh
+        ```
+
+        **Subsystem Context:**
+        - One-line responsibility — NOT a paragraph. If you need more words, the boundary is wrong
+        - System context table: only show DIRECT inbound/outbound. No transitive dependencies
+        - Keep it brief — the full system view is in system-architecture.md
+
+        **L3 Component Diagram:**
+        - Layered top-to-bottom (entry → application → domain → infrastructure → data)
+        - Each box = a logical component, NOT a file or class
+        - Use `flowchart TD` for layered architectures (Clean Architecture, DDD) or `flowchart LR`
+          for pipeline/stream-processing subsystems
+        - Do NOT show method calls — this is component-level, not code-level
+        - Component table: key files must be actual paths within the subsystem
+
+        **Internal Flows:**
+        - 1-3 flows maximum. Choose flows a NEW DEVELOPER must understand to add a feature
+        - Component-level only — no method names, no line numbers, no class details
+        - Sequence diagram participants = components from the L3 diagram, not files
+        - If more than 3 flows are needed, this subsystem likely has multiple bounded operations —
+          consider separate docs per operation or split the subsystem
+
+        **Dependency Inventory:**
+        - Inbound: every caller of this subsystem, even if it's just one other subsystem
+        - Outbound: every dependency this subsystem calls — including data stores, caches, queues
+        - "Failure Handling" for outbound: what happens when that dependency is unavailable?
+
+        **Data Ownership:**
+        - Strict — document who OWNS the data, not just who reads it
+        - Include ALL data stores: relational tables, document collections, cache keys, message topics
+        - "Data NOT owned here" prevents confusion when a subsystem reads across ownership boundaries
+
+        **Subsystem Architectural Decisions:**
+        - Only decisions that deviate from system-wide defaults or are significant within the subsystem
+        - Skip obvious choices (e.g., don't document "we use async/await" in a Node.js service)
+        - Decision + Rationale only. No status tracking, no dates
+
+        **What does NOT belong here:**
+        - Physical file layout (that's subsystem-structure.md)
+        - System-wide tech stack (that's system-architecture.md)
+        - L1/L2 diagrams (that's system-architecture.md)
+        - Code-level detail like class signatures, method contracts (L4 — in code comments/docs)
+
+    </guidelines>
+
+    <evolution>
+
+        Update when this subsystem's internal architecture changes.
+
+        **Update triggers:**
+        - Architectural pattern changed (e.g., N-Tier refactored to Clean Architecture)
+        - New component layer added (e.g., adding CQRS, adding a cache layer)
+        - New inbound integration (new caller, new event type consumed)
+        - New outbound dependency (new API called, new data store added)
+        - Data ownership changes (new table, new schema, new topic)
+        - New subsystem-specific architectural decision made
+        - Core internal flow fundamentally changed (not just a new step in an existing flow)
+
+        **NOT an update trigger:**
+        - New feature following existing patterns
+        - Bug fixes or refactoring within existing components
+        - New API endpoint within existing handler
+        - New fields on existing entities
+
+    </evolution>
+
+</subsystem-architecture>

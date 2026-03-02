@@ -1,0 +1,137 @@
+<guide>
+    <purpose>
+        Template for `.docs/wiki/subsystems/[subsystem-name]/guides/<task-name>.md` — a step-by-step
+        recipe for a common implementation task. Answers "How do I add/create/implement X?"
+
+        Each guide combines knowledge from multiple systems, patterns, and cross-cutting concerns
+        into one actionable recipe. It is the document an AI agent follows when performing a
+        recurring task end-to-end.
+
+        A "guide" is a task recipe for something developers do repeatedly:
+        e.g., "How to Add a New Drawing Tool", "How to Add a New CRUD Endpoint",
+        "How to Add a New Indicator", "How to Add a New Repository".
+
+        Complements:
+        - patterns/ docs (the structural patterns that guides reference)
+        - systems/ docs (the domain systems where guide steps take place)
+        - cross-cutting/ docs (the registrations and setup that guides include as steps)
+    </purpose>
+
+    <template>
+        <title>
+            # How to [Task]
+        </title>
+
+        <prerequisites>
+            ## Prerequisites
+
+            What you need to know or have in place before starting.
+            - Read: [Pattern Doc](../patterns/relevant-pattern.md) — understand the structural pattern
+            - Read: [System Doc](../systems/relevant-system.md) — understand the domain context
+            - Read: [Cross-Cutting Doc](../cross-cutting/relevant-concern.md) — understand registrations
+        </prerequisites>
+
+        <steps>
+            ## Steps
+
+            ### 1. [First Step]
+
+            What to do, where to do it, reference implementation to copy from.
+            - Create file: `[path]`
+            - Copy from: `file:ExistingImplementation` (closest reference)
+            - Key changes: [what to modify from the reference]
+
+            ### 2. [Second Step]
+
+            ...
+
+            ### 3. [Third Step]
+
+            ...
+        </steps>
+
+        <verification>
+            ## Verification
+
+            How to verify the implementation works.
+            - [ ] [Check 1]: [What to verify and how]
+            - [ ] [Check 2]: [What to verify and how]
+            - [ ] [Check 3]: [What to verify and how]
+        </verification>
+
+        <common-mistakes>
+            ## Common Mistakes
+
+            What people typically get wrong.
+            - [Mistake 1]: [Why it happens and how to avoid it]
+            - [Mistake 2]: [Why it happens and how to avoid it]
+        </common-mistakes>
+    </template>
+
+    <guidelines>
+
+        **Documentation Style:**
+        - EXTREMELY SUCCINCT — every word must add value
+        - NO FLUFF — direct, actionable information only
+        - Numbered steps — the agent follows these in order
+        - Code references as `file-path:ClassName.methodName` (not line numbers)
+        - Inline snippets ONLY for non-obvious configuration or registration code
+        - Every step must have a clear deliverable (a file created, a registration added, etc.)
+
+        **Prerequisites:**
+        - Link to the docs an agent should read BEFORE starting.
+        - Don't repeat content from those docs — just link.
+        - List any tools, dependencies, or environment requirements.
+
+        **Steps:**
+        - NUMBERED, ORDERED steps. An agent follows these sequentially.
+        - Each step has: WHAT to do, WHERE to do it, WHAT to copy from.
+        - Reference existing implementations as "copy from" targets — agents copy patterns, not invent.
+        - Include ALL steps: file creation, registration, configuration, wiring.
+        - Don't skip "obvious" steps — agents don't infer implicit requirements.
+
+        **Verification:**
+        - Checklist format. Agent runs through these after completing all steps.
+        - Include compilation check, runtime check, and behavioral check.
+        - Reference specific files or commands for verification.
+
+        **Common Mistakes:**
+        - Things agents (and developers) typically get wrong on first attempt.
+        - Each mistake should include WHY it happens and HOW to avoid it.
+        - Drawn from actual experience (gotchas from pattern and system docs).
+
+        **What does NOT belong here:**
+        - Detailed pattern explanations (link to patterns/ docs instead)
+        - System domain knowledge (link to systems/ docs instead)
+        - Cross-cutting mechanism details (link to cross-cutting/ docs instead)
+        - Story numbers, sprint context, revision history
+        - Testing strategy or test code (verification section covers basic checks only)
+
+    </guidelines>
+
+    <evolution>
+
+        This is a LIVING document — updated when the recipe changes.
+
+        **Update triggers:**
+        - New step required (new registration, new file to create)
+        - Step removed (registration no longer needed)
+        - Step order changed
+        - New common mistake discovered
+        - Reference implementation changed (new "copy from" target)
+        - Prerequisite docs added or removed
+
+        **NOT an update trigger:**
+        - New feature that follows the existing recipe without changes
+        - Bug fix in one implementation that followed the guide
+        - Internal refactoring that doesn't change the steps
+
+        **Update rules:**
+        - UPDATE steps when the recipe changes
+        - ADD new common mistakes as they are discovered
+        - UPDATE "copy from" references when better examples exist
+        - Keep the guide current — an agent should be able to follow it TODAY
+
+    </evolution>
+
+</guide>

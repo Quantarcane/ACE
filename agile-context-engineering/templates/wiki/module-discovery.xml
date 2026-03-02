@@ -1,0 +1,174 @@
+<module-discovery>
+    <purpose>
+        Template for `.ace/artifacts/[subsystem_name]/module-discovery.md` — the discovery
+        artifact that groups subsystem files into logical documentation modules.
+
+        This document is consumed by Step 8.7 of map-subsystem to determine which map-story
+        calls to make and what files to pass to each call.
+
+        Each module is a coherent group of related files that together represent one concern.
+        map-story receives the files and autonomously decides what documentation to produce —
+        it may create systems/ docs, patterns/ docs, cross-cutting/ docs, guides/ docs, and
+        decisions/ docs, all from a single call. Discovery does NOT pre-categorize modules
+        by document type.
+
+        Files CAN appear in multiple modules. A domain model shared by two systems legitimately
+        belongs in both — map-story will document it from each system's perspective.
+    </purpose>
+
+    <template>
+        # Module Discovery: [subsystem_name]
+
+        ## Modules
+
+        Each row is one coherent group of related files. map-story receives these files
+        and autonomously decides what docs to create or update (systems/, patterns/,
+        cross-cutting/, guides/, decisions/).
+
+        | # | Module Name | Files | Relevant Docs |
+        |---|-------------|-------|---------------|
+        | 1 | [e.g., User Management] | [comma-separated absolute paths — full E2E flow] | [comma-separated doc paths, or `none`] |
+        | 2 | [e.g., Order Processing] | [comma-separated absolute paths — full E2E flow] | [comma-separated doc paths, or `none`] |
+        | 3 | [e.g., Repository Pattern] | [2-4 representative files that demonstrate the pattern] | [docs, or `none`] |
+        | 4 | [e.g., Dependency Injection] | [all DI/registration files] | [docs, or `none`] |
+
+        ## Existing Documentation Inventory
+
+        All documentation files found within the subsystem, with their curation status.
+
+        | # | Doc Path | Type | Curated To Module |
+        |---|----------|------|-------------------|
+        | 1 | [absolute path to .md file] | [README / architecture / implementation-doc / planning / cross-cutting / other] | [module name, or `unmatched`] |
+
+        ## File Coverage
+
+        **Total files in subsystem:** N
+        **Files covered by at least one module:** M
+        **Uncovered files:** [list any files intentionally excluded]
+
+        Intentionally excluded (trivial):
+        - `[path]` — [reason: index re-export / empty stub / generated code / test file]
+    </template>
+
+    <guidelines>
+
+        **What makes a good module:**
+
+        A module is a coherent group of files that together represent ONE concern worth
+        documenting. Discovery groups files by concern — map-story decides what doc types
+        to produce from each group. There are three kinds of modules to discover:
+
+        **E2E Domain Flows (most important):**
+
+        A vertical slice traced from entry point through all architectural layers.
+
+        How to discover:
+        - Identify entry points: HTTP controllers, CLI handlers, event consumers, background jobs
+        - Trace DOWNWARD through every layer:
+          controller -> mapper -> service/use-case -> domain entity + value objects
+                     -> repository interface -> repository implementation -> DB scripts / migrations
+        - Collect EVERY file that participates — including DTOs, mappers, constants
+        - Group related entry points when they share the same domain concern:
+          CreateUser + GetUser + UpdateUser + DeleteUser = "User Management" (not 4 modules)
+
+        Key rule: a domain model shared across flows appears in EVERY module that uses it.
+        Do NOT exclude a file because it is shared — duplication in the file list is CORRECT.
+
+        **Recurring Implementation Patterns:**
+
+        A group of similarly structured files that follow a common template.
+
+        How to discover:
+        - Find groups of similar files (3+ repositories, 3+ mappers, 3+ handlers)
+        - Read them — if they follow the same structural template, that's a pattern
+        - Use 2-4 representative files (not all implementations — map-story will discover the rest)
+        - Examples: Repository Pattern, CQRS, Template Method, Factory/Registry, Mapper Pattern
+
+        **Shared Infrastructure / Cross-Cutting Concerns:**
+
+        Infrastructure files that multiple domain flows depend on.
+
+        How to discover:
+        - DI container / service registration files
+        - Event bus, message broker, pub/sub infrastructure
+        - Cache / invalidation infrastructure
+        - Authentication / authorization middleware
+        - Shared abstract base classes
+        - Error handling or logging infrastructure
+        - Registry / factory lookup tables
+
+        **Existing Documentation (Relevant Docs column):**
+
+        Subsystems often contain pre-existing documentation: READMEs, architecture notes,
+        legacy implementation docs, feature planning docs, cross-cutting docs. These are
+        valuable context for map-story — they describe intent, decisions, and history that
+        the code alone doesn't convey.
+
+        How to discover existing docs:
+        - Scan the subsystem directory recursively for *.md files
+        - Scan common documentation locations: `docs/`, `documentation/`, `README.md`,
+          `ARCHITECTURE.md`, `.docs/` (if legacy docs exist there)
+        - Include legacy implementation docs (`*-implementation-doc.md`) — they contain
+          detailed knowledge about what was built and why
+
+        How to curate (assign docs to modules):
+        - Read each doc's title and first few lines to understand its subject
+        - Match to the module whose domain it describes:
+          e.g., `drawing-visibility-implementation-doc.md` -> Drawing System module
+        - A doc can be relevant to multiple modules — list it in each
+        - Architecture docs and READMEs are typically relevant to ALL system modules
+        - Feature planning docs are relevant to the system they planned
+        - Cross-cutting docs match cross-cutting modules
+
+        The Existing Documentation Inventory table lists ALL docs found with their curation status.
+        Docs marked `unmatched` were found but don't clearly belong to any module — the
+        synthesis agent should decide if a new module is needed or if the doc is obsolete.
+
+        **File Coverage:**
+
+        Every non-trivial file must appear in at least one module. Exclude ONLY:
+        - Index / barrel re-exports (files that only re-export from other files, no logic)
+        - Empty stubs or placeholder files
+        - Auto-generated files (never manually edited)
+        - Build output
+        - Test files (*.test.ts, *.spec.ts, *Tests.cs, etc.)
+
+        If a file has meaningful logic and fits no existing module, create a new module for it.
+
+    </guidelines>
+
+    <what-not-to-do>
+
+        DO NOT group files by architectural layer:
+        - WRONG: { module: "Controllers", files: [UserController, OrderController, ProductController] }
+        - RIGHT: { module: "User Management", files: [UserController, CreateUserDto, UserMapper, UserService, IUserRepository, UserRepository, User, 20240101_CreateUsers.sql] }
+
+        DO NOT exclude domain models because they are shared:
+        - WRONG: Put the User model in zero modules or only one
+        - RIGHT: User model appears in every system that uses it (User Management, Authentication, etc.)
+
+        DO NOT create a module per file:
+        - WRONG: { module: "UserController", files: [UserController.ts] }
+        - RIGHT: { module: "User Management", files: [UserController.ts, ...all related files] }
+
+        DO NOT infer modules from the structure doc or architecture doc summaries alone:
+        - WRONG: Read structure.md, see folder names, create one module per folder
+        - RIGHT: Read the ACTUAL SOURCE CODE — trace E2E flows, read multiple similar files to find patterns
+
+        DO NOT treat all files as equally important:
+        - Index re-exports, empty stubs, and test files are excluded from modules
+        - Focus on files that contain real logic a developer would need to understand
+
+    </what-not-to-do>
+
+    <evolution>
+
+        module-discovery.md is a single-use artifact created per map-subsystem run.
+        It is NOT maintained over time — it is regenerated each time map-subsystem runs.
+
+        It lives in `.ace/artifacts/[subsystem_name]/module-discovery.md` (ephemeral tier).
+        It is committed to git as a record of what this map-subsystem run documented.
+
+    </evolution>
+
+</module-discovery>

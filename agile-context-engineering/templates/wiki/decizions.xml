@@ -1,0 +1,115 @@
+<decisions>
+    <purpose>
+        Template for `.docs/wiki/subsystems/[subsystem-name]/decisions/<decision-name>.md` — an
+        Architecture Decision Record (ADR) capturing WHY a significant choice was made.
+        Answers "Why did we choose X over Y?"
+
+        Each decision doc captures one significant technical decision with its context and
+        trade-offs. It is the document an AI agent reads to understand WHY things are built
+        a certain way, preventing it from making the wrong choice.
+
+        Create an ADR ONLY when a significant "why" decision was made:
+        - Choosing one approach over another with meaningful trade-offs
+        - Deviating from an established pattern for a specific reason
+        - Adopting a new technology, pattern, or architectural approach
+        - Rejecting a seemingly obvious solution for non-obvious reasons
+
+        Do NOT create ADRs for trivial or obvious decisions.
+
+        Complements:
+        - systems/ docs (WHAT exists — systems reference decisions that shaped them)
+        - patterns/ docs (HOW things work — patterns reference decisions that defined them)
+        - cross-cutting/ docs (shared infrastructure shaped by architectural decisions)
+    </purpose>
+
+    <template>
+        <decision-record>
+            # ADR-NNN: [Decision Title]
+
+            **Status**: Accepted | Superseded by [ADR-MMM](./ADR-MMM-slug.md)
+            **Date**: YYYY-MM-DD
+            **Story**: [story reference, if applicable]
+
+            ## Context
+            What situation prompted this decision. 2-3 sentences max.
+
+            ## Decision
+            What was decided. 2-3 sentences max.
+
+            ## Alternatives Considered
+            - **[Alternative A]**: [Why rejected — 1 sentence]
+            - **[Alternative B]**: [Why rejected — 1 sentence]
+
+            ## Consequences
+            - Pro: [positive outcome]
+            - Pro: [positive outcome]
+            - Con: [trade-off accepted]
+        </decision-record>
+    </template>
+
+    <guidelines>
+
+        **Documentation Style:**
+        - EXTREMELY SUCCINCT — each ADR should be under 30 lines
+        - NO FLUFF — every sentence must convey a decision, reason, or consequence
+        - Bullet points for alternatives and consequences
+        - Code references as `file-path:ClassName` only when the decision is about specific code
+
+        **ADR Numbering:**
+        - Sequential within the subsystem: ADR-001, ADR-002, etc.
+        - Filename format: `ADR-NNN-kebab-case-slug.md`
+        - To find the next number, read existing ADRs in the decisions/ directory.
+
+        **Status:**
+        - `Accepted` — the decision is in effect
+        - `Superseded by ADR-MMM` — replaced by a later decision (link to it)
+        - ADRs are IMMUTABLE — never edit an accepted ADR. Create a new one that supersedes it.
+
+        **Context:**
+        - 2-3 sentences. What problem or situation forced a choice.
+        - Reference the system or pattern this decision affects.
+
+        **Decision:**
+        - 2-3 sentences. What was chosen and at what scope.
+        - Be specific — "We use X for Y" not "We decided to improve things."
+
+        **Alternatives Considered:**
+        - List each rejected alternative with ONE sentence explaining why.
+        - If there were no meaningful alternatives, omit this section.
+
+        **Consequences:**
+        - Bullet list of pros and cons.
+        - Be honest about trade-offs — future agents need to know the downsides.
+        - Include migration/compatibility consequences if applicable.
+
+        **What does NOT belong here:**
+        - Implementation details (that's in systems/ and patterns/ docs)
+        - Step-by-step instructions (that's in guides/)
+        - Full analysis or research documents (those are in .ace/artifacts/)
+        - Revision history or meeting notes
+
+    </guidelines>
+
+    <evolution>
+
+        ADRs are IMMUTABLE once accepted. They are historical records.
+
+        **When to create a new ADR:**
+        - A significant architectural or pattern choice is made during a story
+        - An existing decision is reversed or significantly modified (supersede the old one)
+        - A new technology, pattern, or approach is adopted
+
+        **When NOT to create an ADR:**
+        - Routine implementation following existing patterns
+        - Bug fixes or refactoring that don't change architectural direction
+        - Trivial decisions with no meaningful trade-offs
+        - Decisions already captured in an existing ADR
+
+        **Superseding:**
+        - Create the new ADR with its own number
+        - Update the old ADR's Status to: `Superseded by [ADR-MMM](./ADR-MMM-slug.md)`
+        - This is the ONLY edit allowed on an accepted ADR
+
+    </evolution>
+
+</decisions>
