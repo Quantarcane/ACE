@@ -1,10 +1,11 @@
 ---
-name: ace:init-project
+name: ace:help
 description: Check project initialization status and suggest next steps
 argument-hint: ""
 allowed-tools:
   - Read
   - Bash
+  - Write
   - AskUserQuestion
 ---
 
@@ -37,7 +38,8 @@ allowed-tools:
     </input>
 
     <execution-context>
-        <init-project-workflow>@~/.claude/agile-context-engineering/workflows/init-project.xml</init-project-workflow>
+        <help-workflow>@~/.claude/agile-context-engineering/workflows/help.xml</help-workflow>
+        <questioning>@~/.claude/agile-context-engineering/utils/questioning.xml</questioning>
         <ui-formatting>@~/.claude/agile-context-engineering/utils/ui-formatting.md</ui-formatting>
     </execution-context>
 
@@ -49,19 +51,19 @@ allowed-tools:
         </objective>
 
         <artifacts>
-            No artifacts created — this is a read-only status check.
+            - .ace/settings.json (created on first run if missing)
         </artifacts>
     </output>
 
     <process>
-        Execute the init-project workflow from
-        `@~/.claude/agile-context-engineering/workflows/init-project.xml` end-to-end.
+        Execute the help workflow from
+        `@~/.claude/agile-context-engineering/workflows/help.xml` end-to-end.
         This is a lightweight state-check and routing workflow.
     </process>
 
     <next-steps>
         **Specialized commands for each document:**
-        - `/ace:upsert-product-vision` — Create or update the product vision
+        - `/ace:plan-product-vision` — Create or update the product vision
         - `/ace:map-system` — Map codebase structure, architecture, and testing framework
         - `/ace:init-coding-standards` — Generate tailored coding standards
     </next-steps>

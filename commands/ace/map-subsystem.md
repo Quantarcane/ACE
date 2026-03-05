@@ -130,7 +130,7 @@ allowed-tools:
 
         Also suggest:
         - `/ace:init-coding-standards` — Define prescriptive coding standards
-        - `/ace:init-project` — Check overall project initialization status
+        - `/ace:help` — Check project initialization status and next steps
         - Review and edit files in `.docs/wiki/system-wide/` anytime
     </next-steps>
 

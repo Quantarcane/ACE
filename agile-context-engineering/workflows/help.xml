@@ -1,0 +1,469 @@
+<workflow>
+
+    <purpose>
+        Interactive state-checker, settings configurator, and guided router for project
+        initialization. Detects which ACE documents exist, ensures settings are configured
+        (including GitHub Project integration), displays a status dashboard, and offers to
+        run missing setup commands — following the GSD new-project interactive pattern.
+    </purpose>
+
+    <mandatory-context>
+        Read all files referenced by the invoking prompt's execution-context before starting.
+    </mandatory-context>
+
+    <process>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 1: DETECT STATE                                              -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="detect-state" order="1">
+            **MANDATORY FIRST STEP — Execute environment detection before any user interaction.**
+
+            <substep order="1.1" name="environment-detection">
+                ```bash
+                INIT=$(node ~/.claude/agile-context-engineering/src/ace-tools.js init new-project)
+                ```
+
+                <output-fields>
+                    <field name="has_product_vision">Whether .docs/product/product-vision.md exists</field>
+                    <field name="has_system_architecture">Whether .docs/wiki/system-wide/system-architecture.md exists</field>
+                    <field name="has_system_structure">Whether .docs/wiki/system-wide/system-structure.md exists</field>
+                    <field name="has_coding_standards">Whether .docs/wiki/system-wide/coding-standards.md exists</field>
+                    <field name="has_testing_framework">Whether .docs/wiki/system-wide/testing-framework.md exists</field>
+                    <field name="is_brownfield">Existing code or package files detected</field>
+                    <field name="is_greenfield">No existing code detected</field>
+                    <field name="has_git">Whether .git directory exists</field>
+                    <field name="has_gh_cli">Whether GitHub CLI (gh) is installed</field>
+                </output-fields>
+            </substep>
+
+            <substep order="1.2" name="ensure-git">
+                <variant condition="has_git is false">
+                    ```bash
+                    git init
+                    ```
+                </variant>
+
+                <variant condition="has_git is true">
+                    No action needed.
+                </variant>
+            </substep>
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 2: ENSURE SETTINGS                                           -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="ensure-settings" order="2">
+            **Create `.ace/settings.json` if it does not exist.**
+
+            <substep order="2.1" name="create-settings-file">
+                ```bash
+                SETTINGS=$(node ~/.claude/agile-context-engineering/src/ace-tools.js ensure-settings)
+                ```
+
+                <output-fields>
+                    <field name="created">Whether settings.json was just created (true) or already existed (false)</field>
+                    <field name="settings">The current settings object</field>
+                </output-fields>
+            </substep>
+
+            <substep order="2.2" name="display-settings-status">
+                <variant condition="created is true">
+                    Display:
+                    ```
+                    ┌──────────────────────────────────────────────────┐
+                    │  ACE > Settings                                   │
+                    └──────────────────────────────────────────────────┘
+
+                      ✓  Created .ace/settings.json with defaults.
+                    ```
+                </variant>
+
+                <variant condition="created is false">
+                    No display needed — settings already exist.
+                </variant>
+            </substep>
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 3: GITHUB PROJECT SETUP (mandatory — always runs)            -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="github-project-setup" order="3">
+            **Detect GitHub environment and ask the user about project board integration.**
+
+            <substep order="3.1" name="github-detection">
+                ```bash
+                GH_STATUS=$(node ~/.claude/agile-context-engineering/src/ace-tools.js init setup-github)
+                ```
+
+                <output-fields>
+                    <field name="gh_installed">Whether GitHub CLI (gh) is available</field>
+                    <field name="repo">Detected repository (e.g., owner/repo) or empty string</field>
+                    <field name="owner">Repository owner or empty string</field>
+                    <field name="projects">Array of {number, title} objects</field>
+                    <field name="current_settings">Current github_project settings from settings.json</field>
+                </output-fields>
+            </substep>
+
+            <substep order="3.2" name="evaluate-github-state">
+                <variant condition="current_settings.enabled is true">
+                    Already configured. Display:
+                    ```
+                      ✓  GitHub Project: #{current_settings.project_number}
+                         Owner: {current_settings.owner}
+                         Repo:  {current_settings.repo}
+                    ```
+                    Skip to step 4.
+                </variant>
+
+                <variant condition="gh_installed is false">
+                    Display:
+                    ```
+                      i  GitHub CLI (gh) not found — GitHub Project integration unavailable.
+                         Install from: https://cli.github.com/
+                    ```
+                    Skip to step 4.
+                </variant>
+
+                <variant condition="gh_installed is true AND current_settings.enabled is false">
+                    Continue to substep 3.3.
+                </variant>
+            </substep>
+
+            <substep order="3.3" name="ask-github-interest">
+                Use `AskUserQuestion`:
+                - header: "GitHub"
+                - question: "GitHub CLI detected. Do you want to connect a GitHub Project board for sprint tracking?"
+                - options:
+                  - "Yes, set it up (Recommended)" — Connect a GitHub Project now
+                  - "Skip for now" — Continue without GitHub Project integration
+
+                <variant condition="user chose Skip for now">
+                    Skip to step 4.
+                </variant>
+
+                <variant condition="user chose Yes, set it up">
+                    Continue to substep 3.4.
+                </variant>
+            </substep>
+
+            <substep order="3.4" name="confirm-repo">
+                <variant condition="repo is not empty">
+                    Use `AskUserQuestion`:
+                    - header: "Repository"
+                    - question: "Detected repository: `{repo}`. Is this correct?"
+                    - options:
+                      - "Yes, use {repo}" — Confirm this repository
+                      - "No, different repo" — I'll provide the correct repository
+
+                    If "No, different repo": ask user to provide the correct `owner/repo` string.
+                    Parse `owner` from the confirmed/provided repo string (everything before `/`).
+                </variant>
+
+                <variant condition="repo is empty">
+                    Ask the user to provide their `owner/repo` string.
+                    Parse `owner` from the provided string (everything before `/`).
+                </variant>
+            </substep>
+
+            <substep order="3.5" name="confirm-owner">
+                The `owner` is the GitHub user or organization that owns the project board.
+                By default it matches the repo owner, but it can differ (e.g., org project
+                boards used across multiple repos).
+
+                Use `AskUserQuestion`:
+                - header: "Owner"
+                - question: "Which GitHub user or organization owns the project board? Detected: `{owner}`"
+                - options:
+                  - "Use {owner}" — The repo owner owns the project board
+                  - "Different owner" — I'll provide the correct owner
+
+                <variant condition="user chose Use {owner}">
+                    Keep `owner` as-is.
+                </variant>
+
+                <variant condition="user chose Different owner">
+                    Ask user to provide the correct owner (GitHub username or org name).
+                    Update `owner` with the provided value.
+                </variant>
+            </substep>
+
+            <substep order="3.6" name="select-project">
+                Re-fetch projects for the confirmed owner (in case owner changed in 3.5):
+                ```bash
+                gh project list --owner {owner} --limit 10 --format json
+                ```
+
+                <variant condition="projects array is not empty">
+                    Use `AskUserQuestion`:
+                    - header: "Project"
+                    - question: "Which GitHub Project should ACE use?"
+                    - options: (build from projects array, max 4)
+                      - "{title} (#{number})" — for each project
+                </variant>
+
+                <variant condition="projects array is empty">
+                    Display:
+                    ```
+                      i  No GitHub Projects found for {owner}.
+                         Create one at https://github.com/orgs/{owner}/projects
+                         or https://github.com/users/{owner}/projects
+                    ```
+                    Skip to step 4.
+                </variant>
+            </substep>
+
+            <substep order="3.7" name="write-github-settings">
+                ```bash
+                node ~/.claude/agile-context-engineering/src/ace-tools.js write-github-settings enabled=true gh_installed=true repo={repo} project_number={number} owner={owner}
+                ```
+
+                Display:
+                ```
+                  ✓  GitHub Project configured.
+                     Owner:   {owner}
+                     Repo:    {repo}
+                     Project: {title} (#{number})
+                ```
+            </substep>
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 4: DISPLAY STATUS DASHBOARD                                  -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="status-dashboard" order="4">
+            Build and display the project status dashboard.
+
+            <substep order="4.1" name="render-documents-section">
+                ```
+                ╔══════════════════════════════════════════════════╗
+                ║  ACE > Project Status                            ║
+                ╚══════════════════════════════════════════════════╝
+
+                  Project type:       {brownfield|greenfield}
+
+                  Product Vision      [{check}] {status}    {suggestion}
+                  System Architecture [{check}] {status}    {suggestion}
+                  System Structure    [{check}] {status}    {suggestion}
+                  Coding Standards    [{check}] {status}    {suggestion}
+                  Testing Framework   [{check}] {status}    {suggestion}
+                ```
+
+                For each document:
+                - If exists: `[✓] exists` (no suggestion)
+                - If missing: `[ ] not created    → /ace:command-name`
+
+                <doc-command-mapping>
+                    <doc name="Product Vision"      command="/ace:plan-product-vision" />
+                    <doc name="System Architecture" command="/ace:map-system" />
+                    <doc name="System Structure"    command="/ace:map-system" />
+                    <doc name="Coding Standards"    command="/ace:init-coding-standards" />
+                    <doc name="Testing Framework"   command="/ace:map-system" />
+                </doc-command-mapping>
+            </substep>
+
+            <substep order="4.2" name="render-settings-section">
+                ```
+                  Settings            [✓] .ace/settings.json
+                  Model profile:      {settings.model_profile}
+                  Commit docs:        {settings.commit_docs}
+                ```
+            </substep>
+
+            <substep order="4.3" name="render-github-section">
+                ```
+                  GitHub CLI          [{check}] {installed|not found}
+                  Owner               {owner or 'not detected'}
+                  Repository          {repo or 'not detected'}
+                  GitHub Project      [{check}] {configured — #number | not configured}
+                ```
+            </substep>
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 5: OFFER CODEBASE MAPPING (brownfield only)                  -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="offer-map-system" order="5" condition="is_brownfield is true AND has_system_architecture is false">
+
+            <substep order="5.1" name="ask-map-codebase">
+                Use `AskUserQuestion`:
+                - header: "Codebase"
+                - question: "I detected existing code but no wiki documentation. Would you like to map your codebase first?"
+                - options:
+                  - "Map codebase (Recommended)" — Run /ace:map-system to analyze architecture, structure, and testing framework
+                  - "Skip for now" — Continue without mapping
+            </substep>
+
+            <substep order="5.2" name="route-map-decision">
+                <variant condition="user chose Map codebase">
+                    Display:
+                    ```
+                      Next > Run /ace:map-system to map your codebase.
+                             This will generate system-structure, system-architecture,
+                             and testing-framework documents.
+                    ```
+                    **Exit workflow.**
+                </variant>
+
+                <variant condition="user chose Skip for now">
+                    Continue to step 6.
+                </variant>
+            </substep>
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 6: OFFER PRODUCT VISION                                      -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="offer-product-vision" order="6" condition="has_product_vision is false">
+
+            <substep order="6.1" name="ask-product-vision">
+                Use `AskUserQuestion`:
+                - header: "Vision"
+                - question: "No product vision found. Would you like to define one now?"
+                - options:
+                  - "Create product vision (Recommended)" — Run /ace:plan-product-vision to define what you're building and why
+                  - "Skip for now" — Continue without a product vision
+            </substep>
+
+            <substep order="6.2" name="route-vision-decision">
+                <variant condition="user chose Create product vision">
+                    Display:
+                    ```
+                      Next > Run /ace:plan-product-vision to define your product vision.
+                             This drives all downstream planning.
+                    ```
+                    **Exit workflow.**
+                </variant>
+
+                <variant condition="user chose Skip for now">
+                    Continue to step 7.
+                </variant>
+            </substep>
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 7: OFFER CODING STANDARDS                                    -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="offer-coding-standards" order="7" condition="has_coding_standards is false">
+
+            <substep order="7.1" name="ask-coding-standards">
+                Use `AskUserQuestion`:
+                - header: "Standards"
+                - question: "No coding standards found. Would you like to generate them?"
+                - options:
+                  - "Generate coding standards (Recommended)" — Run /ace:init-coding-standards to create tailored standards
+                  - "Skip for now" — Continue without coding standards
+            </substep>
+
+            <substep order="7.2" name="route-standards-decision">
+                <variant condition="user chose Generate coding standards">
+                    Display:
+                    ```
+                      Next > Run /ace:init-coding-standards to generate tailored coding standards.
+                    ```
+                    **Exit workflow.**
+                </variant>
+
+                <variant condition="user chose Skip for now">
+                    Continue to step 8.
+                </variant>
+            </substep>
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 8: OFFER PRODUCT BACKLOG                                     -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="offer-product-backlog" order="8" condition="has_product_vision is true">
+
+            <substep order="8.1" name="check-backlog-exists">
+                ```bash
+                HAS_BACKLOG=$(node ~/.claude/agile-context-engineering/src/ace-tools.js verify-path-exists .ace/artifacts/product/product-backlog.md --raw)
+                ```
+
+                <variant condition="HAS_BACKLOG is true">
+                    Backlog already exists. Skip to step 9.
+                </variant>
+
+                <variant condition="HAS_BACKLOG is false">
+                    Continue to substep 8.2.
+                </variant>
+            </substep>
+
+            <substep order="8.2" name="ask-plan-backlog">
+                Use `AskUserQuestion`:
+                - header: "Backlog"
+                - question: "You have a product vision but no backlog. Would you like to plan your product backlog?"
+                - options:
+                  - "Plan backlog (Recommended)" — Run /ace:plan-backlog to break your vision into epics and features
+                  - "Skip for now" — Continue without a backlog
+            </substep>
+
+            <substep order="8.3" name="route-backlog-decision">
+                <variant condition="user chose Plan backlog">
+                    Display:
+                    ```
+                      Next > Run /ace:plan-backlog to break your vision into epics and features.
+                    ```
+                    **Exit workflow.**
+                </variant>
+
+                <variant condition="user chose Skip for now">
+                    Continue to step 9.
+                </variant>
+            </substep>
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 9: COMPLETION                                                -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="completion" order="9">
+
+            <substep order="9.1" name="greenfield-note" condition="is_greenfield is true AND has_system_architecture is false">
+                Display:
+                ```
+                  i  System architecture, structure, and testing framework docs
+                     are created by /ace:map-system after you have code to analyze.
+                ```
+            </substep>
+
+            <substep order="9.2" name="fully-initialized">
+                <variant condition="all documents exist (vision + architecture + structure + coding standards + testing framework)">
+                    Display:
+                    ```
+                      ✓  Project is fully initialized. All core documents are in place.
+
+                      Next > /ace:plan-project
+                             Start planning your product backlog.
+                    ```
+                </variant>
+
+                <variant condition="some documents are missing (user skipped offers)">
+                    Display:
+                    ```
+                      i  Run /ace:help anytime to check status and pick up where you left off.
+                    ```
+                </variant>
+            </substep>
+        </step>
+
+    </process>
+
+    <success_criteria>
+        <check>Environment detection executed successfully</check>
+        <check>Settings.json ensured (created if missing)</check>
+        <check>GitHub Project integration offered to the user (not silently skipped)</check>
+        <check>Status dashboard displayed showing all document states, settings, and GitHub status</check>
+        <check>Missing setup commands offered interactively in priority order</check>
+        <check>No document creation performed (delegated to specialized commands)</check>
+    </success_criteria>
+
+</workflow>

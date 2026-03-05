@@ -1,0 +1,1356 @@
+<workflow>
+
+    <purpose>
+        Orchestrate product backlog creation or update through environment detection, GitHub issue
+        import, product-vision loading, optional wiki analysis (parallel sub-agents for brownfield
+        projects), optional domain research, deep questioning, document writing, and optional
+        GitHub sync. Produces `.ace/artifacts/product/product-backlog.md` — the ordered backlog
+        of Epics and Features that defines what the product will deliver.
+
+        The product vision's High-Level Capabilities are the primary input — each capability
+        maps to one or more Epics. For brownfield projects with wiki documentation, parallel
+        analysis agents extract existing feature inventories and status from the wiki, keeping
+        raw content out of the main context window. When GitHub Project integration is enabled,
+        existing issues are imported and new items can be synced back to GitHub.
+    </purpose>
+
+    <mandatory-context>
+        Read all files referenced by the invoking command's execution-context before starting.
+        Also read any document or text passed as parameter ($ARGUMENTS) in the invoking command.
+    </mandatory-context>
+
+    <process>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 1: SETUP                                                     -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="setup" order="1">
+            **MANDATORY FIRST STEP — Execute environment detection before any user interaction:**
+
+            ```bash
+            INIT=$(node ~/.claude/agile-context-engineering/src/ace-tools.js init plan-backlog)
+            ```
+
+            Parse JSON for: `product_owner_model`, `researcher_model`, `commit_docs`,
+            `has_product_vision`, `has_product_backlog`,
+            `has_features_research`, `has_architecture_research`, `has_wiki_analysis`,
+            `is_brownfield`, `is_greenfield`,
+            `has_existing_code`, `has_package_file`, `has_wiki`, `has_wiki_system_wide`,
+            `has_wiki_subsystems`, `wiki_subsystem_names`, `has_system_architecture`,
+            `has_system_structure`, `has_testing_framework`, `has_git`, `has_gh_cli`,
+            `github_project` (object: `enabled`, `gh_installed`, `repo`, `project_number`, `owner`).
+
+            Also resolve the product owner model for spawning the writing agent:
+            ```bash
+            PO_MODEL=$(node ~/.claude/agile-context-engineering/src/ace-tools.js resolve-model ace-product-owner --raw)
+            ```
+
+            Display stage banner:
+
+            ```
+            ╔══════════════════════════════════════════════════╗
+            ║  ACE > Plan Backlog                              ║
+            ╚══════════════════════════════════════════════════╝
+            ```
+
+            **If `has_product_backlog` is true:**
+
+            Use AskUserQuestion:
+            - header: "Backlog exists"
+            - question: "A product backlog already exists at `.ace/artifacts/product/product-backlog.md`. What would you like to do?"
+            - options:
+              - "Update it" — Review and refine the existing backlog
+              - "Start fresh" — Discard and create a new backlog from scratch
+              - "Skip" — Keep the current backlog as-is
+
+            If "Update": Read existing file, hold as EXISTING_BACKLOG context, continue to step 2.
+            If "Start fresh": Set EXISTING_BACKLOG = null, continue to step 2.
+            If "Skip": Exit workflow.
+
+            **If `has_git` is false:** Initialize git:
+            ```bash
+            git init
+            ```
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 2: FETCH GITHUB ISSUES                                       -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="fetch-github-issues" order="2">
+
+            **If `github_project.enabled` is false AND `has_gh_cli` is true:**
+
+            GitHub CLI is installed but GitHub Project integration isn't configured in ACE.
+            Check if this is a GitHub repo:
+            ```bash
+            gh repo view --json name,owner 2>/dev/null
+            ```
+
+            If the command succeeds (this IS a GitHub repo):
+
+            Use AskUserQuestion:
+            - header: "GitHub"
+            - question: "I detected a GitHub repo but GitHub Project integration isn't configured in ACE. If you have epics/features in a GitHub Project, I can import them. How would you like to proceed?"
+            - options:
+              - "Configure GitHub first" — Run /ace:help to set up GitHub Project integration, then re-run
+              - "Skip GitHub" — Continue without GitHub import
+
+            If "Configure GitHub first":
+            - Display:
+              ```
+              ┌──────────────────────────────────────────────────┐
+              │  Next > /ace:help                                  │
+              │         Configure GitHub Project integration,      │
+              │         then re-run /ace:plan-backlog               │
+              └──────────────────────────────────────────────────┘
+              ```
+            - Exit workflow.
+
+            If "Skip GitHub":
+            - Set GITHUB_ISSUES = null.
+            - Continue to step 3.
+
+            If the command fails (not a GitHub repo), or if `has_gh_cli` is false:
+            - Set GITHUB_ISSUES = null.
+            - Continue to step 3.
+
+            **If `github_project.enabled` is true AND `github_project.gh_installed` is false:**
+
+            GitHub Project is configured but `gh` CLI is not installed. Warn the user:
+            - Display:
+              ```
+                !  GitHub Project integration is enabled but `gh` CLI is not installed.
+                   Install it: https://cli.github.com/
+                   Continuing without GitHub import.
+              ```
+            - Set GITHUB_ISSUES = null.
+            - Continue to step 3.
+
+            **If `github_project.enabled` is true AND `github_project.gh_installed` is true:**
+
+            Extract settings: REPO = `github_project.repo`, PROJECT_NUMBER = `github_project.project_number`, OWNER = `github_project.owner`.
+
+            Display:
+            ```
+            ┌──────────────────────────────────────────────────┐
+            │  ACE > Plan Backlog > GitHub Import               │
+            └──────────────────────────────────────────────────┘
+
+              i  Fetching epics and features from GitHub Project #{PROJECT_NUMBER}...
+                 Repo: {REPO} | Owner: {OWNER}
+            ```
+
+            **Fetch all epics and features with full field data (single command):**
+
+            ```bash
+            GITHUB_ISSUES=$(node ~/.claude/agile-context-engineering/src/ace-tools.js github fetch-issues \
+              repo={REPO} owner={OWNER} project={PROJECT_NUMBER})
+            ```
+
+            This uses a single paginated GraphQL query to return all Epics and Features with:
+            - **number** — GitHub issue number
+            - **title** — issue title (preserved as-is)
+            - **status** — from the project's Status field (Todo, Refined, In Progress, Done)
+            - **priority** — from the project's Priority field (P0–P4)
+            - **estimate** — from the project's Estimate field (number)
+            - **sprint** — from the project's Sprint/Iteration field
+            - **milestone** — from the issue's milestone
+            - **url** — full GitHub issue URL
+            - **state** — issue state (OPEN/CLOSED)
+            - **parent_number** / **parent_title** — parent issue (features only)
+
+            Type detection uses this priority order (handled by ace-tools):
+            1. If native `issueType` is set → use it (Epic / Feature)
+            2. If title starts with `[Epic]` → type = Epic
+            3. If title starts with `[Feature]` → type = Feature
+            4. Otherwise → skipped (not an epic or feature)
+
+            The command returns structured JSON:
+            ```json
+            {
+              "epics": [{ number, title, status, priority, estimate, sprint, milestone, url, state }],
+              "features": [{ number, title, status, priority, estimate, sprint, milestone, parent_number, parent_title, url, state }],
+              "counts": { total, epics, features, skipped }
+            }
+            ```
+
+            Features without a parent Epic are "unparented" — present them separately
+            during questioning.
+
+            Hold the parsed JSON as GITHUB_ISSUES.
+
+            Display summary:
+            ```
+              +  Found {N} epics and {M} features in GitHub Project #{PROJECT_NUMBER}.
+                 [list epic titles with issue numbers]
+            ```
+
+            Continue to step 3.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 3: PREREQUISITE — PRODUCT VISION                             -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="prerequisite-vision" order="3">
+
+            **If `has_product_vision` is false:**
+
+            Inform the user:
+            "The product vision is the foundation for backlog planning. It defines the
+            high-level capabilities that become epics. Without it, I'd be guessing at
+            the product's direction."
+
+            Use AskUserQuestion:
+            - header: "Product Vision"
+            - question: "No product vision found. The vision drives backlog structure — each capability becomes an epic. How would you like to proceed?"
+            - options:
+              - "Run /ace:plan-product-vision first" — Create the vision, then come back
+              - "Continue without vision" — I'll describe capabilities during questioning
+
+            If "Run /ace:plan-product-vision first":
+            - Display:
+              ```
+              ┌──────────────────────────────────────────────────┐
+              │  Next > /ace:plan-product-vision                   │
+              │         Then re-run /ace:plan-backlog               │
+              └──────────────────────────────────────────────────┘
+              ```
+            - Exit workflow.
+
+            If "Continue without vision":
+            - Set VISION = null
+            - Continue to step 4.
+
+            **If `has_product_vision` is true:**
+
+            Read `.docs/product/product-vision.md`.
+
+            Extract and hold as VISION context:
+            - **Vision Statement** — the north star (1-2 sentences)
+            - **Target Audience** — who uses this product
+            - **High-Level Capabilities** — these map directly to epic candidates
+            - **Key Objectives** — measurable outcomes (epics should trace to these)
+            - **Constraints** — tech, timeline, budget (affects sizing and milestones)
+
+            The High-Level Capabilities list is the **primary seed for epic discovery**.
+            Each capability is a candidate epic. Some may split into multiple epics,
+            some may merge. The questioning step will refine this.
+
+            Continue to step 4.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 4: BROWNFIELD WIKI ANALYSIS (Parallel Sub-Agents)            -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="wiki-analysis" order="4">
+
+            **If `is_greenfield` OR `has_wiki` is false:**
+
+            Set WIKI_ANALYSIS = null.
+            Continue to step 5.
+
+            **If `is_brownfield` AND `has_wiki` is true:**
+
+            Check `has_wiki_analysis` from INIT (already resolved — do NOT use shell commands to check file existence):
+
+            If `has_wiki_analysis` is TRUE:
+            - Use AskUserQuestion:
+              - header: "Wiki Analysis"
+              - question: "A previous wiki analysis exists (`.ace/artifacts/wiki/wiki-analysis.md`). What would you like to do?"
+              - options:
+                - "Reuse it" — Skip wiki analysis, load the existing file
+                - "Re-run analysis" — Delete and re-analyze from wiki docs
+            - If "Reuse it": read `.ace/artifacts/wiki/wiki-analysis.md`, hold as WIKI_ANALYSIS, continue to step 5.
+            - If "Re-run analysis": delete the file and proceed below.
+
+            Display:
+            ```
+            ┌──────────────────────────────────────────────────┐
+            │  ACE > Plan Backlog > Wiki Analysis               │
+            └──────────────────────────────────────────────────┘
+
+              i  Analyzing wiki documentation to infer existing
+                 epics, features, and their status...
+            ```
+
+            Spawn parallel analysis agents using `run_in_background=true`. Each agent reads wiki
+            content and APPENDS its summary directly to a shared file on disk.
+
+            **CRITICAL — Context Window Protection:**
+            The `ace-product-owner` agent has a built-in `<structured-returns>` protocol:
+            when spawned as a background agent, it writes to disk and returns ONLY a ~10-line
+            confirmation (file path + line count). This prevents agent output from inflating
+            the main context window.
+
+            **CRITICAL — Do NOT call TaskOutput:**
+            After spawning background agents, do NOT call TaskOutput to read their results.
+            You will be automatically notified when each agent completes — IGNORE those notifications.
+            The agents write to `.ace/artifacts/wiki/wiki-analysis.md` on disk. You do not need their return messages.
+            After all notifications arrive, verify the file with `wc -l .ace/artifacts/wiki/wiki-analysis.md`,
+            then proceed directly to the synthesizer.
+
+            Scale agents by subsystem count: 1 system-wide + 1 per subsystem, up to 10 total.
+            If subsystems exceed 9, batch 2-3 per agent.
+
+            All agents write to the same file: `.ace/artifacts/wiki/wiki-analysis.md`
+
+            First, create the file with a header:
+            ```bash
+            mkdir -p .ace/artifacts/wiki
+            echo "# Wiki Analysis for Backlog Planning" > .ace/artifacts/wiki/wiki-analysis.md
+            echo "" >> .ace/artifacts/wiki/wiki-analysis.md
+            ```
+
+            Display:
+            ```
+              i  Spawning [N] wiki analysis agents in background
+                 (1 system-wide + [M] subsystem-specific)...
+                 Agents write directly to .ace/artifacts/wiki/wiki-analysis.md
+            ```
+
+            **Agent 1: System-Wide Analyst** (always, if `has_wiki_system_wide`):
+
+            Task tool parameters:
+            ```
+            subagent_type: "ace-product-owner"
+            model: "{PO_MODEL}"
+            run_in_background: true
+            description: "Analyze system-wide wiki"
+            ```
+
+            Prompt:
+            ```
+            You are analyzing wiki documentation to extract backlog-relevant information.
+
+            **Read these files (if they exist):**
+            - .docs/wiki/system-wide/system-architecture.md
+            - .docs/wiki/system-wide/system-structure.md
+
+            **APPEND the following structured summary to `.ace/artifacts/wiki/wiki-analysis.md`:**
+
+            ## System-Wide
+
+            - **System overview:** [1-2 sentences from system overview]
+            - **Subsystem count:** [N]
+            - **Subsystem responsibilities:**
+              - [Subsystem Name]: [Responsibility from matrix]
+              - [Subsystem Name]: [Responsibility from matrix]
+            - **Tech stack:** [comma-separated list of key technologies]
+            - **Communication patterns:** [sync/async/hybrid]
+            - **Capability areas inferred:** [list of broad capability areas derived from subsystem responsibilities]
+
+            IMPORTANT: Use Bash with `>> .ace/artifacts/wiki/wiki-analysis.md` to APPEND — do NOT overwrite.
+            If a file does not exist, note 'not found' for that section in the appended output.
+            ```
+
+            **1 agent per subsystem** (if `has_wiki_subsystems` AND `wiki_subsystem_names` is non-empty):
+
+            For each subsystem name (or batch of 2-3 if more than 9 subsystems):
+
+            Task tool parameters:
+            ```
+            subagent_type: "ace-product-owner"
+            model: "{PO_MODEL}"
+            run_in_background: true
+            description: "Analyze {subsystem_name} wiki"
+            ```
+
+            Prompt:
+            ```
+            You are analyzing subsystem wiki documentation to extract features and their status.
+
+            **Subsystem to analyze:** {subsystem_name}
+
+            **Read these files (if they exist):**
+            - .docs/wiki/subsystems/{subsystem_name}/architecture.md
+            - .docs/wiki/subsystems/{subsystem_name}/structure.md
+
+            **APPEND the following structured summary to `.ace/artifacts/wiki/wiki-analysis.md`:**
+
+            ## Subsystem: {subsystem_name}
+
+            - **Responsibility:** [from architecture.md system context or overview]
+            - **Components:** [list of L3 components from architecture.md]
+            - **Inferred features:**
+              - [Feature name]: [status] — [evidence]
+              (Status inference logic:
+               - 'Done' if architecture doc shows component with documented flows AND structure shows implementation files
+               - 'In Progress' if partially documented — structure exists but architecture incomplete, or vice versa
+               - 'Todo' if mentioned in responsibilities but no components or flows documented)
+            - **Data ownership:** [what data this subsystem owns]
+            - **Key dependencies:** [inbound/outbound from dependency inventory]
+
+            IMPORTANT: Use Bash with `>> .ace/artifacts/wiki/wiki-analysis.md` to APPEND — do NOT overwrite.
+            If a file does not exist, note 'not found' for that section in the appended output.
+            ```
+
+            **After all background notifications arrive:**
+
+            Do NOT call TaskOutput. Just verify the file:
+            ```bash
+            wc -l .ace/artifacts/wiki/wiki-analysis.md
+            ```
+
+            **Synthesize wiki analysis:**
+
+            The raw `.ace/artifacts/wiki/wiki-analysis.md` contains appended outputs from all agents —
+            useful data but unstructured. Spawn a synthesizer agent to read it and produce
+            a concise, opinionated summary focused on backlog implications.
+
+            Task tool parameters:
+            ```
+            subagent_type: "ace-product-owner"
+            model: "{PO_MODEL}"
+            description: "Synthesize wiki analysis"
+            ```
+
+            Prompt:
+            ```
+            You are synthesizing wiki analysis for backlog planning.
+
+            **Read:** `.ace/artifacts/wiki/wiki-analysis.md`
+
+            This file contains raw structured summaries from multiple wiki analysis agents
+            (1 system-wide + N subsystem-specific). Your job: synthesize into a single
+            concise backlog-relevant summary.
+
+            **Write a synthesized summary to `.ace/artifacts/wiki/wiki-analysis.md` (overwrite the raw version):**
+
+            # Wiki Analysis Summary
+
+            ## System Overview
+            [2-3 sentences: what is this system, what does it do]
+
+            ## Tech Stack
+            [comma-separated key technologies found]
+
+            ## Capability Areas
+            [List of broad capability areas derived from subsystem responsibilities — these become epic candidates]
+
+            ## Feature Inventory
+            | Subsystem | Feature | Status | Evidence |
+            |-----------|---------|--------|----------|
+            [One row per inferred feature across ALL subsystems. Status: Done/In Progress/Todo]
+
+            ## Cross-Cutting Concerns
+            [Patterns that span multiple subsystems — communication, shared data, etc.]
+
+            ## Gaps & Unknowns
+            [What couldn't be determined from wiki docs alone]
+
+            RULES:
+            - Synthesize, don't concatenate — integrate findings across subsystems
+            - Feature inventory table must be comprehensive (every feature from every subsystem)
+            - Be opinionated: 'This system has N capability areas suggesting N epics'
+            - Keep it concise — this will be held in the main context window
+            ```
+
+            After synthesis completes, read `.ace/artifacts/wiki/wiki-analysis.md` and hold as WIKI_ANALYSIS.
+
+            Continue to step 5.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 5: OPTIONAL DOMAIN RESEARCH                                  -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="domain-research-decision" order="5a">
+
+            Use `has_features_research` and `has_architecture_research` from INIT
+            (already resolved — do NOT use shell commands to check file existence).
+
+            <!-- ── 5a-1: Existing research found ─────────────────────────────── -->
+
+            **If `has_features_research` is TRUE:**
+
+            Read `.ace/research/FEATURES.md` and display a brief summary (table stakes count,
+            differentiator count, key categories). If `has_architecture_research` is also TRUE,
+            read `.ace/research/ARCHITECTURE.md` and summarize (capability areas, component count).
+
+            Use AskUserQuestion:
+            - header: "Research"
+            - question: "I found existing domain research. Would you like to reuse it or regenerate?"
+            - options:
+              - "Use existing research (Recommended)" — Reuse the current FEATURES.md and ARCHITECTURE.md
+              - "Regenerate research" — Discard and re-run domain research from scratch
+              - "Skip research" — Don't use any research for this backlog
+
+            If "Use existing research":
+            - Hold `.ace/research/FEATURES.md` content as RESEARCH.features
+            - If `has_architecture_research` is TRUE AND `has_system_architecture` is FALSE,
+              hold `.ace/research/ARCHITECTURE.md` content as RESEARCH.architecture
+            - Display the "Research Complete" banner (same as step 5b) with findings from existing files
+            - Continue to step 6.
+
+            If "Skip research":
+            - Set RESEARCH = null.
+            - Continue to step 6.
+
+            If "Regenerate research":
+            - Continue to step 5b (execute research).
+
+            <!-- ── 5a-2: No existing research ────────────────────────────────── -->
+
+            **If `has_features_research` is FALSE:**
+
+            If VISION is null AND WIKI_ANALYSIS is null AND no $ARGUMENTS provided:
+            - Research is strongly recommended (bare context). Skip the question and
+              auto-recommend: "I have very little context. Let me research the domain first."
+            - Continue to step 5b (execute research).
+
+            Otherwise:
+
+            Use AskUserQuestion:
+            - header: "Research"
+            - question: "Would you like me to research standard features and capability areas for this domain before planning the backlog?"
+            - options:
+              - "Research first (Recommended)" — Discover standard stacks, expected features, common epic structures
+              - "Skip research" — I know this domain well, go straight to questioning
+
+            If "Research first" (or auto-recommended):
+            - Continue to step 5b (execute research).
+
+            If "Skip research":
+            - Set RESEARCH = null.
+            - Continue to step 6.
+
+        </step>
+
+        <step name="domain-research-execute" order="5b">
+
+            Infer the domain from VISION (if available) or from the user's earlier description.
+
+            Determine which researchers to spawn based on existing wiki documentation:
+
+            - **Features Researcher** — ALWAYS spawned (domain feature landscape is distinct from wiki docs)
+            - **Architecture Patterns Researcher** — ONLY if `has_system_architecture` is FALSE.
+              If the wiki already has system-architecture.md (from /ace:map-system), that architecture
+              context was already captured in WIKI_ANALYSIS (step 4). Spawning a domain architecture
+              researcher would produce redundant or conflicting content.
+
+            Display (adapts to researcher count):
+            ```
+            ┌──────────────────────────────────────────────────┐
+            │  ACE > Plan Backlog > Domain Research             │
+            └──────────────────────────────────────────────────┘
+
+              i  Researching [domain] ecosystem...
+                 Spawning [1 or 2] researcher(s):
+                 → Features research
+                 [→ Architecture patterns research]  ← only if no wiki architecture exists
+            ```
+
+            If `has_system_architecture` is TRUE, also display:
+            ```
+              i  Skipping architecture research — wiki architecture already captured in step 4.
+            ```
+
+            Resolve the researcher model:
+            ```bash
+            RESEARCHER_MODEL=$(node ~/.claude/agile-context-engineering/src/ace-tools.js resolve-model ace-project-researcher --raw)
+            ```
+
+            **Features Researcher (always spawned):**
+
+            Task tool parameters:
+            ```
+            subagent_type: "general-purpose"
+            model: "{RESEARCHER_MODEL}"
+            run_in_background: true
+            description: "Features research"
+            ```
+
+            Prompt:
+            ```
+            First, read ~/.claude/agents/ace-project-researcher.md for your role and instructions.
+
+            <research_type>
+            Project Research — Features dimension for [domain].
+            </research_type>
+
+            <question>
+            What features do [domain] products have? What's table stakes vs differentiating?
+            </question>
+
+            <project_context>
+            [VISION summary if available, or user's product description]
+            </project_context>
+
+            <downstream_consumer>
+            Your FEATURES.md feeds into backlog creation. Categorize clearly:
+            - Table stakes (must have or users leave)
+            - Differentiators (competitive advantage)
+            - Anti-features (things to deliberately NOT build)
+            - Feature dependencies (what depends on what)
+            </downstream_consumer>
+
+            <output>
+            Write to: .ace/research/FEATURES.md
+            </output>
+
+            **WRITE TO FILE DIRECTLY. RETURN ONLY CONFIRMATION.**
+            Your response must be ~5 lines max. Just confirm what was written and the line count.
+            Do NOT return file contents or research findings in your response.
+            ```
+
+            **Architecture Patterns Researcher (only if `has_system_architecture` is FALSE):**
+
+            Task tool parameters:
+            ```
+            subagent_type: "general-purpose"
+            model: "{RESEARCHER_MODEL}"
+            run_in_background: true
+            description: "Architecture patterns research"
+            ```
+
+            Prompt:
+            ```
+            First, read ~/.claude/agents/ace-project-researcher.md for your role and instructions.
+
+            <research_type>
+            Project Research — Architecture/Epic structure dimension for [domain].
+            </research_type>
+
+            <question>
+            How are [domain] systems typically structured? What are common capability
+            boundaries that translate to epics? What are the major components?
+            </question>
+
+            <project_context>
+            [VISION summary if available, or user's product description]
+            </project_context>
+
+            <downstream_consumer>
+            Your ARCHITECTURE.md informs epic structure in the backlog. Include:
+            - Component boundaries (what talks to what)
+            - Suggested epic/capability groupings
+            - Data flow (how information moves)
+            - Suggested build order (dependencies between components)
+            </downstream_consumer>
+
+            <output>
+            Write to: .ace/research/ARCHITECTURE.md
+            </output>
+
+            **WRITE TO FILE DIRECTLY. RETURN ONLY CONFIRMATION.**
+            Your response must be ~5 lines max. Just confirm what was written and the line count.
+            Do NOT return file contents or research findings in your response.
+            ```
+
+            **After all background notifications arrive:**
+
+            Do NOT call TaskOutput. Just verify the files exist:
+            ```bash
+            wc -l .ace/research/FEATURES.md .ace/research/ARCHITECTURE.md 2>/dev/null
+            ```
+
+            Read the research files and hold combined results as RESEARCH:
+            - features: key findings from .ace/research/FEATURES.md (table stakes, differentiators, anti-features)
+            - architecture: IF .ace/research/ARCHITECTURE.md was created, include its key findings
+              (capability boundaries, suggested epics). Otherwise, architecture context comes from
+              WIKI_ANALYSIS (step 3) — do NOT duplicate it into RESEARCH.
+
+            Display key findings:
+            ```
+            ┌──────────────────────────────────────────────────┐
+            │  ACE > Plan Backlog > Research Complete            │
+            └──────────────────────────────────────────────────┘
+
+              +  Research complete.
+
+              Table stakes: [comma-separated list]
+              Differentiators: [comma-separated list]
+              [Suggested capability areas: [comma-separated list]]  ← only if architecture was researched
+
+              Files: .ace/research/
+            ```
+
+            Continue to step 6.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 6: ABSORB INPUT                                              -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="absorb-input" order="6">
+
+            **If $ARGUMENTS is provided (user passed text or file):**
+
+            Read/absorb the input content. Hold as INPUT_CONTEXT.
+
+            Do NOT summarize it back to the user. Do NOT restructure it yet.
+            Simply hold it for use in step 7 questioning.
+
+            Note what kind of input it is:
+            - Contains suggested epics/features? Hold as SUGGESTED_ITEMS.
+            - Contains product description? Hold as PRODUCT_DESCRIPTION.
+            - Contains PRD or specs? Hold as SPECS.
+            - Contains a mix? Categorize each section.
+
+            **If no $ARGUMENTS:**
+
+            Set INPUT_CONTEXT = null.
+
+            Continue to step 7.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 7: DEEP QUESTIONING                                          -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="deep-questioning" order="7">
+            Follow the questioning guide from `questioning.xml`. You are a thinking partner,
+            not an interviewer.
+
+            <!-- ── 7a: Determine run mode ─────────────────────────────────────── -->
+
+            **Determine RUN_MODE:**
+
+            - **UPDATE** — EXISTING_BACKLOG is set (user chose "Update it" in step 1)
+            - **CREATE** — EXISTING_BACKLOG is null (first run or "Start fresh")
+
+            <!-- ── 7b: UPDATE mode — start from existing backlog ──────────────── -->
+
+            **If RUN_MODE is UPDATE:**
+
+            Read EXISTING_BACKLOG and build a current inventory:
+            - Parse all epics (IDs, titles, feature counts, statuses, GitHub links)
+            - Parse all features (IDs, titles, parent epic, statuses, GitHub links)
+
+            If GITHUB_ISSUES is set, cross-reference:
+            - **Backlog-only items** — items in backlog without a GitHub link
+            - **GitHub-only items** — epics/features in GitHub NOT found in the backlog
+              (match by issue number in Link column; unmatched GitHub items are new)
+            - **Status drift** — items where backlog status differs from GitHub status
+            - **New GitHub items** — epics/features added directly in GitHub since last sync
+
+            Present the current state:
+            ```
+            Your backlog has [N] epics with [M] features.
+            [If GitHub: [X] items linked to GitHub, [Y] not yet linked.]
+            [If drift: [Z] items have status changes in GitHub.]
+            [If new GH items: [W] new items found in GitHub not in the backlog.]
+            ```
+
+            Use AskUserQuestion:
+            - header: "Update"
+            - question: "What would you like to change?"
+            - options:
+              - "Add new epics/features" — Expand the backlog with new items
+              - "Sync from GitHub" — Import new GitHub items and update statuses
+              - "Reorganize" — Reorder, merge, split, or remove items
+              - "Full review" — Walk through all epics and refine
+
+            If "Add new epics/features":
+            - Ask what to add. Follow natural conversation. Then proceed to decision gate.
+
+            If "Sync from GitHub":
+            - If there are GitHub-only items: present them and ask which to add to backlog.
+            - If there are status drifts: present them and ask which to accept.
+            - Merge accepted changes into the backlog plan. Then proceed to decision gate.
+
+            If "Reorganize":
+            - Present the epic index. Ask what to change. Iterate. Then proceed to decision gate.
+
+            If "Full review":
+            - Fall through to the epic-by-epic refinement below (same as CREATE mode).
+
+            <!-- ── 7c: CREATE mode — context-aware opening ────────────────────── -->
+
+            **If RUN_MODE is CREATE:**
+
+            Assess available context richness:
+
+            Compute CONTEXT_RICHNESS:
+            - RICH: VISION is set AND (WIKI_ANALYSIS is set OR RESEARCH is set OR GITHUB_ISSUES is set)
+            - MODERATE: VISION is set OR (WIKI_ANALYSIS is set AND INPUT_CONTEXT is set) OR (RESEARCH is set AND INPUT_CONTEXT is set) OR GITHUB_ISSUES is set
+            - LEAN: INPUT_CONTEXT only (no vision, no wiki, no research, no GitHub issues)
+            - BARE: Nothing available
+
+            **Opening — adapt based on context richness:**
+
+            If RICH (vision + wiki/research/github + possibly input):
+            - Synthesize what you know: "Based on your product vision and
+              [codebase analysis / domain research / GitHub issues], I see these capability areas..."
+            - Present a draft epic list derived from:
+              1. Vision High-Level Capabilities (primary source)
+              2. GitHub Issues — use EXACT GitHub titles and #[issue_number] as ID (if exists)
+              3. Subsystem responsibilities from WIKI_ANALYSIS (if exists)
+              4. Research findings — table stakes and suggested capability areas (if exists)
+              5. INPUT_CONTEXT suggested items (if any)
+            - For GitHub issues: present with EXACT titles (do NOT rephrase), #N as ID, and their GitHub status/priority
+            - For brownfield with wiki: note inferred feature statuses (Done/In Progress/Todo)
+            - For research: highlight table stakes that aren't yet covered
+            - Probe: "Does this match your mental model? What's missing? What should be
+              reordered or merged?"
+
+            If MODERATE (some context, not the full picture):
+            - If vision exists: "Your product vision lists these capability areas:
+              [list from High-Level Capabilities]. Let's turn these into epics with
+              concrete features. Starting with the first — what are the specific
+              things it needs to deliver?"
+            - If no vision but wiki + input: "I've analyzed your codebase documentation
+              and your input. Here's what I see as the current state: [summary].
+              Let's structure this into a backlog."
+            - If research + input: "Domain research suggests these capability areas:
+              [list]. Combined with your input, let me propose an initial structure."
+
+            If LEAN (input doc only):
+            - Absorb the input. Probe structure: "I've read your document. It mentions
+              [key themes]. Let me make sure I understand the scope before we structure
+              the backlog."
+
+            If BARE (nothing):
+            - Open with: "What are the major things this product needs to do?"
+            - Wait for their response. This gives you context for intelligent follow-ups.
+
+            **Follow the thread:**
+
+            Based on what they said (and what you absorbed), ask follow-up questions that dig
+            into their response. Use AskUserQuestion with options that probe what they mentioned —
+            interpretations, clarifications, concrete examples.
+
+            Keep following threads. Each answer opens new threads to explore:
+            - What capability area is this feature part of?
+            - What does this feature actually deliver to the user?
+            - Is this already partially built? (use wiki analysis to confirm)
+            - What's the relative priority?
+            - What depends on what?
+            - What's MVP vs future?
+
+            **Map answers to backlog template structure (background, not out loud):**
+
+            **CRITICAL — GitHub identity preservation:**
+            Items from GITHUB_ISSUES use #[issue_number] as their ID and their EXACT GitHub title.
+            Do NOT assign E[N]/F[N] IDs to GitHub-linked items. Do NOT rephrase their titles.
+            Only new items (not in GitHub) get E[N]/F[N] IDs and new titles.
+
+            As you question, mentally track coverage against backlog needs:
+            - [ ] Capability areas (epics) identified — as many as the product naturally requires
+            - [ ] Each epic has features — as many as naturally emerge (Agile scoping, not arbitrary limits)
+            - [ ] Features are concrete deliverables (what it delivers, not how)
+            - [ ] Status understood for each (Todo / Refined / In Progress / Done)
+            - [ ] Size estimated using Fibonacci×10 (10, 20, 30, 50, 80, 130)
+            - [ ] Milestones assigned (mvp, v0.1.0, v0.2.0, etc.)
+            - [ ] Cross-epic dependencies identified
+            - [ ] Vision capability coverage validated (every capability maps to at least 1 epic)
+
+            Don't walk through this as a checklist. Weave questions naturally based on
+            the conversation. If gaps remain after the conversation feels complete, probe
+            those specific areas.
+
+            **Epic-by-epic refinement:**
+
+            Once the initial epic list is established, go through each epic:
+
+            Use AskUserQuestion for each epic:
+            - header: "[Epic Title]"
+            - question: "Here are the features I have for [Epic Title]. Confirm, add, or remove:"
+            - options:
+              - "Looks good" — Features are complete for this epic
+              - "Add more" — I have more features to add
+              - "Remove some" — Some of these don't belong
+              - "Split this epic" — This is too broad, let's break it apart
+
+            For each feature in the epic, confirm or discuss:
+            - Title and description
+            - Status (if brownfield with wiki, present inferred status for confirmation)
+            - Size (Fibonacci×10: 10, 20, 30, 50, 80, 130)
+            - Milestone
+
+            **Gap check:**
+
+            After all epics are refined:
+            - "Any capability areas we haven't covered?"
+            - If VISION exists, validate: "Every vision capability should map to at least one
+              epic. Let me check..." Present any unmapped capabilities.
+            - If RESEARCH exists, validate: "Research identified these table stakes:
+              [list]. Are they all covered?" Surface any missing table stakes.
+            - "Any cross-cutting concerns that need their own epic? (e.g., DevOps/CI,
+              Monitoring, Documentation, Security)"
+
+            **Decision gate:**
+
+            When the backlog feels complete:
+
+            Use AskUserQuestion:
+            - header: "Ready?"
+            - question: "I have [N] epics with [M] total features. Ready to create the product backlog?"
+            - options:
+              - "Create product backlog" — Let's write it
+              - "Keep exploring" — I want to add more or adjust
+              - "Show me what you have" — Present a summary before deciding
+
+            If "Show me what you have":
+            - Display epic index as a quick table:
+              ```
+              | ID | Epic | Features | Milestone |
+              |----|------|----------|-----------|
+              | E1 | [Title] | [count] features | [milestone] |
+              | E2 | [Title] | [count] features | [milestone] |
+              ...
+              ```
+            - Return to decision gate.
+
+            If "Keep exploring" — ask what they want to add, or identify gaps and probe naturally.
+
+            Loop until "Create product backlog" selected.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 8: WRITE BACKLOG                                             -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="write-backlog" order="8">
+
+            **Determine WRITE_MODE based on RUN_MODE and what changed:**
+
+            - **CREATE** — RUN_MODE is CREATE, or user chose "Start fresh" in step 1.
+              Writes a new backlog from scratch.
+            - **UPDATE** — RUN_MODE is UPDATE. Edits the existing backlog in place,
+              preserving IDs, GitHub links, and unchanged items.
+
+            <!-- ── 8a: CREATE mode — write new backlog ────────────────────────── -->
+
+            **If WRITE_MODE is CREATE:**
+
+            Create directory structure:
+            ```bash
+            mkdir -p .ace/artifacts/product
+            ```
+
+            Prepare a context brief (500 words max) that distills:
+            - Product direction summary (from vision if available, else from questioning)
+            - Complete epic list with: ID, Title, Description, Status, Priority, Size (Fibonacci×10), Sprint, Milestone, Link
+              - ID = #[issue_number] for GitHub-linked epics, E[N] for new epics
+              - Title = EXACT GitHub title for GitHub-linked items (verbatim)
+            - For each epic, complete feature list with: ID, Title, Description, Status, Priority, Size, Sprint, Milestone, Link
+              - ID = #[issue_number] for GitHub-linked features, F[N] for new features
+              - Title = EXACT GitHub title for GitHub-linked items (verbatim)
+            - Local Feature ID numbering: sequential across entire backlog (F1, F2, ... FN) — only for non-GitHub items
+            - Epic ordering rationale (strategic priority)
+            - Any cross-epic dependencies noted
+            - If RESEARCH exists: flag any table stakes that were included and their coverage
+            - If GITHUB_ISSUES exists: include GitHub issue numbers and URLs for items that already
+              have corresponding GitHub issues. Map GitHub Status/Priority/Sprint/Estimate to our columns.
+
+            Spawn the backlog-writing agent:
+
+            ```
+            Task(
+                prompt="You are an Agile Product Owner writing a product backlog document.
+
+                **Context brief from questioning session:**
+                {paste the context brief here}
+
+                **Instructions:**
+                1. Read the product backlog template: ~/.claude/agile-context-engineering/templates/product/product-backlog.xml
+                2. Write `.ace/artifacts/product/product-backlog.md` following the template structure exactly
+                3. Include the header paragraph explaining product direction
+                4. Write the Epic Index table (ordered by strategic priority)
+                5. Write each Epic Detail section with its Feature table
+                6. Follow all column definitions from the template:
+                   - ID: #[issue_number] for GitHub-linked items, E[N] for local epics, F[N] for local features
+                   - Title: EXACT GitHub title for GitHub-linked items (do NOT rephrase); 5-10 words for new items
+                   - Description: 1-2 sentences
+                   - Status: Todo | Refined | In Progress | Done
+                   - Priority: Critical | High | Medium | Low
+                   - Size: Fibonacci×10 values only (10, 20, 30, 50, 80, 130)
+                   - Sprint: Sprint name/iteration or '—' if unassigned
+                   - Milestone: mvp | v0.1.0 | v0.2.0 | etc.
+                   - Link: [#N](url) if GitHub issue exists, otherwise '—'
+                7. Apply ordering rules: epics by strategic priority, features by delivery sequence
+                8. Apply Agile scoping principles:
+                   - Epics are broad capability categories — as many as the product naturally requires
+                   - Features are concrete deliverables within epics — as many as naturally emerge
+                   - Local Feature IDs (F[N]) are globally sequential (F1, F2, F3... not restarting per epic)
+                   - Epic status reflects aggregate of features
+                   - 130-point items flagged for potential splitting
+                9. GitHub integration (CRITICAL — identity preservation):
+                   - GitHub-linked items: ID = #[issue_number], Title = EXACT GitHub title (verbatim, no rephrasing)
+                   - Epic detail section headers: ### #45: Exact GitHub Title (not ### E1: ...)
+                   - Link column: [#N](url) for GitHub items, '—' for local items
+                   - Map GitHub Priority/Status/Sprint/Estimate to our columns
+                   - Only items without a GitHub issue get E[N]/F[N] IDs
+
+                10. Table formatting (CRITICAL for readability):
+                   - Pad ALL cells with spaces so column separators | align vertically
+                   - Separator row dashes must match column widths
+                   - Follow the table-formatting guideline in the template for minimum column widths
+                   - Every row in a table must have the same total width
+
+                Write the file using the Write tool.
+
+                **Return format — ONLY this, nothing else:**
+                DONE
+                - Epic count: [N]
+                - Feature count: [N]
+                - MVP scope: [number of features in mvp milestone]
+                - Epics: [comma-separated list of epic titles]
+                - GitHub-linked items: [N]",
+                subagent_type="ace-product-owner",
+                model="{PO_MODEL}",
+                description="Write product backlog document"
+            )
+            ```
+
+            <!-- ── 8b: UPDATE mode — edit existing backlog ────────────────────── -->
+
+            **If WRITE_MODE is UPDATE:**
+
+            Prepare a change brief that describes exactly what to change:
+            - **Additions:** new epics/features to add (with all columns populated)
+              - New Feature IDs continue from the highest existing F[N] in the backlog
+              - New Epic IDs continue from the highest existing E[N]
+            - **Removals:** items to delete (by ID)
+            - **Modifications:** items to update (by ID, with field changes — e.g., status, size, milestone, priority)
+            - **Status syncs from GitHub:** items where GitHub status should overwrite backlog status
+            - **New GitHub imports:** items from GitHub to add to the backlog
+              (include issue number and URL for the Link column)
+            - **Reorders:** if epic ordering changed
+
+            Spawn the backlog-editing agent:
+
+            ```
+            Task(
+                prompt="You are an Agile Product Owner editing an existing product backlog.
+
+                **Read the current backlog:** `.ace/artifacts/product/product-backlog.md`
+                **Read the template for reference:** `~/.claude/agile-context-engineering/templates/product/product-backlog.xml`
+
+                **Changes to apply:**
+                {paste the change brief here}
+
+                **Rules:**
+                - PRESERVE all existing IDs (#N for GitHub-linked, E[N]/F[N] for local), titles, and unchanged items exactly as-is
+                - GitHub-linked items keep their #[issue_number] ID and EXACT GitHub title — never change these
+                - New local Feature IDs continue sequentially from the highest existing F[N]
+                - New local Epic IDs continue sequentially from the highest existing E[N]
+                - Update the Epic Index table to reflect any additions, removals, or reorders
+                - Update Epic status to reflect aggregate of its features
+                - Size values must be Fibonacci×10 only: 10, 20, 30, 50, 80, 130
+                - Maintain all template formatting — especially table column alignment:
+                  pad cells with spaces so | separators align vertically across all rows.
+                  Follow the table-formatting guideline in the template for minimum column widths.
+                - If adding items with GitHub issue numbers, set Link = [#N](url)
+                - Do NOT change items that aren't in the change brief
+
+                Use the Edit tool to modify in place. If changes are extensive (new epics added,
+                major reorders), use the Write tool to rewrite the file completely.
+
+                **Return format — ONLY this, nothing else:**
+                DONE
+                - Added: [N] epics, [M] features
+                - Modified: [X] items
+                - Removed: [Y] items
+                - Total: [N] epics, [M] features
+                - GitHub-linked items: [Z]",
+                subagent_type="ace-product-owner",
+                model="{PO_MODEL}",
+                description="Update product backlog document"
+            )
+            ```
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 9: REVIEW AND APPROVE                                        -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="review" order="9">
+            Show the agent's returned summary to the user. Then:
+
+            Use AskUserQuestion:
+            - header: "Backlog"
+            - question: "Product backlog written to `.ace/artifacts/product/product-backlog.md`. Does this look right? Review the full file in your editor for details."
+            - options:
+              - "Approve" — Looks good, commit it
+              - "Adjust" — I want to change some things
+              - "Redo questioning" — Let's go back and explore more
+
+            **If "Adjust":**
+            - Ask what they want to change (add/remove epics, reorder, change milestones, etc.)
+            - Spawn a Task agent to edit:
+              ```
+              Task(
+                  prompt="Read `.ace/artifacts/product/product-backlog.md` and make these changes:
+                  {user's requested changes}.
+
+                  **Rules:**
+                  - Maintain all template formatting — especially table column alignment:
+                    pad cells with spaces so | separators align vertically across all rows
+                  - Keep Feature IDs globally sequential — if adding new features, use the next available F[N]
+                  - Update Epic status to reflect aggregate feature status
+                  - Size values must be Fibonacci×10 only: 10, 20, 30, 50, 80, 130
+                  - Re-read the template for reference: ~/.claude/agile-context-engineering/templates/product/product-backlog.xml
+
+                  Use the Edit tool to modify in place. Return only a confirmation of what changed.",
+                  subagent_type="general-purpose",
+                  model="haiku",
+                  description="Adjust product backlog"
+              )
+              ```
+            - Present for review again. Loop until approved.
+
+            **If "Redo questioning":**
+            - Return to step 7 (deep-questioning)
+            - Preserve VISION, WIKI_ANALYSIS, RESEARCH, GITHUB_ISSUES, and INPUT_CONTEXT
+            - Hold previous answers as additional context
+
+            **If "Approve":**
+            Continue to step 10.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 10: GITHUB SYNC                                              -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="github-sync" order="10">
+
+            **If `github_project.enabled` is false OR `github_project.gh_installed` is false:**
+
+            Skip to step 11.
+
+            **If `github_project.enabled` is true AND `github_project.gh_installed` is true:**
+
+            Read the approved `.ace/artifacts/product/product-backlog.md` and cross-reference
+            with GITHUB_ISSUES (from step 2) to identify sync actions:
+
+            - **Unlinked items** — backlog items with Link = "—" → candidates for GitHub creation
+            - **Linked but modified** — backlog items whose status/priority/estimate changed
+              during this session vs their GitHub values → candidates for GitHub update
+            - **Already synced** — backlog items with Link that match GitHub exactly → no action
+
+            If no sync actions needed (all items linked, nothing changed):
+            - Display: "All backlog items are already synced with GitHub."
+            - Continue to step 11.
+
+            If there are unlinked items:
+
+            Build a sync summary and present it:
+            ```
+            GitHub Sync Summary:
+            - New (unlinked): [N] epics, [M] features
+            [- Modified: [X] items with field changes to push]
+            ```
+
+            Use AskUserQuestion:
+            - header: "GitHub Sync"
+            - question: "How would you like to sync with GitHub?"
+            - options:
+              - "Sync all (Recommended)" — Create new issues and update modified ones
+              - "Create new only" — Create unlinked items, don't update existing
+              - "Create epics only" — Only create Epic issues, skip features and updates
+              - "Skip" — Don't sync to GitHub
+
+            **If "Skip":**
+            Continue to step 11.
+
+            **If any sync option selected:**
+
+            Display:
+            ```
+            ┌──────────────────────────────────────────────────┐
+            │  ACE > Plan Backlog > GitHub Sync                 │
+            └──────────────────────────────────────────────────┘
+
+              i  Creating GitHub issues...
+                 Repo: {REPO} | Project: #{PROJECT_NUMBER}
+            ```
+
+            **Prerequisite — Resolve all field and type IDs (once, before creating any issues):**
+
+            ```bash
+            GH_FIELDS=$(node ~/.claude/agile-context-engineering/src/ace-tools.js github resolve-fields repo={REPO} owner={OWNER} project={PROJECT_NUMBER})
+            ```
+
+            Parse the JSON response. Extract and cache:
+            - `issue_types.Epic` → EPIC_TYPE_ID
+            - `issue_types.Feature` → FEATURE_TYPE_ID
+            - `project_id` → PROJECT_ID
+            - `fields.Status.id` → STATUS_FIELD_ID
+            - `fields.Status.options` → STATUS_OPTIONS map (e.g., `{ "Todo": "id", "In Progress": "id", ... }`)
+            - `fields.Priority.id` → PRIORITY_FIELD_ID (if exists)
+            - `fields.Priority.options` → PRIORITY_OPTIONS map (e.g., `{ "P0": "id", "P1": "id", ... }`)
+            - `fields.Estimate.id` → ESTIMATE_FIELD_ID (if exists)
+
+            If Epic or Feature type doesn't exist in `issue_types`, log a warning and skip type-setting.
+
+            **For each unlinked Epic (in order):**
+
+            ```bash
+            EPIC_RESULT=$(node ~/.claude/agile-context-engineering/src/ace-tools.js github create-issue \
+              type=Epic \
+              "title={Epic Title}" \
+              "body={Epic Description}" \
+              repo={REPO} \
+              owner={OWNER} \
+              project={PROJECT_NUMBER} \
+              project_id={PROJECT_ID} \
+              type_id={EPIC_TYPE_ID} \
+              [priority_field_id={PRIORITY_FIELD_ID} priority_option_id={PRIORITY_OPTIONS[priority]}])
+            ```
+
+            Epics do NOT get Status or Estimate — only Priority (optional).
+            Parse the JSON response: `number`, `url`, `item_id`, and status flags.
+            Store the epic's issue number for use as parent when creating features.
+
+            Display progress:
+            ```
+              +  Created [Epic] {Title} → #{number}
+            ```
+
+            **If "Create new only" or "Sync all" was selected, for each unlinked Feature (in order):**
+
+            ```bash
+            FEATURE_RESULT=$(node ~/.claude/agile-context-engineering/src/ace-tools.js github create-issue \
+              type=Feature \
+              "title={Feature Title}" \
+              "body={Feature Description}" \
+              repo={REPO} \
+              owner={OWNER} \
+              project={PROJECT_NUMBER} \
+              project_id={PROJECT_ID} \
+              type_id={FEATURE_TYPE_ID} \
+              status_field_id={STATUS_FIELD_ID} \
+              status_option_id={STATUS_OPTIONS[status]} \
+              estimate_field_id={ESTIMATE_FIELD_ID} \
+              estimate={size_value} \
+              [priority_field_id={PRIORITY_FIELD_ID} priority_option_id={PRIORITY_OPTIONS[priority]}] \
+              [parent={epic_issue_number}] \
+              [milestone={Milestone}])
+            ```
+
+            Status and Estimate are ALWAYS set for Features. Priority, parent, and milestone are optional.
+            Parse the JSON response: `number`, `url`, status flags.
+
+            Display progress:
+            ```
+              +  Created [Feature] {Title} → #{number} (parent: #{epic_number})
+            ```
+
+            **If "Sync all" was selected, update modified existing issues:**
+
+            For each linked item whose fields changed during this session
+            (status, priority, estimate differ from GITHUB_ISSUES values fetched in step 2):
+
+            Use `gh project item-edit` to update the changed fields:
+            - Status change → `gh project item-edit --project-id {PROJECT_ID} --id {ITEM_ID} --field-id {STATUS_FIELD_ID} --single-select-option-id {STATUS_OPTIONS[new_status]}`
+            - Priority change → `gh project item-edit --project-id {PROJECT_ID} --id {ITEM_ID} --field-id {PRIORITY_FIELD_ID} --single-select-option-id {PRIORITY_OPTIONS[new_priority]}`
+            - Estimate change → `gh project item-edit --project-id {PROJECT_ID} --id {ITEM_ID} --field-id {ESTIMATE_FIELD_ID} --number {new_estimate}`
+
+            Note: To get the ITEM_ID for existing linked issues, use:
+            ```bash
+            ITEM_ID=$(gh project item-list {PROJECT_NUMBER} --owner {OWNER} --format json --limit 500 | jq -r '.items[] | select(.content.number == {issue_number}) | .id')
+            ```
+
+            Display progress for each update:
+            ```
+              ~  Updated [Feature] {Title} #{number} — status: {old} → {new}
+            ```
+
+            **After all creates and updates, update the backlog file:**
+
+            Read `.ace/artifacts/product/product-backlog.md` and update every newly created
+            item's Link column from "—" to `[#N](https://github.com/{REPO}/issues/N)`.
+
+            Use the Edit tool to make targeted replacements in the markdown tables.
+
+            Display summary:
+            ```
+              +  Created {N} GitHub issues.
+              [~  Updated {X} existing issues.]
+                 Backlog Link column updated.
+            ```
+
+            Continue to step 11.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 11: COMMIT                                                   -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="commit" order="11">
+            Stage and commit all changed files in a single commit.
+            Only stage files that actually changed (use `git diff` / `git status` to check).
+
+            Files that may have changed:
+            - `.ace/artifacts/product/product-backlog.md` — always (this is the main output)
+            - `.ace/research/FEATURES.md` — if research was regenerated in step 5b
+            - `.ace/research/ARCHITECTURE.md` — if research was regenerated in step 5b
+            - `.ace/artifacts/wiki/wiki-analysis.md` — if wiki analysis was re-run in step 4
+
+            ```bash
+            git add .ace/artifacts/product/product-backlog.md
+            ```
+
+            If research files were created or regenerated this session:
+            ```bash
+            git add .ace/research/
+            ```
+
+            If wiki analysis was re-run this session:
+            ```bash
+            git add .ace/artifacts/wiki/wiki-analysis.md
+            ```
+
+            Commit with a message that reflects what happened:
+            - CREATE mode: `git commit -m "docs: initialize product backlog"`
+            - UPDATE mode: `git commit -m "docs: update product backlog — [brief summary of changes]"`
+              Examples:
+              - "docs: update product backlog — add 2 epics, 5 features"
+              - "docs: update product backlog — sync status from GitHub"
+              - "docs: update product backlog — reorganize epic order"
+
+            Display completion (adapt banner to mode):
+
+            ```
+            ╔══════════════════════════════════════════════════╗
+            ║  ACE > Product Backlog [Created | Updated]       ║
+            ╚══════════════════════════════════════════════════╝
+
+              +  .ace/artifacts/product/product-backlog.md committed.
+              [If UPDATE: Changes: +N epics, +M features, ~X modified]
+
+              Summary:
+              ────────
+              [N] epics, [M] features
+              MVP scope: [X] features across [Y] epics
+
+              i  This backlog will be used as context by ACE commands
+                 when planning features, stories, and sprints.
+
+              Next > /ace:plan-feature E1
+                     Break the first epic into detailed stories.
+                   > /ace:help
+                     Check project status and available commands.
+            ```
+        </step>
+
+    </process>
+
+    <success_criteria>
+        - Init function executed (environment detected, wiki state checked, GitHub settings loaded)
+        - GitHub issues fetched via `github fetch-issues` if GitHub Project integration is enabled
+        - Product vision loaded as primary input (if exists)
+        - Brownfield with wiki: analysis reused from cache or re-run with parallel agents
+        - Domain research reused from cache or regenerated if selected
+        - User-provided input absorbed and integrated
+        - Deep questioning adapted to run mode (CREATE = from scratch, UPDATE = targeted changes)
+        - Every vision capability mapped to at least one epic (if vision exists)
+        - Research table stakes validated against backlog (if research exists)
+        - Epics and features scoped using Agile methodology (no arbitrary count limits)
+        - Size estimated using Fibonacci×10 (10, 20, 30, 50, 80, 130)
+        - Priority, status, size, sprint, milestone, and link assigned to every item
+        - product-backlog.md written (CREATE) or edited in place (UPDATE) following template structure
+        - Existing IDs, GitHub links, and unchanged items preserved during updates
+        - User reviewed and approved the document
+        - GitHub sync: new issues created, modified issues updated (if user chose to sync)
+        - Link column updated with GitHub issue numbers and URLs
+        - Document committed with mode-appropriate message (initialize vs update + summary)
+    </success_criteria>
+
+</workflow>

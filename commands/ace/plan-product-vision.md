@@ -1,5 +1,5 @@
 ---
-name: ace:upsert-product-vision
+name: ace:plan-product-vision
 description: Create or update the product vision through architecture-aware questioning and guided writing
 argument-hint: "[optional: context='PRD, specs, or notes to build on']"
 allowed-tools:
@@ -15,7 +15,7 @@ allowed-tools:
 
     <execution-time>
         <runs-after>
-            <trigger>During /ace:init-project — as part of initial project setup</trigger>
+            <trigger>During /ace:help — as part of initial project setup</trigger>
             <trigger>After /ace:map-system — once codebase is mapped, leverage architecture context</trigger>
             <trigger>Anytime — to create or refresh the product vision for a project</trigger>
         </runs-after>
@@ -45,7 +45,7 @@ allowed-tools:
     </input>
 
     <execution-context>
-        <upsert-product-vision-workflow>@~/.claude/agile-context-engineering/workflows/upsert-product-vision.xml</upsert-product-vision-workflow>
+        <plan-product-vision-workflow>@~/.claude/agile-context-engineering/workflows/plan-product-vision.xml</plan-product-vision-workflow>
         <product-vision-template>@~/.claude/agile-context-engineering/templates/product/product-vision.xml</product-vision-template>
         <questioning>@~/.claude/agile-context-engineering/utils/questioning.xml</questioning>
         <ui-formatting>@~/.claude/agile-context-engineering/utils/ui-formatting.md</ui-formatting>
@@ -65,8 +65,8 @@ allowed-tools:
     </output>
 
     <process>
-        Execute the upsert-product-vision workflow from
-        `@~/.claude/agile-context-engineering/workflows/upsert-product-vision.xml` end-to-end.
+        Execute the plan-product-vision workflow from
+        `@~/.claude/agile-context-engineering/workflows/plan-product-vision.xml` end-to-end.
         Preserve all workflow gates (validation, approvals, commits).
     </process>
 
@@ -74,7 +74,7 @@ allowed-tools:
         **After this command:**
         - `/ace:init-coding-standards` — Establish coding standards for the project
         - `/ace:map-system` — Map codebase structure and architecture
-        - `/ace:init-project` — Check overall project initialization status
+        - `/ace:help` — Check project initialization status and next steps
     </next-steps>
 
 </command>

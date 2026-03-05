@@ -17,8 +17,8 @@ allowed-tools:
 
     <execution-time>
         <runs-after>
-            <trigger>Before /ace:init-project (brownfield codebases) — understand existing code first</trigger>
-            <trigger>After /ace:init-project (greenfield codebases) — document architecture decisions</trigger>
+            <trigger>Before /ace:help (brownfield codebases) — understand existing code first</trigger>
+            <trigger>After /ace:help (greenfield codebases) — document architecture decisions</trigger>
             <trigger>Anytime to refresh system-wide wiki documents</trigger>
         </runs-after>
         <use-when>
@@ -82,7 +82,7 @@ allowed-tools:
         **After this command, `/clear` first for a fresh context window, then:**
         - `/ace:map-subsystems` — Map individual subsystem internals (structure, dependencies)
         - `/ace:init-coding-standards` — Define prescriptive coding standards
-        - `/ace:init-project` — Initialize full project with product vision
+        - `/ace:help` — Check project initialization status and next steps
         - Review and edit files in `.docs/wiki/system-wide/` anytime
     </next-steps>
 

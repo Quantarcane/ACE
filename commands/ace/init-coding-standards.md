@@ -17,7 +17,7 @@ allowed-tools:
 
     <execution-time>
         <runs-after>
-            <trigger>During /ace:init-project — as part of initial project setup</trigger>
+            <trigger>During /ace:help — as part of initial project setup</trigger>
             <trigger>After /ace:map-system — once codebase is mapped, add prescriptive standards</trigger>
             <trigger>Anytime — to create or refresh coding standards for a project</trigger>
         </runs-after>
@@ -75,7 +75,7 @@ allowed-tools:
     <next-steps>
         **After this command:**
         - `/ace:map-system` — Map codebase structure and architecture
-        - `/ace:init-project` — Initialize full project with product vision
+        - `/ace:help` — Check project initialization status and next steps
         - Review and edit `.docs/wiki/system-wide/coding-standards.md` anytime
     </next-steps>
 

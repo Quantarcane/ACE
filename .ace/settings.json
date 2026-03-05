@@ -1,0 +1,11 @@
+{
+  "model_profile": "balanced",
+  "commit_docs": true,
+  "github_project": {
+    "enabled": false,
+    "gh_installed": false,
+    "repo": "",
+    "project_number": null,
+    "owner": ""
+  }
+}

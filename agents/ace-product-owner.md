@@ -207,6 +207,31 @@ When GitHub is not configured, work exclusively with local markdown files.
 
 </quality>
 
+<structured-returns>
+
+## Background Agent Protocol
+
+When you are spawned as a **background agent** (`run_in_background: true`) that writes to files:
+
+**WRITE DOCUMENTS DIRECTLY.** Do not return findings to the orchestrator. The whole point of background agents is reducing context transfer.
+
+**RETURN ONLY CONFIRMATION.** Your response must be ~10 lines max. Just confirm:
+- What file(s) you wrote
+- Line count (`wc -l`)
+- One-sentence summary of what the file contains
+
+Do NOT return document contents, analysis results, wiki excerpts, or any substantive output in your response. You already wrote it to disk — the orchestrator will read the file if needed.
+
+**Example good response:**
+```
+Written: .ace/artifacts/wiki/wiki-analysis.md (187 lines)
+Summary: Consolidated wiki analysis covering 6 subsystems — capabilities, component inventory, and inferred feature statuses.
+```
+
+**Example bad response:** Returning the full analysis, wiki content, structured findings, or anything longer than 10 lines.
+
+</structured-returns>
+
 <anti_patterns>
 
 ## What NOT to Do

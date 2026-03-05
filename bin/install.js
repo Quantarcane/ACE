@@ -342,7 +342,7 @@ async function main() {
   }
 
   log(`\nAvailable commands:`, colors.cyan);
-  log(`  /ace:init          Initialize ACE in your project`, colors.dim);
+  log(`  /ace:help          Check project status and next steps`, colors.dim);
   log(`  /ace:plan-project  Plan your project with epics and features`, colors.dim);
   log(`  /ace:plan-epic     Plan an epic with features and stories`, colors.dim);
   log(`  /ace:plan-feature  Plan a feature with stories`, colors.dim);
@@ -353,7 +353,7 @@ async function main() {
 
   log(`\nGet started:`, colors.cyan);
   log(`  1. Navigate to your project directory`, colors.dim);
-  log(`  2. Run /ace:init to initialize ACE`, colors.dim);
+  log(`  2. Run /ace:help to initialize ACE`, colors.dim);
   log(`  3. Run /ace:plan-project to start planning\n`, colors.dim);
 }
 

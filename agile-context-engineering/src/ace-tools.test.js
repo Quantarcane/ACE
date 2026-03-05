@@ -556,6 +556,192 @@ describe('init new-project command', () => {
   });
 });
 
+// ─── ensure-settings ──────────────────────────────────────────────────────────
+
+describe('ensure-settings command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('creates settings.json with defaults when missing', () => {
+    const result = runAceTools('ensure-settings', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const data = JSON.parse(result.output);
+
+    assert.strictEqual(data.created, true);
+    assert.strictEqual(data.settings.model_profile, 'balanced');
+    assert.strictEqual(data.settings.commit_docs, true);
+    assert.strictEqual(data.settings.github_project.enabled, false);
+    assert.strictEqual(data.settings.github_project.gh_installed, false);
+    assert.strictEqual(data.settings.github_project.repo, '');
+    assert.strictEqual(data.settings.github_project.project_number, null);
+    assert.strictEqual(data.settings.github_project.owner, '');
+
+    // Verify file was actually created
+    const settingsPath = path.join(tmpDir, '.ace', 'settings.json');
+    assert.ok(fs.existsSync(settingsPath), 'settings.json should exist on disk');
+    const onDisk = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+    assert.strictEqual(onDisk.model_profile, 'balanced');
+  });
+
+  test('creates .ace directory if it does not exist', () => {
+    const aceDir = path.join(tmpDir, '.ace');
+    assert.ok(!fs.existsSync(aceDir), '.ace dir should not exist yet');
+
+    const result = runAceTools('ensure-settings', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const data = JSON.parse(result.output);
+
+    assert.strictEqual(data.created, true);
+    assert.ok(fs.existsSync(aceDir), '.ace dir should be created');
+  });
+
+  test('does not overwrite existing settings.json', () => {
+    fs.mkdirSync(path.join(tmpDir, '.ace'), { recursive: true });
+    const customSettings = {
+      model_profile: 'quality',
+      commit_docs: false,
+      github_project: {
+        enabled: true,
+        gh_installed: true,
+        repo: 'owner/repo',
+        project_number: 5,
+        owner: 'owner',
+      },
+    };
+    fs.writeFileSync(path.join(tmpDir, '.ace', 'settings.json'), JSON.stringify(customSettings, null, 2));
+
+    const result = runAceTools('ensure-settings', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const data = JSON.parse(result.output);
+
+    assert.strictEqual(data.created, false);
+    assert.strictEqual(data.settings.model_profile, 'quality');
+    assert.strictEqual(data.settings.commit_docs, false);
+    assert.strictEqual(data.settings.github_project.enabled, true);
+    assert.strictEqual(data.settings.github_project.project_number, 5);
+  });
+});
+
+// ─── init setup-github ────────────────────────────────────────────────────────
+
+describe('init setup-github command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('returns gh_installed as boolean', () => {
+    const result = runAceTools('init setup-github', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const data = JSON.parse(result.output);
+
+    assert.strictEqual(typeof data.gh_installed, 'boolean');
+  });
+
+  test('returns projects as array', () => {
+    const result = runAceTools('init setup-github', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const data = JSON.parse(result.output);
+
+    assert.ok(Array.isArray(data.projects), 'projects should be an array');
+  });
+
+  test('returns current_settings object', () => {
+    const result = runAceTools('init setup-github', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const data = JSON.parse(result.output);
+
+    assert.ok(data.current_settings !== undefined, 'current_settings should be present');
+    assert.strictEqual(typeof data.current_settings.enabled, 'boolean');
+  });
+
+  test('returns repo and owner as strings', () => {
+    const result = runAceTools('init setup-github', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const data = JSON.parse(result.output);
+
+    assert.strictEqual(typeof data.repo, 'string');
+    assert.strictEqual(typeof data.owner, 'string');
+  });
+});
+
+// ─── write-github-settings ────────────────────────────────────────────────────
+
+describe('write-github-settings command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProjectWithAce();
+    // Seed a settings.json with defaults
+    const defaults = {
+      model_profile: 'balanced',
+      commit_docs: true,
+      github_project: {
+        enabled: false,
+        gh_installed: false,
+        repo: '',
+        project_number: null,
+        owner: '',
+      },
+    };
+    fs.writeFileSync(path.join(tmpDir, '.ace', 'settings.json'), JSON.stringify(defaults, null, 2));
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('writes key=value pairs to settings.json', () => {
+    const result = runAceTools('write-github-settings enabled=true repo=owner/repo project_number=3 owner=owner gh_installed=true', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const data = JSON.parse(result.output);
+
+    assert.strictEqual(data.written, true);
+    assert.strictEqual(data.settings.github_project.enabled, true);
+    assert.strictEqual(data.settings.github_project.repo, 'owner/repo');
+    assert.strictEqual(data.settings.github_project.project_number, 3);
+    assert.strictEqual(data.settings.github_project.owner, 'owner');
+    assert.strictEqual(data.settings.github_project.gh_installed, true);
+
+    // Verify persisted to disk
+    const onDisk = JSON.parse(fs.readFileSync(path.join(tmpDir, '.ace', 'settings.json'), 'utf-8'));
+    assert.strictEqual(onDisk.github_project.enabled, true);
+    assert.strictEqual(onDisk.github_project.project_number, 3);
+  });
+
+  test('preserves non-github settings when writing', () => {
+    const result = runAceTools('write-github-settings enabled=true', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const data = JSON.parse(result.output);
+
+    assert.strictEqual(data.settings.model_profile, 'balanced');
+    assert.strictEqual(data.settings.commit_docs, true);
+  });
+
+  test('handles project_number=null', () => {
+    // First set a number
+    runAceTools('write-github-settings project_number=5', tmpDir);
+    // Then reset to null
+    const result = runAceTools('write-github-settings project_number=null', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const data = JSON.parse(result.output);
+
+    assert.strictEqual(data.settings.github_project.project_number, null);
+  });
+});
+
 // ─── CLI error handling ───────────────────────────────────────────────────────
 
 describe('CLI error handling', () => {

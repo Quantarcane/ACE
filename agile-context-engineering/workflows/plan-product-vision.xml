@@ -89,7 +89,7 @@
               ```
               ┌──────────────────────────────────────────────────┐
               │  Next > /ace:map-system                           │
-              │         Then re-run /ace:upsert-product-vision    │
+              │         Then re-run /ace:plan-product-vision       │
               └──────────────────────────────────────────────────┘
               ```
             - Exit workflow.

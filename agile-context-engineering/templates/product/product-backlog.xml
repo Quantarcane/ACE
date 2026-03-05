@@ -1,0 +1,231 @@
+<template>
+
+    <purpose>
+        Template for `.ace/artifacts/product/product-backlog.md` — the single ordered backlog
+        of Epics and Features that define what the product will deliver. Epics are broad
+        capability categories; Features are concrete deliverables within an Epic.
+    </purpose>
+
+    <output-format>
+
+        <section name="header">
+            ## Product Backlog
+
+            Brief paragraph describing the product's current direction and what this backlog
+            is ordered toward. Keep it to 2-3 sentences — enough context for anyone reading
+            the backlog to understand the "why" behind the ordering.
+        </section>
+
+        <section name="epic-index">
+            ### Epic Index
+
+            &lt;!-- Ordered by strategic priority. This is the master list of all Epics. --&gt;
+
+            | ID | Title | Description | Status | Priority | Size | Sprint | Milestone | Link |
+            |----|-------|-------------|--------|----------|------|--------|-----------|------|
+            | #45 | [Exact GitHub title] | [1-2 sentence summary] | [Status] | [Priority] | [10-130] | — | [Milestone] | [#45](url) |
+            | E1 | [New epic title] | [1-2 sentence summary] | [Status] | [Priority] | [10-130] | — | [Milestone] | — |
+        </section>
+
+        <section name="epic-details" repeat="once per Epic">
+            ### #45: [Exact GitHub Epic Title]   &lt;!-- or ### E[N]: [Title] for local epics --&gt;
+
+            &lt;!-- Features ordered by delivery sequence within this Epic. --&gt;
+
+            | ID | Title | Description | Status | Priority | Size | Sprint | Milestone | Link |
+            |----|-------|-------------|--------|----------|------|--------|-----------|------|
+            | #78 | [Exact GitHub title] | [1-2 sentence summary] | [Status] | [Priority] | [10-130] | [Sprint] | [Milestone] | [#78](url) |
+            | F1 | [New feature title] | [1-2 sentence summary] | [Status] | [Priority] | [10-130] | [Sprint] | [Milestone] | — |
+        </section>
+
+    </output-format>
+
+    <column-definitions>
+
+        <column name="ID">
+            <format>
+                <github-linked>#[issue_number] — when the item has a corresponding GitHub issue (e.g. #45, #78)</github-linked>
+                <local-epic>E[number] — sequential, for epics without a GitHub issue (e.g. E1, E2)</local-epic>
+                <local-feature>F[number] — sequential across the entire backlog, for features without a GitHub issue (e.g. F1, F2)</local-feature>
+            </format>
+            <rules>
+                <rule>GitHub-linked items ALWAYS use #[issue_number] as their ID — this is the source of truth</rule>
+                <rule>Only items without a GitHub issue use E[N] or F[N] local IDs</rule>
+                <rule>IDs are stable — never renumber after assignment</rule>
+                <rule>Gaps in E[N]/F[N] sequences are fine (deleted items leave gaps)</rule>
+                <rule>When an item gets a GitHub issue later (via sync), its ID changes from E[N]/F[N] to #[issue_number]</rule>
+            </rules>
+        </column>
+
+        <column name="Title">
+            <rules>
+                <rule>GitHub-linked items: use the EXACT GitHub issue title — do NOT rephrase, shorten, or "improve" it</rule>
+                <rule>New items (no GitHub issue): short, descriptive name (5-10 words max)</rule>
+                <rule>Epics: broad capability area (e.g., "User Authentication", "Data Export Pipeline")</rule>
+                <rule>Features: specific deliverable (e.g., "OAuth2 Login Flow", "CSV Bulk Export")</rule>
+            </rules>
+        </column>
+
+        <column name="Description">
+            <rules>
+                <rule>1-2 sentences max — what this item delivers and why it matters</rule>
+                <rule>Epics: describe the broad capability and its user impact</rule>
+                <rule>Features: describe the specific deliverable and what it enables</rule>
+                <rule>Write for someone unfamiliar with the project — no jargon without context</rule>
+            </rules>
+        </column>
+
+        <column name="Status">
+            <allowed-values>
+                <value name="Todo">Not yet started or refined</value>
+                <value name="Refined">Requirements clear, ready to be planned into stories</value>
+                <value name="In Progress">Currently being implemented (has active stories)</value>
+                <value name="Done">All stories complete, acceptance criteria met</value>
+            </allowed-values>
+            <rules>
+                <rule>An Epic's status reflects its aggregate — "In Progress" if any child Feature is in progress</rule>
+                <rule>An Epic is "Done" only when ALL child Features are Done</rule>
+            </rules>
+        </column>
+
+        <column name="Size">
+            <allowed-values>
+                <value name="10">Trivial — a single story, minimal complexity</value>
+                <value name="20">Small — a few stories, low complexity</value>
+                <value name="30">Medium — moderate scope, some unknowns</value>
+                <value name="50">Large — significant scope, multiple components</value>
+                <value name="80">Very Large — cross-cutting, high complexity</value>
+                <value name="130">Massive — cross-cutting, high complexity, should be split</value>
+            </allowed-values>
+            <rules>
+                <rule>Fibonacci×10 relative sizing — compared to other items in this backlog</rule>
+                <rule>130-point items should be reviewed for splitting opportunities</rule>
+                <rule>Epic size reflects total scope of all child Features</rule>
+            </rules>
+        </column>
+
+        <column name="Priority">
+            <allowed-values>
+                <value name="Critical">Blocks other work or has external deadline</value>
+                <value name="High">Core functionality, high user impact</value>
+                <value name="Medium">Important but not blocking</value>
+                <value name="Low">Nice to have, can be deferred</value>
+            </allowed-values>
+            <rules>
+                <rule>Priority reflects business importance, not technical difficulty</rule>
+                <rule>Epic priority drives its position in the Epic Index ordering</rule>
+                <rule>When synced from GitHub Project, use the project's Priority field value</rule>
+            </rules>
+        </column>
+
+        <column name="Sprint">
+            <format>
+                Sprint name or iteration identifier from the GitHub Project board.
+                Examples: Sprint 1, Sprint 2, 2026-W10, —
+            </format>
+            <rules>
+                <rule>Use "—" when no sprint is assigned</rule>
+                <rule>Epics typically don't have sprints (use "—") — only features are sprint-planned</rule>
+                <rule>When synced from GitHub Project, use the project's Iteration field value</rule>
+                <rule>Sprint assignment happens during feature/story planning, not backlog creation</rule>
+            </rules>
+        </column>
+
+        <column name="Milestone">
+            <format>
+                Semver-style release target or named milestone.
+                Examples: mvp, v0.1.0, v0.2.0, v1.0.0
+            </format>
+            <rules>
+                <rule>Milestones are delivery targets, not deadlines</rule>
+                <rule>Features inherit their Epic's milestone unless explicitly overridden</rule>
+                <rule>Use "mvp" for the minimum viable product milestone</rule>
+            </rules>
+        </column>
+
+        <column name="Link">
+            <format>
+                GitHub issue link in markdown format: [#number](url)
+                Example: [#76](https://github.com/owner/repo/issues/76)
+            </format>
+            <rules>
+                <rule>"—" when the item has no corresponding GitHub issue (ID will be E[N] or F[N])</rule>
+                <rule>When ID is #[N], Link MUST also be populated: [#N](url)</rule>
+                <rule>Populated automatically when issues are created via GitHub sync</rule>
+                <rule>Links are stable — issue numbers never change</rule>
+            </rules>
+        </column>
+
+    </column-definitions>
+
+    <ordering-rules>
+        <rule>Epic Index is ordered by strategic priority (highest value first)</rule>
+        <rule>Each Epic's feature table is ordered by delivery sequence</rule>
+        <rule>Epic detail sections appear in the same order as the Epic Index</rule>
+        <rule>Cross-Epic dependencies may force reordering — note these in a comment</rule>
+    </ordering-rules>
+
+    <guidelines>
+
+        <guideline name="epic-structure">
+            Epics are broad capability categories, not phases or sprints.
+            A good Epic groups related Features that together deliver a coherent
+            user-facing capability. Epics should be decomposable into 3-10 Features.
+            If an Epic has only 1-2 Features, it may be too narrow — consider merging.
+            If an Epic has 10+ Features, it may be too broad — consider splitting.
+        </guideline>
+
+        <guideline name="feature-scope">
+            A Feature is a concrete deliverable that can be broken down into stories
+            during planning. Features at 80 points or above (~6 sprints) should be
+            reviewed for splitting. Features describe WHAT will be delivered, not
+            HOW it will be implemented.
+        </guideline>
+
+        <guideline name="status-transitions">
+            Items move forward through statuses: Todo -> Refined -> In Progress -> Done.
+            Moving backward (e.g., In Progress -> Todo) is valid when scope changes
+            or blockers are discovered. Document the reason in a commit message.
+        </guideline>
+
+        <guideline name="milestone-assignment">
+            Assign milestones based on delivery priority and dependencies.
+            Not every item needs a milestone — unassigned items are future/exploratory.
+            Milestones should have a clear theme (e.g., "mvp" = core user flows).
+        </guideline>
+
+        <guideline name="backlog-hygiene">
+            Prune regularly — delete items that have been Todo for too long.
+            Review ordering after each milestone completion.
+            Keep the backlog as short as practical — fewer items, more focus.
+        </guideline>
+
+        <guideline name="table-formatting">
+            Tables MUST be column-aligned for readability. Pad every cell with spaces so
+            that column separators (`|`) line up vertically across all rows. Use consistent
+            minimum widths per column:
+
+            - **ID**: 6 chars (e.g. `| #45  |` or `| E1   |`)
+            - **Title**: pad to the longest title in the table
+            - **Description**: pad to the longest description in the table
+            - **Status**: 14 chars (longest value: "In Progress")
+            - **Priority**: 10 chars (longest value: "Critical")
+            - **Size**: 6 chars (longest value: "130")
+            - **Sprint**: 10 chars
+            - **Milestone**: 10 chars
+            - **Link**: pad to the longest link in the table
+
+            The separator row (`|------|---...`) must match column widths using dashes.
+
+            Example of properly aligned table:
+            ```
+            | ID   | Title                          | Description                                     | Status      | Priority | Size | Sprint   | Milestone | Link                                                    |
+            |------|--------------------------------|-------------------------------------------------|-------------|----------|------|----------|-----------|---------------------------------------------------------|
+            | #45  | Indicator &amp; Chart Engine   | Core charting capability with indicators        | In Progress | Critical | 130  | —        | mvp       | [#45](https://github.com/owner/repo/issues/45)          |
+            | E1   | AI Agent Swarm                 | Agentic order execution and analysis            | Todo        | High     | 80   | —        | v0.2.0    | —                                                       |
+            ```
+        </guideline>
+
+    </guidelines>
+
+</template>
