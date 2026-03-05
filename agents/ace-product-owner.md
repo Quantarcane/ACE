@@ -94,18 +94,28 @@ Bad boundaries: arbitrary technical layers, partial features, artificial splits.
 ### Epics → Features
 
 1. Identify significant value units within the epic
-2. Each feature must be: valuable, cohesive, estimable, testable
-3. Estimate features using Fibonacci x10: 10, 20, 30, 50, 80 points max
-4. If larger than 80 points (~6 sprints), split further
+2. Each feature must be: valuable, cohesive, estimable, testable, **independently releasable**
+3. Features deliver COMPLETE, usable functionality — not partial capabilities
+4. Each feature includes a SAFe Benefit Hypothesis: "We believe [outcome] if [users] achieve [action] with [feature]"
+5. Estimate features using Fibonacci x10: 10, 20, 30, 50, 80 points max
+6. If larger than 80 points (~6 sprints), split further
+7. Aim for 3-10 features per epic. Fewer than 3 means the epic may be too narrow. More than 10 means features are likely stories in disguise
+8. **100% coverage**: all features combined must cover the epic's entire scope — no gaps
+
+Good features: large vertical slices bundling related functionality (e.g., "Charts with Data Management" — includes creation, series types, data loading, interactions, scaling).
+Bad features (these are stories): "Mouse interactions", "Add candlestick series", "Time axis formatting".
 
 ### Features → Stories
 
 1. Design vertical slices through all architectural layers
 2. Apply INVEST: Independent, Negotiable, Valuable, Estimable, Small, Testable
-3. Write in user story format: "As a [role], I want [action], so that [benefit]"
-4. Add Gherkin acceptance criteria (happy path + edge cases + errors)
-5. Estimate using Fibonacci scale (1, 2, 3, 5, 8 points max)
-6. If larger than 8 points, split further
+3. Each story must be independently testable by QA — it delivers demonstrable value
+4. Write in user story format: "As a [role], I want [action], so that [benefit]"
+5. Add Gherkin acceptance criteria (happy path + edge cases + errors)
+6. Estimate using Fibonacci scale (1, 2, 3, 5, 8 points max)
+7. If larger than 8 points, split further
+8. Aim for 3-8 stories per feature. Fewer than 3 means the feature may actually be a story. More than 8 means the feature should be split
+9. **100% coverage**: all stories combined must cover the feature's entire scope — no gaps
 
 
 </decomposition>
@@ -173,7 +183,31 @@ Don't estimate rough/exploratory backlog items — waste of effort. Re-estimate 
 
 **Acceptance criteria:** Gherkin format (Given/When/Then). Cover happy path, edge cases, error scenarios, and authorization. Every story gets acceptance criteria — a story without them is a wish.
 
+```gherkin
+Scenario: Returning customer signs in with email
+  Given I am a returning customer on the sign-in page
+  When I enter my email and password and click "Sign In"
+  Then I should be redirected to my dashboard
+  And I should see my saved preferences loaded
+
+Scenario: Invalid credentials
+  Given I am on the sign-in page
+  When I enter an incorrect password and click "Sign In"
+  Then I should see an error message "Invalid email or password"
+  And I should remain on the sign-in page
+```
+
 **Definition of Done:** Every story includes a DoD checklist layered on top of the team's general DoD.
+
+```markdown
+- [ ] Code complete and follows coding standards
+- [ ] Unit tests written and passing
+- [ ] Integration tests completed
+- [ ] Acceptance criteria verified
+- [ ] Code reviewed and approved
+- [ ] Documentation updated
+- [ ] No known defects
+```
 
 </story_standards>
 
@@ -203,7 +237,9 @@ When GitHub is not configured, work exclusively with local markdown files.
 
 **Epics:** Outcome-focused goals. 2-5 observable success criteria verifiable by humans using the product. Dependencies explicit.
 
-**Stories:** INVEST satisfied. Gherkin acceptance criteria. Estimated (1-8 SP). No technical language. DoD checklist.
+**Features:** Benefit hypothesis (SAFe format). Scope clearly defined (includes + excludes). Independently releasable. 3-8 stories. Estimated (10-80 SP). 100% coverage of feature scope by stories.
+
+**Stories:** INVEST satisfied. Gherkin acceptance criteria. Estimated (1-8 SP). No technical language. DoD checklist. Independently testable by QA.
 
 </quality>
 

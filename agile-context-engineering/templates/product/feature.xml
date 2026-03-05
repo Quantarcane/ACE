@@ -1,0 +1,355 @@
+<feature>
+
+    <purpose>
+        Template for `.ace/artifacts/product/&lt;id-epic_name&gt;/&lt;id-feature_name&gt;/&lt;id-feature_name&gt;.md` —
+        a feature specification document that describes a complete vertical slice of functionality,
+        its benefit hypothesis, acceptance criteria, and story breakdown. Stories are captured as
+        comprehensive plain-text descriptions; formal story specification (Gherkin) is
+        handled later by the `plan-story` command using a separate `story.xml` template.
+    </purpose>
+
+    <output-format>
+
+        <section name="header">
+            # [ID]: [Feature Title]
+
+            **Epic**: [Epic ID] [Epic Title] | **Status**: [Status] | **Priority**: [Priority]
+            **Size**: [Size] | **Sprint**: [Sprint] | **Milestone**: [Milestone] | **Link**: [Link]
+
+            &lt;!-- Example:
+            # F3: OAuth2 Login Flow
+            **Epic**: #45 User Authentication | **Status**: Refined | **Priority**: High
+            **Size**: 30 | **Sprint**: — | **Milestone**: mvp | **Link**: [#78](https://github.com/owner/repo/issues/78)
+            --&gt;
+        </section>
+
+        <section name="description">
+            ## Description
+
+            [What this feature delivers as a complete vertical slice of functionality. 2-4 sentences.
+            Describe end-to-end user-facing behavior — what the user can do when this feature is done.
+            Focus on WHAT is delivered and WHY it matters, not HOW it is implemented.
+            Must cut through all/most architectural layers: domain, application, infrastructure, presentation.
+            It also may cut througn multiple modules.]
+        </section>
+
+        <section name="benefit-hypothesis">
+            ## Benefit Hypothesis
+
+            &gt; We believe [measurable business outcome] will be achieved if [target users/personas]
+            &gt; successfully [user outcome / what they can do] with [this feature / what we deliver].
+
+            &lt;!-- The hypothesis MUST be:
+                 - Measurable: includes a quantifiable or observable outcome
+                 - Falsifiable: you can determine if it was wrong
+                 - User-focused: describes user benefit, not system behavior
+                 Example:
+                 "We believe a 25% reduction in login support tickets will be achieved if returning
+                  customers successfully authenticate via OAuth2 providers with the Social Login feature."
+            --&gt;
+        </section>
+
+        <section name="scope">
+            ## Scope
+
+            ### Includes
+
+            &lt;!-- ALL functionality bundled within this feature. Be exhaustive — if it's not listed,
+                 it's not in scope. Each item should be a concrete behavior or capability. --&gt;
+
+            - [Capability or behavior 1]
+            - [Capability or behavior 2]
+            - [Capability or behavior 3]
+
+            ### Out of Scope
+
+            &lt;!-- Explicitly excluded items to prevent scope creep. Name things that someone might
+                 reasonably assume are included but are NOT part of this feature. --&gt;
+
+            - [Excluded item 1 — brief reason why]
+            - [Excluded item 2 — brief reason why]
+        </section>
+
+        <section name="acceptance-criteria">
+            ## Acceptance Criteria
+
+            &lt;!-- High-level, measurable success conditions that validate the benefit hypothesis.
+                 These are FEATURE-level criteria — NOT Gherkin scenarios (those belong in stories).
+                 3-7 criteria. Each must be independently verifiable. --&gt;
+
+            - [ ] [Criterion 1 — observable, measurable condition]
+            - [ ] [Criterion 2 — observable, measurable condition]
+            - [ ] [Criterion 3 — observable, measurable condition]
+        </section>
+
+        <section name="existing-implementation">
+            ## Existing Implementation
+
+            &lt;!-- BROWNFIELD ONLY — omit this entire section for greenfield features.
+                 What already exists in the codebase that this feature builds on, integrates with,
+                 or must account for. Sourced from relevant-code.md research. --&gt;
+
+            ### Components &amp; Modules
+            - [Existing component/module — what it does, how it relates to this feature]
+
+            ### APIs &amp; Interfaces
+            - [Existing API/interface — current capabilities, what this feature extends or uses]
+
+            ### Partial Implementations
+            - [What's already partially built — what remains to be done]
+
+            ### Architectural Constraints
+            - [Constraint from existing architecture — how it affects this feature's design]
+        </section>
+
+        <section name="story-index">
+            ## Story Breakdown
+
+            &lt;!-- Summary table of all stories. Story details follow below.
+                 Stories are ordered by delivery sequence within this feature. --&gt;
+
+            | ID   | Title                          | Size | Status      | Sprint   | Link                                                    |
+            |------|--------------------------------|------|-------------|----------|---------------------------------------------------------|
+            | S1   | [Short descriptive name]       | —    | Todo        | —        | —                                                       |
+            | S2   | [Short descriptive name]       | —    | Todo        | —        | —                                                       |
+        </section>
+
+        <section name="story-details" repeat="once per story">
+            ### [ID]: [Story Title]
+
+            [Comprehensive plain-text description of what this story covers.
+
+            This should be rich and detailed — multiple paragraphs if needed. Cover:
+            - What the story is about (scope, user-facing behavior)
+            - Why it matters (value to the user within this feature)
+            - Key behaviors and edge cases to consider
+            - Any known constraints or technical considerations
+            - How it relates to other stories in this feature
+
+            This is NOT a formal user story. It is a thorough description of intent and scope.
+            The `plan-story` command will later restructure this into a proper INVEST story
+            with Gherkin acceptance criteria, a Definition of Done.]
+        </section>
+
+        <section name="technical-context">
+            ## Technical Context
+
+            &lt;!-- Architecture considerations across layers. NOT implementation details — those
+                 belong in individual stories and tasks. This section captures the technical
+                 landscape that informs story decomposition and estimation.
+                 Informed by relevant-code.md and relevant-wiki.md research. --&gt;
+
+            ### System Boundaries
+            - [Where this feature sits in the system architecture]
+            - [What external systems or services it interacts with]
+
+            ### Integration Points
+            - [APIs, events, data flows this feature connects to]
+
+            ### Cross-Cutting Concerns
+            - [Security, performance, accessibility, observability considerations]
+
+            ### Non-Functional Requirements
+            - [Performance targets, scalability needs, compliance requirements]
+        </section>
+
+        <section name="dependencies">
+            ## Dependencies
+
+            ### Requires
+            &lt;!-- Features, epics, or external items that must be completed before this feature. --&gt;
+            - [Dependency — what it is and why this feature needs it]
+
+            ### Enables
+            &lt;!-- Features or capabilities that depend on this feature being done. --&gt;
+            - [Dependent feature — what it needs from this feature]
+
+            ### External
+            &lt;!-- Third-party services, APIs, libraries, or approvals needed. --&gt;
+            - [External dependency — status and risk]
+        </section>
+
+        <section name="metadata">
+            ---
+            *Created: [date] | Last refined: [date] | Refinements: [count]*
+
+            **Research artifacts:**
+            - Wiki analysis: [relative path to relevant-wiki.md or "—"]
+            - Code analysis: [relative path to relevant-code.md or "—"]
+        </section>
+
+    </output-format>
+
+    <field-definitions>
+
+        <field name="ID">
+            F[number] for local features, #[issue_number] for GitHub-linked.
+            Same identity rules as product-backlog.xml — IDs are stable, never renumber.
+        </field>
+
+        <field name="Status">
+            <allowed-values>
+                <value name="Todo">Not yet started or refined</value>
+                <value name="Refined">Requirements clear, broken into stories, ready for sprint planning</value>
+                <value name="In Progress">Has active stories being implemented</value>
+                <value name="Done">All stories complete, acceptance criteria met</value>
+            </allowed-values>
+        </field>
+
+        <field name="Priority">
+            <allowed-values>
+                <value name="Critical">Blocks other work or has external deadline</value>
+                <value name="High">Core functionality, high user impact</value>
+                <value name="Medium">Important but not blocking</value>
+                <value name="Low">Nice to have, can be deferred</value>
+            </allowed-values>
+        </field>
+
+        <field name="Size">
+            <allowed-values>
+                <value name="10">Small feature — 1-2 sprints</value>
+                <value name="20">Small-Medium — 2-3 sprints</value>
+                <value name="30">Medium — 3-4 sprints</value>
+                <value name="50">Large — 4-6 sprints</value>
+                <value name="80">Very large — 6+ sprints, consider splitting</value>
+            </allowed-values>
+            Fibonacci×10 relative sizing. If larger than 80, split into smaller features.
+        </field>
+
+        <field name="Story table">
+            The story breakdown table uses the same column conventions as product-backlog.xml.
+            Story IDs: S[N] local or #[issue_number] GitHub-linked.
+            Story sizes: Fibonacci (1, 2, 3, 5, 8) — not ×10.
+        </field>
+
+    </field-definitions>
+
+    <guidelines>
+
+        <guideline name="vertical-slicing">
+            Features MAY cut through multiple modules.
+            Features MAY cut through ALL/MOST architectural layers — domain, application,
+            infrastructure, and presentation of a module. A feature that only touches one layer
+            (e.g., "set up the database schema") is NOT a feature; it's a technical story.
+            Every feature delivers end-to-end user-facing value.
+        </guideline>
+
+        <guideline name="feature-scope">
+            Features are sized using Fibonacci×10: 10, 20, 30, 50, 80 points.
+            If a feature is less than 10 points, it's probably a story — promote it down.
+            If a feature exceeds 80 points (~6 sprints), it should be split into
+            smaller features. Features describe WHAT will be delivered, not HOW.
+        </guideline>
+
+        <guideline name="benefit-hypothesis">
+            The Benefit Hypothesis MUST follow the SAFe template format exactly:
+            "We believe [outcome] will be achieved if [users] successfully [action] with [feature]."
+            The outcome must be measurable and falsifiable.
+
+            Bad: "Users will like the new login." (not measurable)
+            Bad: "We will build OAuth2 support." (describes output, not outcome)
+            Good: "We believe a 25% reduction in login support tickets will be achieved
+                   if returning customers successfully authenticate via social providers
+                   with the OAuth2 Login feature."
+        </guideline>
+
+        <guideline name="acceptance-criteria-levels">
+            Feature acceptance criteria are HIGH-LEVEL business validation — checkboxes
+            that can be verified by a product owner or stakeholder. They validate the
+            benefit hypothesis, not implementation details.
+
+            Story acceptance criteria (Gherkin Given/When/Then) are created later by
+            the plan-story command. Do NOT mix feature-level and story-level criteria
+            in this document.
+        </guideline>
+
+        <guideline name="story-breakdown">
+            Stories are plain-text descriptions of intent and scope — NOT formal user stories.
+            The `plan-story` command handles formal specification later.
+            Aim for 3-8 stories per feature. Fewer than 3 suggests the feature is really a story.
+            More than 8 suggests the feature should be split.
+        </guideline>
+
+        <guideline name="brownfield-context">
+            The "Existing Implementation" section is populated from the relevant-code.md
+            research artifact. It captures what already exists in the codebase that this
+            feature builds upon or must integrate with.
+
+            This section directly informs story decomposition — knowing what exists
+            affects which stories need to be written and how they are scoped.
+
+            For greenfield features (no existing codebase), omit this section entirely.
+        </guideline>
+
+        <guideline name="refinement-support">
+            Every run of plan-feature should produce a COMPLETE, high-quality feature
+            document — description, hypothesis, scope, acceptance criteria, story breakdown
+            with estimates, and technical context. Do not defer work to "later passes."
+
+            Re-running plan-feature on the same feature is supported for cases where
+            scope changes, new information surfaces, or something was missed — but it
+            is the exception, not the workflow.
+
+            When re-running, increment the metadata refinement count and update
+            the "Last refined" date.
+        </guideline>
+
+        <guideline name="github-identity">
+            - GitHub-linked items: ID = #[issue_number], Title = EXACT GitHub title
+            - Local items: ID = S[N], sequential within the feature
+            - IDs are stable — never renumber after assignment
+            - When a story gets a GitHub issue, ID changes from S[N] to #[issue_number]
+        </guideline>
+
+        <guideline name="table-formatting">
+            Tables MUST be column-aligned for readability. Pad every cell with spaces so
+            that column separators (`|`) line up vertically across all rows.
+
+            Minimum column widths:
+            - **ID**: 6 chars (e.g. `| S1   |` or `| #92  |`)
+            - **Title**: pad to the longest title in the table
+            - **Size**: 6 chars
+            - **Status**: 14 chars (longest value: "In Progress")
+            - **Sprint**: 10 chars
+            - **Link**: pad to the longest link in the table
+
+            The separator row must match column widths using dashes.
+
+            Example of properly aligned table:
+            ```
+            | ID   | Title                          | Size | Status      | Sprint   | Link                                                    |
+            |------|--------------------------------|------|-------------|----------|---------------------------------------------------------|
+            | #92  | Social provider integration    | 5    | In Progress | Sprint 2 | [#92](https://github.com/owner/repo/issues/92)          |
+            | S2   | Token refresh handling         | 3    | Todo        | —        | —                                                       |
+            | S3   | Login error states             | 2    | Refined     | Sprint 3 | —                                                       |
+            ```
+        </guideline>
+
+    </guidelines>
+
+    <evolution>
+
+        **Creation (plan-feature):**
+        A single run produces the complete document — all sections filled, stories
+        described and estimated, acceptance criteria defined, technical context populated.
+
+        **Refinement (plan-feature re-run — exception, not norm):**
+        Only when scope changes, new information surfaces, or gaps are found.
+        Updates metadata refinement count and "Last refined" date.
+
+        **Story planning (plan-story on individual stories):**
+        Story status moves from "Todo" to "Refined" in the index.
+        Individual story files are created in the same directory.
+        The plain-text description here remains as the source seed.
+
+        **During implementation:**
+        Story statuses update in the index (In Progress → Done).
+        Feature status reflects aggregate of story statuses.
+
+        **Completion:**
+        All stories Done, feature acceptance criteria checked off.
+        Benefit hypothesis reviewed — validated, partially validated, or invalidated.
+
+    </evolution>
+
+</feature>

@@ -1,0 +1,1454 @@
+<workflow>
+
+    <purpose>
+        Orchestrate feature planning or refinement: locate a feature in the product backlog,
+        load foundation context (vision, backlog, architecture), perform targeted wiki and code
+        research via background sub-agents, conduct deep questioning to define feature scope,
+        acceptance criteria, and story breakdown, then write the feature specification document.
+        Optionally syncs with GitHub issues.
+
+        Produces `.ace/artifacts/product/<id-epic_name>/<id-feature_name>/<id-feature_name>.md`
+        — a complete feature specification with benefit hypothesis, scope, acceptance criteria,
+        and story descriptions with rough Fibonacci estimates.
+
+        Can be run multiple times on the same feature for refinement. Supports both CREATE
+        (new feature) and REFINE (existing feature) modes.
+    </purpose>
+
+    <mandatory-context>
+        Read all files referenced by the invoking command's execution-context before starting.
+        Also read any document or text passed as parameter ($ARGUMENTS) in the invoking command.
+    </mandatory-context>
+
+    <process>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 1: SETUP                                                     -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="setup" order="1">
+            **MANDATORY FIRST STEP — Execute environment detection before any user interaction:**
+
+            ```bash
+            INIT=$(node ~/.claude/agile-context-engineering/src/ace-tools.js init plan-feature)
+            ```
+
+            Parse JSON for: `product_owner_model`, `researcher_model`, `commit_docs`,
+            `has_product_vision`, `has_product_backlog`,
+            `has_wiki_analysis`,
+            `is_brownfield`, `is_greenfield`,
+            `has_existing_code`, `has_package_file`, `has_wiki`, `has_wiki_system_wide`,
+            `has_wiki_subsystems`, `wiki_subsystem_names`, `has_system_architecture`,
+            `has_system_structure`, `has_testing_framework`, `has_git`, `has_gh_cli`,
+            `github_project` (object: `enabled`, `gh_installed`, `repo`, `project_number`, `owner`).
+
+            Also resolve the product owner model for spawning agents:
+            ```bash
+            PO_MODEL=$(node ~/.claude/agile-context-engineering/src/ace-tools.js resolve-model ace-product-owner --raw)
+            ```
+
+            Display stage banner:
+
+            ```
+            ╔══════════════════════════════════════════════════╗
+            ║  ACE > Plan Feature                              ║
+            ╚══════════════════════════════════════════════════╝
+            ```
+
+            **If `has_git` is false:** Initialize git:
+            ```bash
+            git init
+            ```
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 2: LOCATE FEATURE                                            -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="locate-feature" order="2">
+
+            <!-- ── 2a: Check backlog exists ─────────────────────────────────── -->
+
+            **If `has_product_backlog` is false:**
+
+            Display error:
+            ```
+              x  No product backlog found. Feature planning requires a backlog.
+                 The backlog defines epics and features that drive feature planning.
+            ```
+
+            Display next action:
+            ```
+            ┌──────────────────────────────────────────────────┐
+            │  Next > /ace:plan-backlog                         │
+            │         Create the product backlog first, then    │
+            │         re-run /ace:plan-feature                  │
+            └──────────────────────────────────────────────────┘
+            ```
+
+            Exit workflow.
+
+            <!-- ── 2b: Read backlog and parse features ──────────────────────── -->
+
+            **If `has_product_backlog` is true:**
+
+            Read `.ace/artifacts/product/product-backlog.md`. Parse:
+            - All epics: extract ID, Title, Status, Milestone, Link
+            - All features per epic: extract ID, Title, Description, Status, Priority, Size, Sprint, Milestone, Link
+            - Build a BACKLOG_INDEX: `{ epics: [...], features: [...] }` with parent epic references
+
+            <!-- ── 2c: Resolve target feature ───────────────────────────────── -->
+
+            Check if `$ARGUMENTS` contains a feature identifier (first positional argument before `context=`):
+            - Could be: `F3`, `#78`, or absent
+
+            **If feature ID is provided:**
+            - Search BACKLOG_INDEX for matching feature by ID (F[N] or #[N])
+            - If found: set `TARGET_FEATURE` from backlog data, set `FEATURE_IN_BACKLOG = true`
+            - If NOT found: set `FEATURE_IN_BACKLOG = false`, set `NEEDS_BACKLOG_ADD = true`,
+              hold the user-provided ID/name as seed context
+
+            **If feature ID is NOT provided:**
+
+            Present the backlog's feature list for selection:
+            ```
+            ┌──────────────────────────────────────────────────┐
+            │  ACE > Plan Feature > Select Feature             │
+            └──────────────────────────────────────────────────┘
+            ```
+
+            Display features grouped by epic as a tree:
+            ```
+              E1  User Authentication
+              ├── F1  OAuth2 Login Flow                [Todo]
+              ├── F2  Session Management               [Todo]
+              └── F3  Password Reset                   [Refined]
+              E2  Data Export Pipeline
+              ├── F4  CSV Bulk Export                   [Todo]
+              └── F5  Scheduled Exports                [Todo]
+            ```
+
+            Use AskUserQuestion:
+            - header: "Feature"
+            - question: "Which feature would you like to plan? Pick from the list, or describe a new feature."
+            - options: list feature IDs + titles (up to 4), plus "New feature — describe it"
+
+            If user picks an existing feature: set `TARGET_FEATURE`, set `FEATURE_IN_BACKLOG = true`
+            If user picks "New feature": ask to describe the feature + pick parent epic
+            (or create under new epic), set `NEEDS_BACKLOG_ADD = true`.
+            The feature gets a provisional ID (next F[N]) and user-provided title.
+
+            <!-- ── 2d: Resolve directory paths ──────────────────────────────── -->
+
+            Using `TARGET_FEATURE` (or user-described new feature), compute:
+            ```bash
+            EPIC_SLUG=$(node ~/.claude/agile-context-engineering/src/ace-tools.js generate-slug "{Epic ID}-{Epic Title}" --raw)
+            FEATURE_SLUG=$(node ~/.claude/agile-context-engineering/src/ace-tools.js generate-slug "{Feature ID}-{Feature Title}" --raw)
+            ```
+
+            Set `FEATURE_DIR = .ace/artifacts/product/{EPIC_SLUG}/{FEATURE_SLUG}`
+            Set `FEATURE_FILE = {FEATURE_DIR}/{FEATURE_SLUG}.md`
+
+            <!-- ── 2e: Check for existing feature file (REFINE mode) ────────── -->
+
+            Check if `FEATURE_FILE` exists:
+            ```bash
+            EXISTING_FEATURE=$(node ~/.claude/agile-context-engineering/src/ace-tools.js verify-path-exists {FEATURE_FILE} --raw)
+            ```
+
+            If exists: set `RUN_MODE = REFINE`
+
+            Use AskUserQuestion:
+            - header: "Feature exists"
+            - question: "A feature spec already exists at `{FEATURE_FILE}`. What would you like to do?"
+            - options:
+              - "Refine it" — Review and update the existing specification
+              - "Start fresh" — Discard and create a new specification from scratch
+              - "Skip" — Keep the current specification as-is
+
+            If "Refine it": read the existing file, hold as `EXISTING_FEATURE_DOC`, continue.
+            If "Start fresh": set `RUN_MODE = CREATE`, set `EXISTING_FEATURE_DOC = null`, continue.
+            If "Skip": Exit workflow.
+
+            If not exists: set `RUN_MODE = CREATE`, set `EXISTING_FEATURE_DOC = null`
+
+            <!-- ── 2f: Check GitHub for feature issue ───────────────────────── -->
+
+            **If `github_project.enabled` is true AND `github_project.gh_installed` is true:**
+
+            - If TARGET_FEATURE has a GitHub link (#N):
+              set `GITHUB_FEATURE_ISSUE = true`, store issue number.
+              Fetch:
+              ```bash
+              GH_FEATURE_DATA=$(gh issue view {issue_number} --repo {REPO} --json title,body,labels,state,comments,milestone)
+              ```
+              Hold parsed JSON as `GITHUB_FEATURE_DATA`.
+              Compare with `EXISTING_FEATURE_DOC` (if both exist) — note any differences.
+
+            - If TARGET_FEATURE has no GitHub link:
+              set `GITHUB_FEATURE_ISSUE = false`, set `NEEDS_GITHUB_CREATE = true`
+
+            **If GitHub not enabled:** set `GITHUB_FEATURE_ISSUE = null`
+
+            **Display (after resolution):**
+
+            For CREATE mode:
+            ```
+              i  Feature: {Feature ID} — {Feature Title}
+                 Epic: {Epic ID} — {Epic Title}
+                 Mode: New feature specification
+                 Output: {FEATURE_FILE}
+            ```
+
+            For REFINE mode:
+            ```
+              i  Feature: {Feature ID} — {Feature Title}
+                 Epic: {Epic ID} — {Epic Title}
+                 Mode: Refinement (#{refinement_count + 1})
+                 Existing: {FEATURE_FILE}
+            ```
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 3: LOAD FOUNDATION                                           -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="load-foundation" order="3">
+
+            **3a. Load product vision (if exists):**
+
+            If `has_product_vision` is true:
+            - Read `.docs/product/product-vision.md`
+            - Extract and hold as VISION context: Vision Statement, Target Audience,
+              High-Level Capabilities, Key Objectives, Constraints
+
+            If false: set `VISION = null` (acceptable — the backlog already encapsulates vision direction)
+
+            **3b. Load product backlog:**
+
+            Already loaded in step 2. Hold the full parsed BACKLOG_INDEX and specifically
+            the TARGET_FEATURE's parent epic details.
+
+            **3c. Load system architecture (if exists):**
+
+            If `has_system_architecture` is true:
+            - Read `.docs/wiki/system-wide/system-architecture.md`
+            - Hold as `SYSTEM_ARCHITECTURE` context
+
+            If false: set `SYSTEM_ARCHITECTURE = null`
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 4: AGGREGATE EXISTING INFO                                   -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="aggregate-existing" order="4">
+
+            **4a. Existing feature file:**
+
+            If `RUN_MODE` is REFINE:
+            - `EXISTING_FEATURE_DOC` already loaded in step 2e
+            - Parse: Description, Benefit Hypothesis, Scope, Acceptance Criteria,
+              Story Breakdown, Technical Context, Dependencies, Metadata (refinement count, dates)
+
+            If CREATE: `EXISTING_FEATURE_DOC = null`
+
+            **4b. GitHub issue data (if enabled and linked):**
+
+            If `GITHUB_FEATURE_ISSUE` is true:
+            - `GITHUB_FEATURE_DATA` already loaded in step 2f
+            - Compare with `EXISTING_FEATURE_DOC` (if both exist) — note any differences
+              (e.g., status drift, updated description in GitHub)
+
+            If not applicable: `GITHUB_FEATURE_DATA = null`
+
+            **4c. Optional parameter text/file:**
+
+            If `$ARGUMENTS` contains `context=` parameter:
+            - If it is a file path: read the file
+            - If it is inline text: hold as-is
+            - Hold as `INPUT_CONTEXT`
+            - Categorize: does it contain acceptance criteria? Story suggestions?
+              Technical constraints? Scope details?
+
+            If no context parameter: `INPUT_CONTEXT = null`
+
+            Continue to step 5.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 5: WIKI RESEARCH (Subagent)                                  -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="wiki-research" order="5">
+
+            **If `is_greenfield` OR `has_wiki` is false:**
+
+            Set RELEVANT_WIKI = null.
+            Continue to step 6.
+
+            **If `is_brownfield` AND `has_wiki` is true:**
+
+            <!-- ── 5a: Check for existing research ──────────────────────────── -->
+
+            Check if `{FEATURE_DIR}/relevant-wiki.md` exists:
+            ```bash
+            HAS_WIKI_RESEARCH=$(node ~/.claude/agile-context-engineering/src/ace-tools.js verify-path-exists {FEATURE_DIR}/relevant-wiki.md --raw)
+            ```
+
+            If `HAS_WIKI_RESEARCH` is TRUE:
+            - Use AskUserQuestion:
+              - header: "Wiki Research"
+              - question: "Previous wiki analysis exists for this feature (`{FEATURE_DIR}/relevant-wiki.md`). What would you like to do?"
+              - options:
+                - "Use existing" — Skip wiki analysis, load the existing file
+                - "Regenerate" — Re-analyze wiki docs for this feature
+                - "Skip" — Don't use wiki analysis for this planning session
+
+            - If "Use existing": read `{FEATURE_DIR}/relevant-wiki.md`, hold as RELEVANT_WIKI.
+              Set `WIKI_FROM_CACHE = true`. Continue to step 6.
+            - If "Skip": set `RELEVANT_WIKI = null`. Continue to step 6.
+            - If "Regenerate": proceed to 5b.
+
+            If `HAS_WIKI_RESEARCH` is FALSE: proceed to 5b.
+
+            <!-- ── 5b: Spawn wiki research subagent ─────────────────────────── -->
+
+            Create the target directory:
+            ```bash
+            mkdir -p {FEATURE_DIR}
+            ```
+
+            Display:
+            ```
+            ┌──────────────────────────────────────────────────┐
+            │  ACE > Plan Feature > Wiki Research              │
+            └──────────────────────────────────────────────────┘
+
+              i  Analyzing wiki documentation relevant to feature:
+                 {Feature ID} — {Feature Title}
+                 Writing to: {FEATURE_DIR}/relevant-wiki.md
+            ```
+
+            **CRITICAL — Context Window Protection:**
+            The `ace-product-owner` agent has a built-in `<structured-returns>` protocol:
+            when spawned as a background agent, it writes to disk and returns ONLY a ~10-line
+            confirmation (file path + line count). This prevents agent output from inflating
+            the main context window.
+
+            **CRITICAL — Do NOT call TaskOutput. NEVER. UNDER NO CIRCUMSTANCES.**
+            After spawning the background agent, do NOT call TaskOutput to read its results.
+            You will be automatically notified when the agent completes — IGNORE those notifications.
+            The agent writes to `{FEATURE_DIR}/relevant-wiki.md` on disk. You do not need the return message.
+            TaskOutput returns the agent's FULL internal transcript (every file read, every search,
+            every tool call) — calling it will inflate the context window by 10-20%. THIS IS FORBIDDEN.
+            After the notification arrives, verify the file with `wc -l {FEATURE_DIR}/relevant-wiki.md`,
+            then READ the file directly from disk using the Read tool. That is how you get the results.
+
+            Task tool parameters:
+            ```
+            subagent_type: "ace-product-owner"
+            model: "{PO_MODEL}"
+            run_in_background: true
+            description: "Wiki research for {Feature ID}"
+            ```
+
+            Prompt:
+            ```
+            You are analyzing wiki documentation to extract information relevant to a specific feature.
+
+            **Feature context:**
+            - Feature: {Feature ID} — {Feature Title}
+            - Epic: {Epic ID} — {Epic Title}
+            - Feature description (from backlog): {TARGET_FEATURE.description}
+
+            **Step 1 — Read the system-level wiki analysis first:**
+            Read `.ace/artifacts/wiki/wiki-analysis.md` if it exists.
+            This gives you the map of what subsystems exist and their responsibilities.
+
+            **Step 2 — Identify relevant subsystems:**
+            Based on the feature's scope, identify which subsystems from the wiki are relevant.
+
+            **Step 3 — Deep-read relevant wiki docs:**
+            For each relevant subsystem, read:
+            - .docs/wiki/subsystems/{subsystem_name}/architecture.md
+            - .docs/wiki/subsystems/{subsystem_name}/structure.md
+
+            Also read system-wide docs if relevant:
+            - .docs/wiki/system-wide/system-architecture.md
+            - .docs/wiki/system-wide/system-structure.md
+
+            **Step 4 — Write structured analysis to `{FEATURE_DIR}/relevant-wiki.md`:**
+
+            # Wiki Analysis: {Feature ID} — {Feature Title}
+
+            ## Relevant Subsystems
+            - [Subsystem]: [Why relevant to this feature]
+
+            ## Existing Capabilities
+            - [What already exists that this feature builds on or interacts with]
+
+            ## Architecture Patterns
+            - [Relevant patterns from wiki that affect this feature's design]
+
+            ## Data Flows
+            - [Relevant data ownership and flows]
+
+            ## Integration Points
+            - [Where this feature connects to existing subsystems]
+
+            ## Constraints
+            - [Architectural constraints from existing system that affect this feature]
+
+            ## Gaps
+            - [What the wiki doesn't cover that this feature will need]
+
+            IMPORTANT: Write to `{FEATURE_DIR}/relevant-wiki.md` using the Write tool.
+
+            **WRITE TO FILE DIRECTLY. RETURN ONLY CONFIRMATION.**
+            Your response must be ~10 lines max. Just confirm what was written and the line count.
+            Do NOT return file contents in your response.
+            ```
+
+            **After background notification arrives — IGNORE it:**
+
+            Do NOT call TaskOutput. Do NOT call TaskOutput. Do NOT call TaskOutput.
+            Just verify the file and read it directly from disk:
+            ```bash
+            wc -l {FEATURE_DIR}/relevant-wiki.md
+            ```
+
+            Read `{FEATURE_DIR}/relevant-wiki.md` using the Read tool, hold as `RELEVANT_WIKI`.
+            Set `WIKI_FROM_CACHE = false`.
+
+            Continue to step 6.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 6: CODE RESEARCH (Subagent)                                  -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="code-research" order="6">
+
+            **If `is_greenfield`:**
+
+            Set RELEVANT_CODE = null.
+            Continue to step 7.
+
+            **If `is_brownfield`:**
+
+            **Parallelism rule:** If wiki research was served from cache (`WIKI_FROM_CACHE = true`
+            in step 5a), code research can start immediately — the `relevant-wiki.md` file is
+            already on disk. If wiki research had to regenerate (step 5b with a background agent),
+            code research waits for that background agent to complete first before spawning.
+
+            <!-- ── 6a: Check for existing code research ─────────────────────── -->
+
+            Check if `{FEATURE_DIR}/relevant-code.md` exists:
+            ```bash
+            HAS_CODE_RESEARCH=$(node ~/.claude/agile-context-engineering/src/ace-tools.js verify-path-exists {FEATURE_DIR}/relevant-code.md --raw)
+            ```
+
+            If `HAS_CODE_RESEARCH` is TRUE:
+            - Use AskUserQuestion:
+              - header: "Code Research"
+              - question: "Previous code analysis exists for this feature (`{FEATURE_DIR}/relevant-code.md`). What would you like to do?"
+              - options:
+                - "Use existing" — Skip code analysis, load the existing file
+                - "Regenerate" — Re-analyze codebase for this feature
+                - "Skip" — Don't use code analysis for this planning session
+
+            - If "Use existing": read the file, hold as `RELEVANT_CODE`. Continue to step 7.
+            - If "Skip": set `RELEVANT_CODE = null`. Continue to step 7.
+            - If "Regenerate": proceed to 6b.
+
+            If `HAS_CODE_RESEARCH` is FALSE: proceed to 6b.
+
+            <!-- ── 6b: Spawn code research subagent ─────────────────────────── -->
+
+            Display:
+            ```
+            ┌──────────────────────────────────────────────────┐
+            │  ACE > Plan Feature > Code Research              │
+            └──────────────────────────────────────────────────┘
+
+              i  Analyzing codebase for existing implementation
+                 relevant to feature: {Feature ID} — {Feature Title}
+                 Writing to: {FEATURE_DIR}/relevant-code.md
+            ```
+
+            **CRITICAL — Context Window Protection:**
+            The agent writes to disk and returns ONLY a ~10-line confirmation.
+            This prevents agent output from inflating the main context window.
+
+            **CRITICAL — Do NOT call TaskOutput. NEVER. UNDER NO CIRCUMSTANCES.**
+            After spawning the background agent, do NOT call TaskOutput to read its results.
+            You will be automatically notified when the agent completes — IGNORE those notifications.
+            The agent writes to `{FEATURE_DIR}/relevant-code.md` on disk. You do not need the return message.
+            TaskOutput returns the agent's FULL internal transcript (every file read, every search,
+            every tool call) — calling it will inflate the context window by 10-20%. THIS IS FORBIDDEN.
+            After the notification arrives, verify the file with `wc -l {FEATURE_DIR}/relevant-code.md`,
+            then READ the file directly from disk using the Read tool. That is how you get the results.
+
+            Resolve the researcher model:
+            ```bash
+            RESEARCHER_MODEL=$(node ~/.claude/agile-context-engineering/src/ace-tools.js resolve-model ace-project-researcher --raw)
+            ```
+
+            Task tool parameters:
+            ```
+            subagent_type: "general-purpose"
+            model: "{RESEARCHER_MODEL}"
+            run_in_background: true
+            description: "Code research for {Feature ID}"
+            ```
+
+            Prompt:
+            ```
+            First, read ~/.claude/agents/ace-project-researcher.md for your role and instructions.
+
+            **Feature context:**
+            - Feature: {Feature ID} — {Feature Title}
+            - Epic: {Epic ID} — {Epic Title}
+            - Feature description (from backlog): {TARGET_FEATURE.description}
+
+            **Read these context files (if they exist):**
+            - {FEATURE_DIR}/relevant-wiki.md (wiki analysis for this feature)
+            - .docs/wiki/system-wide/system-architecture.md (system architecture)
+
+            **Your job:** Drill into the actual codebase to discover what is already implemented
+            that relates to this feature. Focus on:
+
+            1. **Existing Components & Modules** — What code already exists that this feature
+               will build on, extend, or integrate with?
+            2. **APIs & Interfaces** — Existing endpoints, function signatures, data contracts
+            3. **Partial Implementations** — Code that partially addresses this feature's scope
+            4. **System Boundaries** — Where this feature sits in the overall architecture
+            5. **Integration Points** — APIs, events, data flows this feature connects to
+            6. **Cross-Cutting Concerns** — Security, logging, error handling patterns in use
+            7. **Non-Functional Patterns** — Performance patterns, caching, rate limiting in use
+
+            **Write structured analysis to `{FEATURE_DIR}/relevant-code.md`:**
+
+            # Code Analysis: {Feature ID} — {Feature Title}
+
+            ## Existing Components
+            - [Component/module path — what it does, relevance to this feature]
+
+            ## APIs & Interfaces
+            - [Endpoint/interface — current capability, what this feature extends]
+
+            ## Partial Implementations
+            - [What's partially built — what remains]
+
+            ## System Boundaries
+            - [Where this feature sits in the architecture]
+
+            ## Integration Points
+            - [How this feature connects to existing code]
+
+            ## Cross-Cutting Concerns
+            - [Security, observability, error handling patterns to follow]
+
+            ## Non-Functional Patterns
+            - [Performance, caching, scalability patterns in use]
+
+            ## Architectural Constraints
+            - [Constraints that affect this feature's design]
+
+            Write to `{FEATURE_DIR}/relevant-code.md` using the Write tool.
+
+            **WRITE TO FILE DIRECTLY. RETURN ONLY CONFIRMATION.**
+            Your response must be ~10 lines max. Just confirm what was written and the line count.
+            Do NOT return file contents or analysis results in your response.
+            ```
+
+            **After background notification arrives — IGNORE it:**
+
+            Do NOT call TaskOutput. Do NOT call TaskOutput. Do NOT call TaskOutput.
+            Just verify the file and read it directly from disk:
+            ```bash
+            wc -l {FEATURE_DIR}/relevant-code.md
+            ```
+
+            Read `{FEATURE_DIR}/relevant-code.md` using the Read tool, hold as `RELEVANT_CODE`.
+
+            Continue to step 7.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 7: LOAD RESEARCH RESULTS                                     -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="load-research" order="7">
+
+            Build `CONTEXT_INVENTORY` by loading all available context:
+
+            1. `VISION` — product vision (from step 3, if available)
+            2. `BACKLOG_INDEX` — product backlog with all epics/features (from step 2/3)
+            3. `SYSTEM_ARCHITECTURE` — system architecture doc (from step 3, if available)
+            4. `RELEVANT_WIKI` — wiki analysis for this feature (from step 5, if available)
+            5. `RELEVANT_CODE` — code analysis for this feature (from step 6, if available)
+            6. `INPUT_CONTEXT` — user-provided context text/file (from step 4, if available)
+            7. `EXISTING_FEATURE_DOC` — existing feature file contents (from step 4, if REFINE mode)
+            8. `GITHUB_FEATURE_DATA` — GitHub issue data (from step 2f, if different from file)
+
+            Compute `CONTEXT_RICHNESS`:
+            - **RICH**: RELEVANT_WIKI is set OR RELEVANT_CODE is set (brownfield with research)
+            - **MODERATE**: VISION is set AND (BACKLOG has detailed descriptions)
+            - **LEAN**: Only INPUT_CONTEXT available beyond the backlog entry
+            - **BARE**: Only the backlog's 1-2 sentence description
+
+            Display loaded context summary:
+            ```
+              i  Context loaded for questioning:
+                 [+] Product vision
+                 [+] Product backlog (parent epic context)
+                 [+] System architecture
+                 [+] Wiki analysis (127 lines)
+                 [+] Code analysis (89 lines)
+                 [ ] User-provided context (none)
+                 [+] Existing feature doc (refinement mode)
+            ```
+
+            Continue to step 8.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 8: DEEP QUESTIONING                                          -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="deep-questioning" order="8">
+            Follow the questioning guide from `questioning.xml`. You are a thinking partner,
+            not an interviewer.
+
+            Display:
+            ```
+            ┌──────────────────────────────────────────────────┐
+            │  ACE > Plan Feature > Questioning                │
+            └──────────────────────────────────────────────────┘
+            ```
+
+            <!-- ── 8a: Mode-adapted opening ─────────────────────────────────── -->
+
+            **If RUN_MODE is REFINE:**
+
+            Read EXISTING_FEATURE_DOC and present current state:
+            ```
+              i  Refinement mode — existing feature specification found.
+                 Stories: {N} | Size: {size} | Status: {status}
+                 Last refined: {date} | Refinements: {count}
+            ```
+
+            Use AskUserQuestion:
+            - header: "Refinement"
+            - question: "What would you like to refine about this feature?"
+            - options:
+              - "Update scope" — Add or remove items from scope
+              - "Revise stories" — Change story breakdown
+              - "Update acceptance criteria" — Revise success conditions
+              - "Full review" — Walk through the entire feature specification
+
+            Proceed to questioning with the relevant focus area.
+
+            **If RUN_MODE is CREATE:**
+
+            Adapt opening based on `CONTEXT_RICHNESS`:
+
+            If **RICH** (wiki + code research available):
+            - "Based on my analysis of your codebase and documentation, here's what I
+              understand about {Feature Title}..."
+            - Present synthesis: what already exists, what needs to be built, where it
+              fits in the architecture
+            - "The backlog says: '{TARGET_FEATURE.description}'. Based on the code analysis,
+              here's what's already implemented and what remains..."
+            - Probe: "Does this match your understanding? What am I missing?"
+
+            If **MODERATE** (vision + backlog context):
+            - "Your backlog describes this feature as: '{TARGET_FEATURE.description}'.
+              It sits under the {Epic Title} epic with priority {priority}."
+            - "Let's make this concrete. Walk me through what a user actually does when
+              this feature is working."
+
+            If **LEAN** (only INPUT_CONTEXT or backlog entry):
+            - "I have the backlog entry and your context. Let me make sure I understand
+              the full picture."
+            - Probe the most important unknowns first.
+
+            If **BARE** (just a backlog entry name):
+            - "The backlog lists this as '{Feature Title}' under {Epic Title}. Tell me
+              more — what does this feature actually deliver?"
+
+            <!-- ── 8b: Template-field questioning ────────────────────────────── -->
+
+            **Map answers to feature.xml template structure (background, not out loud).**
+
+            As you question, mentally track coverage against feature.xml template fields:
+            - [ ] **Description** — What this feature delivers end-to-end (2-4 sentences, vertical slice)
+            - [ ] **Benefit Hypothesis** — SAFe format: "We believe [outcome] will be achieved
+                  if [users] successfully [action] with [feature]."
+                  - Challenge vagueness: outcome must be measurable and falsifiable
+                  - If user says "users will like it" — probe: "How will you measure that? What changes?"
+                  - Bad: "Users will like the new login." (not measurable)
+                  - Good: "We believe a 25% reduction in login support tickets will be achieved
+                    if returning customers successfully authenticate via social providers
+                    with the OAuth2 Login feature."
+            - [ ] **Scope: Includes** — Exhaustive list of capabilities in scope
+            - [ ] **Scope: Out of Scope** — Things someone might reasonably assume are included but are NOT
+            - [ ] **Acceptance Criteria** — 3-7 high-level, measurable conditions (NOT Gherkin scenarios)
+                  - These validate the benefit hypothesis, not implementation details
+                  - Each must be independently verifiable
+            - [ ] **Existing Implementation** (brownfield only) — Seeded from RELEVANT_CODE
+                  - Confirm with user: "Based on the code analysis, these components exist: [list]. Correct?"
+            - [ ] **Technical Context** — System boundaries, integration points, cross-cutting concerns, NFRs
+                  - Seeded from RELEVANT_WIKI and RELEVANT_CODE
+            - [ ] **Dependencies** — Requires, Enables, External
+            - [ ] **Story Breakdown** — stories as many as naturally emerge (see 8c)
+
+            Don't walk through this as a checklist. Weave questions naturally based on
+            the conversation. If gaps remain after the conversation feels complete, probe
+            those specific areas.
+
+            <!-- ── 8c: Story breakdown questioning ──────────────────────────── -->
+
+            Once feature scope is clear:
+
+            Display:
+            ```
+              i  Feature scope is taking shape. Let's break it into stories.
+                 Each story should be a vertical slice delivering testable value.
+                 The number of stories emerges from the requirements — no predefined range.
+            ```
+
+            **Approach for eliciting good stories:**
+
+            1. Start from the user journey: "Walk me through the happy path.
+               What's the first thing the user does? What happens next?"
+
+            2. Identify natural cut points: each story should deliver independently testable value.
+
+            3. If brownfield, use RELEVANT_CODE to inform decomposition:
+               "The code analysis shows {component} already handles {partial capability}.
+               That suggests we can scope a story around extending it to do {new thing}."
+
+            4. Present a draft story list when you have enough context:
+               ```
+               Here's how I'd break this down:
+
+               S1: [Title] — [1-sentence scope]
+               S2: [Title] — [1-sentence scope]
+               S3: [Title] — [1-sentence scope]
+               ...
+
+               That's {N} stories. Each is independently testable.
+               ```
+
+            5. Use AskUserQuestion:
+               - header: "Stories"
+               - question: "Here's the story breakdown. What would you like to adjust?"
+               - options:
+                 - "Looks good" — Stories are well-scoped
+                 - "Split a story" — One of these is too big
+                 - "Merge stories" — Some of these should be combined
+                 - "Add a story" — Something is missing
+
+            6. For each story, confirm or discuss:
+               - Title (short descriptive name)
+               - Scope description (rich, multi-paragraph plain text — NOT a formal user story.
+                 The `plan-story` command handles formal specification later.)
+               - Key behaviors and edge cases to consider
+               - Relationship to other stories in the feature
+               - **Rough Fibonacci estimate** (1, 2, 3, 5, 8) — planning-level size to help
+                 with sprint planning. `plan-story` can refine later after detailed specification.
+
+            7. Validate coverage: "Do these {N} stories cover 100% of the feature scope?
+               The includes list is: [list scope items]. Every item should map to at least one story."
+
+            <!-- ── 8d: Decision gate ────────────────────────────────────────── -->
+
+            When the feature specification feels complete:
+
+            Use AskUserQuestion:
+            - header: "Ready?"
+            - question: "I have the full feature spec: {description summary}, {N} acceptance criteria, {M} stories. Ready to write the feature document?"
+            - options:
+              - "Write feature document" — Let's create it
+              - "Keep exploring" — I want to add more or adjust
+              - "Show me what you have" — Summary before deciding
+
+            If "Show me what you have":
+            - Display a structured summary:
+              ```
+              Feature: {ID} — {Title}
+              Epic: {Epic ID} — {Epic Title}
+              Size: {size} | Priority: {priority} | Milestone: {milestone}
+
+              Description: {2-4 sentence description}
+
+              Benefit Hypothesis:
+              > We believe {outcome} if {users} {action} with {feature}.
+
+              Acceptance Criteria: {count}
+              Stories: {count}
+              | ID | Title             | Size |
+              |----|-------------------|------|
+              | S1 | {story title}     | {est}|
+              | S2 | {story title}     | {est}|
+              ...
+              ```
+            - Return to decision gate.
+
+            If "Keep exploring" — ask what they want to add, or identify gaps and probe naturally.
+
+            Loop until "Write feature document" selected.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 9: WRITE FEATURE DOCUMENT                                    -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="write-feature" order="9">
+
+            Display:
+            ```
+            ┌──────────────────────────────────────────────────┐
+            │  ACE > Plan Feature > Writing Document           │
+            └──────────────────────────────────────────────────┘
+
+              i  Spawning product owner agent to write feature
+                 specification...
+                 Output: {FEATURE_FILE}
+            ```
+
+            Create directory structure:
+            ```bash
+            mkdir -p {FEATURE_DIR}
+            ```
+
+            Prepare a context brief (800 words max) that distills all questioning results:
+            - Feature header fields: ID, Title, Epic reference, Status, Priority, Size (Fibonacci x10),
+              Sprint, Milestone, Link
+            - Complete Description (2-4 sentences)
+            - Benefit Hypothesis (SAFe format)
+            - Scope: Includes + Out of Scope
+            - Acceptance Criteria (3-7 items)
+            - Existing Implementation (brownfield only — from RELEVANT_CODE, confirmed by user)
+            - Story Breakdown: index table with rough Fibonacci estimates + rich descriptions for each story
+            - Technical Context: System Boundaries, Integration Points, Cross-Cutting Concerns, NFRs
+            - Dependencies: Requires, Enables, External
+            - Metadata: current date, refinement count
+            - Research artifact paths for metadata section
+
+            <!-- ── 9a: CREATE mode — write new feature ──────────────────────── -->
+
+            **If RUN_MODE is CREATE:**
+
+            Spawn the feature-writing agent:
+
+            ```
+            Task(
+                prompt="You are an Agile Product Owner writing a feature specification document.
+
+                **Context brief from questioning session:**
+                {paste the context brief here}
+
+                **Instructions:**
+                1. Read the feature template: ~/.claude/agile-context-engineering/templates/product/feature.xml
+                2. Write `{FEATURE_FILE}` following the template structure exactly
+                3. Include ALL sections: Header, Description, Benefit Hypothesis, Scope,
+                   Acceptance Criteria, [Existing Implementation if brownfield],
+                   Story Breakdown (index + detail per story), Technical Context,
+                   Dependencies, Metadata
+                4. Story descriptions must be RICH and detailed — multiple paragraphs. Cover:
+                   scope, user-facing behavior, value, key behaviors, edge cases, constraints,
+                   relationships to other stories.
+                   These are NOT formal user stories — they are thorough descriptions of intent
+                   and scope. The `plan-story` command handles formal specification later.
+                5. Story index table:
+                   - ID = S[N], sequential within this feature
+                   - Size = rough Fibonacci estimate (1, 2, 3, 5, 8) from the questioning session
+                   - Status = Todo
+                   - Sprint = —
+                   - Link = —
+                6. Follow all field definitions from the template:
+                   - Feature Status: Refined (stories well-defined) or Todo (if still rough)
+                   - Feature Size: Fibonacci x10 values only (10, 20, 30, 50, 80)
+                   - Priority: Critical | High | Medium | Low
+                7. Benefit Hypothesis MUST follow SAFe format exactly:
+                   'We believe [outcome] will be achieved if [users] successfully [action] with [feature].'
+                   The outcome must be measurable and falsifiable.
+                8. Acceptance Criteria are HIGH-LEVEL business validation — NOT Gherkin scenarios.
+                   3-7 criteria, each independently verifiable.
+                9. Table formatting (CRITICAL): pad ALL cells with spaces so | separators align
+                   vertically across all rows. Follow the table-formatting guideline from the
+                   template for minimum column widths.
+                10. GitHub identity: use #[issue_number] for GitHub-linked items, S[N] for local stories
+                11. Metadata: Created={today}, Last refined={today}, Refinements=1
+                    Research artifacts: include paths to relevant-wiki.md and relevant-code.md if they exist,
+                    otherwise use '—'
+
+                Write the file using the Write tool.
+
+                **Return format — ONLY this, nothing else:**
+                DONE
+                - Feature: {ID} — {Title}
+                - Stories: {count}
+                - Acceptance criteria: {count}
+                - File: {FEATURE_FILE}
+                - Lines: {line count}",
+                subagent_type="ace-product-owner",
+                model="{PO_MODEL}",
+                description="Write feature specification"
+            )
+            ```
+
+            <!-- ── 9b: REFINE mode — update existing feature ────────────────── -->
+
+            **If RUN_MODE is REFINE:**
+
+            Prepare a change brief describing exactly what changed during questioning:
+            - **Additions:** new scope items, new stories (with all details), new acceptance criteria
+              - New Story IDs continue from the highest existing S[N] in the feature
+            - **Removals:** items to delete (by ID or description)
+            - **Modifications:** changed descriptions, updated scope, revised hypothesis, resized stories
+            - **Unchanged:** items to preserve as-is
+
+            Spawn the feature-editing agent:
+
+            ```
+            Task(
+                prompt="You are an Agile Product Owner updating an existing feature specification.
+
+                **Read the current feature:** `{FEATURE_FILE}`
+                **Read the template for reference:** `~/.claude/agile-context-engineering/templates/product/feature.xml`
+
+                **Changes to apply:**
+                {paste the change brief here}
+
+                **Rules:**
+                - PRESERVE existing story IDs (S[N] or #[N]) — never renumber after assignment
+                - Update the story index table to reflect any additions, removals, or changes
+                - Increment metadata refinement count
+                - Update 'Last refined' date to today
+                - Maintain all template formatting — especially table column alignment:
+                  pad cells with spaces so | separators align vertically across all rows
+                - If adding new stories, use next available S[N]
+                - Story sizes: keep existing estimates unless explicitly changed, use Fibonacci (1,2,3,5,8)
+                - Do NOT change stories or sections that aren't in the change brief
+                - Benefit Hypothesis must follow SAFe format
+                - Acceptance criteria are feature-level, NOT Gherkin
+
+                Use Edit or Write tool as appropriate. If changes are extensive (new stories added,
+                major scope revision), use the Write tool to rewrite the file completely.
+
+                **Return format — ONLY this, nothing else:**
+                DONE
+                - Feature: {ID} — {Title}
+                - Stories: {count} (added: {N}, removed: {N}, unchanged: {N})
+                - Refinements: {new count}
+                - File: {FEATURE_FILE}",
+                subagent_type="ace-product-owner",
+                model="{PO_MODEL}",
+                description="Update feature specification"
+            )
+            ```
+
+            <!-- ── 9c: Create individual story files ────────────────────────── -->
+
+            **After the feature document is written (both CREATE and REFINE modes):**
+
+            For each story in the feature's story breakdown, create a stub story file at:
+            `{FEATURE_DIR}/{STORY_SLUG}/{STORY_SLUG}.md`
+
+            Each story gets its own subdirectory within the feature directory.
+
+            Compute story slugs:
+            ```bash
+            STORY_SLUG=$(node ~/.claude/agile-context-engineering/src/ace-tools.js generate-slug "{Story ID}-{Story Title}" --raw)
+            ```
+
+            For each story, check if the file already exists:
+            - If exists: **do NOT overwrite** — it may have been refined by `plan-story` already.
+              Skip silently.
+            - If not exists: create a stub file seeded from the story description in the feature doc.
+
+            Spawn a Task agent to create all missing story files:
+
+            ```
+            Task(
+                prompt="You are creating stub story files for a feature.
+
+                **Read the feature document:** `{FEATURE_FILE}`
+
+                **For each story in the Story Breakdown section, create a stub file IF it does not already exist.**
+
+                File path pattern: `{FEATURE_DIR}/{story_slug}/{story_slug}.md`
+                where story_slug = generate-slug of '{Story ID}-{Story Title}'
+                (use Bash: `node ~/.claude/agile-context-engineering/src/ace-tools.js generate-slug '{Story ID}-{Story Title}' --raw`)
+
+                Each story gets its own subdirectory. Create the directory with `mkdir -p` before writing.
+
+                **Before writing each file, check if it exists.** If it exists, skip it — do NOT overwrite.
+                Existing files may have been formally refined by plan-story.
+
+                **Stub file content for each new story:**
+
+                # {Story ID}: {Story Title}
+
+                **Feature**: {Feature ID} {Feature Title} | **Status**: Todo | **Size**: {estimate}
+
+                ## Description
+
+                {Copy the rich plain-text description from the feature document's story detail section verbatim.}
+
+                ---
+                *Stub created by plan-feature. Run `/ace:plan-story {Story ID}` for formal specification with INVEST criteria and Gherkin acceptance scenarios.*
+
+                **Return format — ONLY this, nothing else:**
+                DONE
+                - Created: {N} story files
+                - Skipped: {M} (already exist)
+                - Directory: {FEATURE_DIR}",
+                subagent_type="general-purpose",
+                model="{PO_MODEL}",
+                description="Create story stub files"
+            )
+            ```
+
+            Display:
+            ```
+              +  Created {N} story stub files in {FEATURE_DIR}/
+              [If skipped: Skipped {M} existing story files (already refined)]
+            ```
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 10: UPDATE BACKLOG                                           -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="update-backlog" order="10">
+
+            <!-- ── 10a: New feature — add to backlog ────────────────────────── -->
+
+            **If `NEEDS_BACKLOG_ADD` is true (new feature not in backlog):**
+
+            Spawn a Task agent to add the feature to the backlog:
+            ```
+            Task(
+                prompt="Read `.ace/artifacts/product/product-backlog.md` and add a new feature
+                to the {Epic Title} epic's feature table:
+
+                - ID: {new F[N] — next sequential from highest existing F[N]}
+                - Title: {Feature Title}
+                - Description: {1-2 sentence description}
+                - Status: Refined
+                - Priority: {priority}
+                - Size: {size}
+                - Sprint: —
+                - Milestone: {milestone}
+                - Link: —
+
+                Rules:
+                - Feature ID continues from highest existing F[N] in the entire backlog
+                - Insert in the correct epic's detail section, ordered by delivery sequence
+                - Update the Epic Index table if needed (aggregate status change)
+                - Maintain table formatting — pad ALL cells so | separators align vertically
+                - Read template for reference: ~/.claude/agile-context-engineering/templates/product/product-backlog.xml
+
+                Use Edit tool to modify in place. Return only a confirmation of what changed.",
+                subagent_type="ace-product-owner",
+                model="{PO_MODEL}",
+                description="Add feature to backlog"
+            )
+            ```
+
+            Display:
+            ```
+              +  Added {Feature ID} — {Feature Title} to product backlog.
+            ```
+
+            <!-- ── 10b: Existing feature — update status ────────────────────── -->
+
+            **If `FEATURE_IN_BACKLOG` is true (feature already existed):**
+
+            Spawn a Task agent to update the feature's status and any changed fields:
+            ```
+            Task(
+                prompt="Read `.ace/artifacts/product/product-backlog.md` and update feature {Feature ID}:
+                - Status: Refined
+                {any other field changes from the planning session — size, priority, etc.}
+
+                Rules:
+                - Maintain table formatting — pad ALL cells so | separators align vertically
+                - Update Epic aggregate status if needed
+                - Do NOT change other items
+
+                Use Edit tool to modify in place. Return only a confirmation of what changed.",
+                subagent_type="general-purpose",
+                model="{PO_MODEL}",
+                description="Update feature status in backlog"
+            )
+            ```
+
+            Display:
+            ```
+              ~  Updated {Feature ID} status to Refined in product backlog.
+            ```
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 11: REVIEW AND APPROVE                                       -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="review" order="11">
+            Show the agent's returned summary to the user (from step 9). Then:
+
+            Use AskUserQuestion:
+            - header: "Feature"
+            - question: "Feature specification written to `{FEATURE_FILE}`. Does this look right? Review the full file in your editor for details."
+            - options:
+              - "Approve" — Looks good, commit it
+              - "Adjust" — I want to change some things
+              - "Redo questioning" — Let's go back and explore more
+
+            **If "Adjust":**
+            - Ask what they want to change (scope, stories, criteria, hypothesis, etc.)
+            - Spawn a Task agent to edit:
+              ```
+              Task(
+                  prompt="Read `{FEATURE_FILE}` and make these changes:
+                  {user's requested changes}.
+
+                  **Rules:**
+                  - Read the template for reference: ~/.claude/agile-context-engineering/templates/product/feature.xml
+                  - Maintain all template formatting — especially table column alignment:
+                    pad cells with spaces so | separators align vertically across all rows
+                  - Keep Story IDs stable — do NOT renumber
+                  - If adding stories, use next available S[N]
+                  - Benefit Hypothesis must follow SAFe format
+                  - Acceptance criteria are feature-level, NOT Gherkin
+                  - Story sizes: Fibonacci (1, 2, 3, 5, 8)
+
+                  Use the Edit tool to modify in place. Return only a confirmation of what changed.",
+                  subagent_type="general-purpose",
+                  model="{PO_MODEL}",
+                  description="Adjust feature specification"
+              )
+              ```
+            - Present for review again. Loop until approved.
+
+            **If "Redo questioning":**
+            - Return to step 8 (deep-questioning)
+            - Preserve VISION, RELEVANT_WIKI, RELEVANT_CODE, SYSTEM_ARCHITECTURE, INPUT_CONTEXT
+            - Hold previous answers as additional context
+
+            **If "Approve":**
+            Continue to step 12.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 12: GITHUB SYNC                                              -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="github-sync" order="12">
+
+            **If `github_project.enabled` is false OR `github_project.gh_installed` is false:**
+
+            Skip to step 13.
+
+            **If `github_project.enabled` is true AND `github_project.gh_installed` is true:**
+
+            Extract settings: REPO = `github_project.repo`, PROJECT_NUMBER = `github_project.project_number`,
+            OWNER = `github_project.owner`.
+
+            <!-- ── 12a: Identify sync actions ───────────────────────────────── -->
+
+            Read the approved `{FEATURE_FILE}` and cross-reference with GitHub state:
+
+            - **Feature issue:** Does `NEEDS_GITHUB_CREATE` flag indicate we need to create the feature issue?
+              If REFINE mode and the feature already has a GitHub issue, check if any fields changed.
+            - **Story sub-issues:** Parse the story index table. All stories with Link = "—" are
+              candidates for creation.
+
+            If no sync actions needed (feature linked, all stories linked):
+            - Display: "All items already synced with GitHub."
+            - Continue to step 13.
+
+            <!-- ── 12b: Present sync plan ───────────────────────────────────── -->
+
+            ```
+              GitHub Sync Summary:
+              - Feature issue: {create / update / already synced}
+              - Story sub-issues: {N} to create, {M} already linked
+            ```
+
+            Use AskUserQuestion:
+            - header: "GitHub Sync"
+            - question: "How would you like to sync with GitHub?"
+            - options:
+              - "Sync all (Recommended)" — Create/update feature and story issues
+              - "Feature only" — Only create/update the feature issue
+              - "Skip" — Don't sync to GitHub
+
+            **If "Skip":**
+            Continue to step 13.
+
+            <!-- ── 12c: Execute sync ────────────────────────────────────────── -->
+
+            Display:
+            ```
+            ┌──────────────────────────────────────────────────┐
+            │  ACE > Plan Feature > GitHub Sync                │
+            └──────────────────────────────────────────────────┘
+
+              i  Syncing with GitHub...
+                 Repo: {REPO} | Project: #{PROJECT_NUMBER}
+            ```
+
+            **Prerequisite — Resolve all field and type IDs (once, before creating any issues):**
+
+            ```bash
+            GH_FIELDS=$(node ~/.claude/agile-context-engineering/src/ace-tools.js github resolve-fields repo={REPO} owner={OWNER} project={PROJECT_NUMBER})
+            ```
+
+            Parse the JSON response. Extract and cache:
+            - `issue_types.Feature` -> FEATURE_TYPE_ID
+            - `issue_types.Story` -> STORY_TYPE_ID (if exists; handle gracefully if not)
+            - `project_id` -> PROJECT_ID
+            - `fields.Status.id` -> STATUS_FIELD_ID
+            - `fields.Status.options` -> STATUS_OPTIONS map
+            - `fields.Priority.id` -> PRIORITY_FIELD_ID (if exists)
+            - `fields.Priority.options` -> PRIORITY_OPTIONS map
+            - `fields.Estimate.id` -> ESTIMATE_FIELD_ID (if exists)
+
+            **Create feature issue (if `NEEDS_GITHUB_CREATE` is true):**
+
+            Determine the parent epic's GitHub issue number from BACKLOG_INDEX:
+            - If the parent epic has a Link column value like `[#45](url)`, extract issue number 45.
+            - If the parent epic has no GitHub issue (Link = "—"), warn user and skip parent assignment.
+
+            ```bash
+            FEATURE_RESULT=$(node ~/.claude/agile-context-engineering/src/ace-tools.js github create-issue \
+              type=Feature \
+              "title={Feature Title}" \
+              body_file={FEATURE_FILE} \
+              repo={REPO} \
+              owner={OWNER} \
+              project={PROJECT_NUMBER} \
+              project_id={PROJECT_ID} \
+              type_id={FEATURE_TYPE_ID} \
+              status_field_id={STATUS_FIELD_ID} \
+              status_option_id={STATUS_OPTIONS[status]} \
+              estimate_field_id={ESTIMATE_FIELD_ID} \
+              estimate={size_value} \
+              [priority_field_id={PRIORITY_FIELD_ID} priority_option_id={PRIORITY_OPTIONS[priority]}] \
+              [parent={epic_issue_number}] \
+              [milestone={Milestone}])
+            ```
+
+            Parse the JSON response: `number`, `url`, `item_id`.
+            Store the feature's issue number for use as parent when creating stories.
+
+            Display:
+            ```
+              +  Created [Feature] {Title} -> #{number} (parent: #{epic_number})
+            ```
+
+            **Update existing feature issue (if `GITHUB_FEATURE_ISSUE` is true — feature already has a GitHub issue):**
+
+            The feature file IS the body. 100% of `{FEATURE_FILE}` goes to GitHub as-is.
+
+            ```bash
+            node ~/.claude/agile-context-engineering/src/ace-tools.js github update-issue \
+              number={feature_issue_number} \
+              repo={REPO} \
+              "title={Feature Title}" \
+              body_file={FEATURE_FILE}
+            ```
+
+            Display:
+            ```
+              ~  Updated [Feature] #{feature_issue_number} — {Title}
+            ```
+
+            **If "Sync all" selected, sync ALL story issues:**
+
+            For each story in the story breakdown:
+
+            **If the story has NO GitHub issue (Link = "—") — CREATE:**
+
+            The story stub file IS the body. 100% of `{FEATURE_DIR}/{STORY_SLUG}/{STORY_SLUG}.md`
+            goes to GitHub as-is. The story stub files were created in step 9c.
+
+            ```bash
+            STORY_RESULT=$(node ~/.claude/agile-context-engineering/src/ace-tools.js github create-issue \
+              type=Story \
+              "title={Story Title}" \
+              body_file={FEATURE_DIR}/{STORY_SLUG}/{STORY_SLUG}.md \
+              repo={REPO} \
+              owner={OWNER} \
+              project={PROJECT_NUMBER} \
+              project_id={PROJECT_ID} \
+              [type_id={STORY_TYPE_ID}] \
+              status_field_id={STATUS_FIELD_ID} \
+              status_option_id={STATUS_OPTIONS["Todo"]} \
+              estimate_field_id={ESTIMATE_FIELD_ID} \
+              estimate={story_size_value} \
+              [parent={feature_issue_number}])
+            ```
+
+            Parse response: `number`, `url`.
+
+            Display:
+            ```
+              +  Created [Story] {Title} -> #{number} (parent: #{feature_number})
+            ```
+
+            **If the story ALREADY has a GitHub issue (Link != "—") — UPDATE:**
+
+            The story stub file IS the body. 100% of `{FEATURE_DIR}/{STORY_SLUG}/{STORY_SLUG}.md`
+            goes to GitHub as-is.
+
+            ```bash
+            node ~/.claude/agile-context-engineering/src/ace-tools.js github update-issue \
+              number={story_issue_number} \
+              repo={REPO} \
+              "title={Story Title}" \
+              body_file={FEATURE_DIR}/{STORY_SLUG}/{STORY_SLUG}.md
+            ```
+
+            Display:
+            ```
+              ~  Updated [Story] #{story_issue_number} — {Title}
+            ```
+
+            Each story's **parent is set to the feature's GitHub issue number** (either pre-existing
+            or just created above). Stories get their rough Fibonacci estimate from the feature
+            planning session (plan-story may refine later).
+
+            <!-- ── 12d: Update feature file and story files with GitHub links ── -->
+
+            After all creates, read `{FEATURE_FILE}` and update:
+            - Feature header Link field: from "—" to `[#N](url)`
+            - Feature header ID: from F[N] to #[N] if feature issue was created
+            - Story index table Link column: from "—" to `[#N](url)` for each newly created story
+            - Story index table ID: from S[N] to #[N] for each newly created story
+
+            Use the Edit tool for targeted replacements in the markdown.
+
+            Also update each story stub file in `{FEATURE_DIR}/{story_slug}/`:
+            - If the story file exists and was just linked to a GitHub issue, update its header
+              to reflect the new issue number and link.
+            - If the ID changed (e.g., S1 became #92), rename the story directory and file:
+              rename `{FEATURE_DIR}/{old_story_slug}/` to `{FEATURE_DIR}/{new_story_slug}/`
+              and rename the file inside from `{old_story_slug}.md` to `{new_story_slug}.md`.
+
+            <!-- ── 12e: Sync new feature GitHub ID back to product-backlog.md ── -->
+
+            If a feature GitHub issue was created, read `.ace/artifacts/product/product-backlog.md`
+            and update the feature row in the parent epic's detail table:
+            - ID column: change F[N] to #[issue_number]
+            - Link column: change "—" to `[#N](https://github.com/{REPO}/issues/N)`
+            - Title: update to match the GitHub issue title exactly
+
+            Stories are NOT tracked in the backlog — only update the feature row.
+
+            Use the Edit tool for targeted replacements in the markdown.
+            Preserve table alignment — pad ALL cells so | separators align vertically.
+
+            Display summary:
+            ```
+              +  Created {N} GitHub issues.
+                 Synced feature ID back to product-backlog.md.
+                 Updated feature file and story files with GitHub links.
+            ```
+
+            Continue to step 13.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 13: COMMIT                                                   -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="commit" order="13">
+            Stage and commit all changed files in a single commit.
+            Only stage files that actually changed (use `git diff` / `git status` to check).
+
+            Files that may have changed:
+            - `{FEATURE_FILE}` — always (this is the main output)
+            - `{FEATURE_DIR}/{STORY_SLUG}/{STORY_SLUG}.md` — story stub files created in step 9c
+            - `{FEATURE_DIR}/relevant-wiki.md` — if wiki research was run/regenerated in step 5
+            - `{FEATURE_DIR}/relevant-code.md` — if code research was run/regenerated in step 6
+            - `.ace/artifacts/product/product-backlog.md` — if feature was added or status updated
+
+            Stage specifically:
+            ```bash
+            git add {FEATURE_DIR}/
+            git add .ace/artifacts/product/product-backlog.md
+            ```
+
+            Commit with a message that reflects what happened:
+            - CREATE mode: `git commit -m "docs: plan feature {Feature ID} — {Feature Title}"`
+            - REFINE mode: `git commit -m "docs: refine feature {Feature ID} — {brief summary of changes}"`
+              Examples:
+              - "docs: refine feature F3 — add 2 stories, update scope"
+              - "docs: refine feature #78 — revise acceptance criteria"
+
+            Display completion (adapt banner to mode):
+
+            ```
+            ╔══════════════════════════════════════════════════╗
+            ║  ACE > Feature [Planned | Refined]               ║
+            ║  {Feature ID} "{Feature Title}"                  ║
+            ╚══════════════════════════════════════════════════╝
+
+              +  {FEATURE_FILE} committed.
+              [If REFINE: Refinement #{count}]
+
+              Summary:
+              ────────
+              {N} stories | Size: {size} | Priority: {priority}
+              Acceptance criteria: {M}
+              [If brownfield: Existing implementation documented]
+
+              i  Story descriptions are ready for formal planning.
+                 Run plan-story on each to create INVEST stories
+                 with Gherkin acceptance criteria.
+
+              Next > /ace:plan-story {Feature ID}-S1
+                     Plan the first story with formal specification.
+                   > /ace:plan-feature {next feature ID}
+                     Plan the next feature in the backlog.
+            ```
+        </step>
+
+    </process>
+
+    <success_criteria>
+        - Init function executed (environment detected, brownfield status checked, GitHub settings loaded)
+        - Feature located in product backlog (or marked for addition if new)
+        - CREATE vs REFINE mode correctly determined
+        - Product vision and backlog loaded as foundation context
+        - Wiki research: reused from cache, regenerated, or skipped (brownfield only)
+        - Code research: reused from cache, regenerated, or skipped (brownfield only)
+        - Parallelism rule applied: code research runs immediately if wiki from cache, waits if wiki regenerating
+        - Both research agents follow context window protection (write to disk, return ~10 lines only)
+        - No TaskOutput called after background agent spawning
+        - Deep questioning adapted to mode (CREATE vs REFINE) and context richness (RICH/MODERATE/LEAN/BARE)
+        - All feature.xml template fields addressed during questioning
+        - Benefit hypothesis follows SAFe format (measurable, falsifiable, user-focused)
+        - Acceptance criteria are feature-level (NOT Gherkin)
+        - Story breakdown: as many stories as naturally emerge, each a vertical slice with rich plain-text description
+        - Story sizes: rough Fibonacci estimates (1, 2, 3, 5, 8) assigned during questioning
+        - Feature document written following template structure exactly
+        - Individual story stub files created in {FEATURE_DIR}/{STORY_SLUG}/{STORY_SLUG}.md (each story in own subdirectory, skipping already-existing files)
+        - Existing IDs and GitHub links preserved during refinement
+        - Backlog updated: new feature added or status changed to Refined
+        - User reviewed and approved the document
+        - GitHub sync: feature parent set to epic issue, story parents set to feature issue
+        - GitHub identity preservation: #N for linked items, S[N] for local stories
+        - Link columns updated after GitHub issue creation (both feature file and backlog)
+        - Document committed with mode-appropriate message
+    </success_criteria>
+
+</workflow>

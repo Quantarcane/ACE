@@ -1089,7 +1089,7 @@
 
                   Use the Edit tool to modify in place. Return only a confirmation of what changed.",
                   subagent_type="general-purpose",
-                  model="haiku",
+                  model="{PO_MODEL}",
                   description="Adjust product backlog"
               )
               ```

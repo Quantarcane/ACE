@@ -29,6 +29,7 @@
  * GitHub Commands:
  *   github resolve-fields             Resolve native issue type IDs and project field IDs
  *   github create-issue               Create issue, set type, add to project, set fields
+ *   github update-issue               Update an existing issue's title, body, and optionally project fields
  *   github fetch-issues               Fetch all Epics/Features from GitHub Project with full fields
  */
 
@@ -662,6 +663,88 @@ function cmdInitPlanBacklog(cwd, raw) {
   output(result, raw);
 }
 
+// ─── Init: Plan Feature ──────────────────────────────────────────────────────
+
+function cmdInitPlanFeature(cwd, raw) {
+  const config = loadConfig(cwd);
+  const brownfield = detectBrownfieldStatus(cwd);
+
+  // Wiki detection — system-wide
+  const wikiSystemDir = '.docs/wiki/system-wide';
+  const has_wiki_system_wide = pathExistsInternal(cwd, wikiSystemDir);
+  const has_system_architecture = pathExistsInternal(cwd, path.join(wikiSystemDir, 'system-architecture.md'));
+  const has_system_structure = pathExistsInternal(cwd, path.join(wikiSystemDir, 'system-structure.md'));
+  const has_testing_framework = pathExistsInternal(cwd, path.join(wikiSystemDir, 'testing-framework.md'));
+
+  // Wiki detection — subsystems
+  const wikiSubsystemsDir = '.docs/wiki/subsystems';
+  const has_wiki_subsystems = pathExistsInternal(cwd, wikiSubsystemsDir);
+
+  let wiki_subsystem_names = [];
+  if (has_wiki_subsystems) {
+    try {
+      const entries = fs.readdirSync(path.join(cwd, wikiSubsystemsDir), { withFileTypes: true });
+      wiki_subsystem_names = entries
+        .filter(e => e.isDirectory())
+        .map(e => e.name);
+    } catch {}
+  }
+
+  const has_wiki = has_wiki_system_wide || has_wiki_subsystems;
+
+  const result = {
+    // Models
+    product_owner_model: resolveModelInternal(cwd, 'ace-product-owner'),
+    researcher_model: resolveModelInternal(cwd, 'ace-project-researcher'),
+
+    // Config
+    commit_docs: config.commit_docs,
+
+    // Product artifacts
+    has_product_vision: pathExistsInternal(cwd, '.docs/product/product-vision.md'),
+    has_product_backlog: pathExistsInternal(cwd, '.ace/artifacts/product/product-backlog.md'),
+
+    // Wiki analysis cache (from previous runs)
+    has_wiki_analysis: pathExistsInternal(cwd, '.ace/artifacts/wiki/wiki-analysis.md'),
+
+    // Brownfield detection
+    ...brownfield,
+
+    // Wiki state — system-wide
+    has_wiki,
+    has_wiki_system_wide,
+    has_system_architecture,
+    has_system_structure,
+    has_testing_framework,
+
+    // Wiki state — subsystems
+    has_wiki_subsystems,
+    wiki_subsystem_names,
+
+    // Git state
+    has_git: pathExistsInternal(cwd, '.git'),
+
+    // GitHub CLI
+    has_gh_cli: (() => {
+      try {
+        const { execSync } = require('child_process');
+        execSync('gh --version', { stdio: 'pipe' });
+        return true;
+      } catch {
+        return false;
+      }
+    })(),
+
+    // GitHub Project settings (from settings.json)
+    github_project: (() => {
+      const settings = loadSettings(cwd);
+      return settings.github_project;
+    })(),
+  };
+
+  output(result, raw);
+}
+
 // ─── GitHub Integration Commands ──────────────────────────────────────────────
 
 /**
@@ -790,7 +873,7 @@ function cmdGithubResolveFields(cwd, raw, extraArgs) {
  * Required args: type=Epic|Feature|Story  title=...  repo=owner/name  owner=org
  *                project=number  project_id=PVT_...  type_id=IT_...
  *
- * Optional args: body=...
+ * Optional args: body=...  body_file=path (reads body from file, preferred for large bodies)
  *                status_field_id=...  status_option_id=...
  *                priority_field_id=...  priority_option_id=...
  *                estimate_field_id=...  estimate=number
@@ -805,7 +888,15 @@ function cmdGithubCreateIssue(cwd, raw, extraArgs) {
 
   const type = params.type;           // Epic, Feature, or Story
   const title = params.title;
-  const body = params.body || '';
+  let body = params.body || '';
+  if (!body && params.body_file) {
+    const bodyPath = path.isAbsolute(params.body_file)
+      ? params.body_file
+      : path.join(cwd, params.body_file);
+    if (fs.existsSync(bodyPath)) {
+      body = fs.readFileSync(bodyPath, 'utf8');
+    }
+  }
   const repo = params.repo;
   const owner = params.owner;
   const project = params.project;
@@ -944,6 +1035,126 @@ function cmdGithubCreateIssue(cwd, raw, extraArgs) {
     );
     result.milestone_set = milestoneOk !== null;
     if (!result.milestone_set) result.errors.push('Failed to set milestone');
+  }
+
+  if (result.errors.length === 0) delete result.errors;
+  output(result, raw);
+}
+
+/**
+ * github update-issue — Update an existing GitHub issue's title and body,
+ * and optionally update project fields (Status, Priority, Estimate).
+ *
+ * Required args: number=issue_number  repo=owner/name
+ *
+ * Optional args: title=...  body=...  body_file=path (reads body from file)
+ *                owner=org  project=number  project_id=PVT_...
+ *                status_field_id=...  status_option_id=...
+ *                priority_field_id=...  priority_option_id=...
+ *                estimate_field_id=...  estimate=number
+ *
+ * Returns JSON with: { number, updated_title, updated_body, status_set, priority_set, estimate_set }
+ */
+function cmdGithubUpdateIssue(cwd, raw, extraArgs) {
+  const params = parseKeyValueArgs(extraArgs);
+
+  const number = params.number;
+  const repo = params.repo;
+
+  if (!number || !repo) {
+    error('github update-issue requires: number, repo');
+  }
+
+  const result = {
+    number: parseInt(number, 10),
+    updated_title: false,
+    updated_body: false,
+    status_set: false,
+    priority_set: false,
+    estimate_set: false,
+    errors: [],
+  };
+
+  // 1. Update title and/or body via gh issue edit
+  const editParts = [`gh issue edit ${number} --repo ${repo}`];
+
+  if (params.title) {
+    const safeTitle = params.title.replace(/"/g, '\\"');
+    editParts.push(`--title "${safeTitle}"`);
+    result.updated_title = true;
+  }
+
+  // Body can come from body= param or body_file= param (for large bodies)
+  let body = params.body || null;
+  if (!body && params.body_file) {
+    const bodyPath = path.isAbsolute(params.body_file)
+      ? params.body_file
+      : path.join(cwd, params.body_file);
+    if (fs.existsSync(bodyPath)) {
+      body = fs.readFileSync(bodyPath, 'utf8');
+    } else {
+      result.errors.push(`body_file not found: ${params.body_file}`);
+    }
+  }
+
+  if (body) {
+    const safeBody = body.replace(/"/g, '\\"');
+    editParts.push(`--body "${safeBody}"`);
+    result.updated_body = true;
+  }
+
+  if (result.updated_title || result.updated_body) {
+    const editOk = execCommand(editParts.join(' '), cwd);
+    if (!editOk && editOk !== '') {
+      result.errors.push('Failed to update issue');
+      result.updated_title = false;
+      result.updated_body = false;
+    }
+  }
+
+  // 2. Update project fields (optional — requires project context)
+  if (params.owner && params.project && params.project_id) {
+    const owner = params.owner;
+
+    // Find the project item ID for this issue
+    const itemId = execCommand(
+      `gh project item-list ${params.project} --owner ${owner} --format json --jq ".items[] | select(.content.number == ${number}) | .id"`,
+      cwd
+    );
+
+    if (itemId) {
+      // Set Status
+      if (params.status_field_id && params.status_option_id) {
+        const statusOk = execCommand(
+          `gh project item-edit --project-id ${params.project_id} --id ${itemId} --field-id ${params.status_field_id} --single-select-option-id ${params.status_option_id}`,
+          cwd
+        );
+        result.status_set = statusOk !== null;
+        if (!result.status_set) result.errors.push('Failed to set status');
+      }
+
+      // Set Priority
+      if (params.priority_field_id && params.priority_option_id) {
+        const priorityOk = execCommand(
+          `gh project item-edit --project-id ${params.project_id} --id ${itemId} --field-id ${params.priority_field_id} --single-select-option-id ${params.priority_option_id}`,
+          cwd
+        );
+        result.priority_set = priorityOk !== null;
+        if (!result.priority_set) result.errors.push('Failed to set priority');
+      }
+
+      // Set Estimate
+      if (params.estimate_field_id && params.estimate) {
+        const estimateOk = execCommand(
+          `gh project item-edit --project-id ${params.project_id} --id ${itemId} --field-id ${params.estimate_field_id} --number ${params.estimate}`,
+          cwd
+        );
+        result.estimate_set = estimateOk !== null;
+        if (!result.estimate_set) result.errors.push('Failed to set estimate');
+      }
+    } else {
+      result.errors.push('Issue not found in project — cannot update fields');
+    }
   }
 
   if (result.errors.length === 0) delete result.errors;
@@ -1179,11 +1390,14 @@ function main() {
         case 'plan-backlog':
           cmdInitPlanBacklog(cwd, raw);
           break;
+        case 'plan-feature':
+          cmdInitPlanFeature(cwd, raw);
+          break;
         case 'setup-github':
           cmdSetupGithubProject(cwd, raw);
           break;
         default:
-          error('Unknown init subcommand. Available: new-project, product-vision, coding-standards, map-system, map-subsystem, plan-backlog, setup-github');
+          error('Unknown init subcommand. Available: new-project, product-vision, coding-standards, map-system, map-subsystem, plan-backlog, plan-feature, setup-github');
       }
       break;
     }
@@ -1198,11 +1412,14 @@ function main() {
         case 'create-issue':
           cmdGithubCreateIssue(cwd, raw, githubArgs);
           break;
+        case 'update-issue':
+          cmdGithubUpdateIssue(cwd, raw, githubArgs);
+          break;
         case 'fetch-issues':
           cmdGithubFetchIssues(cwd, raw, githubArgs);
           break;
         default:
-          error('Unknown github subcommand. Available: resolve-fields, create-issue, fetch-issues');
+          error('Unknown github subcommand. Available: resolve-fields, create-issue, update-issue, fetch-issues');
       }
       break;
     }
