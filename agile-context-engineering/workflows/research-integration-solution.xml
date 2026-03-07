@@ -1,0 +1,712 @@
+<workflow>
+
+    <purpose>
+        Perform COMPREHENSIVE, IN-DEPTH System Integration Analysis of how a specific story
+        should integrate into the existing codebase. Load the story requirements and wiki
+        references, validate inputs, load wiki documents and optional external analysis,
+        then execute exhaustive codebase analysis following the template's analysis-process
+        phases. Write the analysis to integration-analysis.md in the story's artifact directory.
+
+        Produces `.ace/artifacts/product/<id-epic_name>/<id-feature_name>/<id-story_name>/integration-analysis.md`
+        — a comprehensive integration analysis with architecture compatibility, refactoring needs,
+        hardcoded values discovery, integration points, and implementation guidelines extracted
+        from deep analysis of the existing codebase.
+
+        This is pass 4 of the story specification pipeline (see story.xml composition).
+        All output is written ONLY to the analysis file — no GitHub updates, no modifications
+        to the story file.
+
+        This workflow is executed by the `ace-code-integration-analyst` agent
+        (spawned via `subagent_type="ace-code-integration-analyst"`).
+    </purpose>
+
+    <mandatory-context>
+        Read all files referenced by the invoking command's execution-context before starting.
+        Also read any document or text passed as parameter ($ARGUMENTS) in the invoking command.
+    </mandatory-context>
+
+    <process>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 1: SETUP                                                     -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="setup" order="1">
+            **MANDATORY FIRST STEP — Execute environment detection and story initialization:**
+
+            ```bash
+            INIT=$(node ~/.claude/agile-context-engineering/src/ace-tools.js init research-story {story_param})
+            ```
+
+            This single call validates the story parameter, extracts metadata/requirements/wiki
+            references, computes all paths and slugs, and checks artifact existence.
+
+            Parse INIT JSON for:
+            - **Environment**: `has_git`, `has_gh_cli`, `github_project`, `analyst_model`
+            - **Story validation**: `story_valid`, `story_error`, `story_source`
+            - **Story metadata**: `story` (id, title, status, size), `feature` (id, title), `epic` (id, title)
+            - **Requirements**: `user_story`, `description`, `acceptance_criteria_count`
+            - **Paths**: `paths.*` (story_dir, story_file, integration_analysis_file, external_analysis_file, feature_dir, feature_file, etc.)
+            - **Wiki**: `wiki_references` (system_wide, subsystem_docs, total_count), `wiki_docs_exist`
+            - **Artifacts**: `has_external_analysis`, `has_integration_analysis`, `has_feature_file`
+
+            Display stage banner:
+
+            ```
+            ╔══════════════════════════════════════════════════╗
+            ║  ACE > Research Integration Solution              ║
+            ╚══════════════════════════════════════════════════╝
+            ```
+
+            **If `has_git` is false:** Initialize git:
+            ```bash
+            git init
+            ```
+
+            **If `INIT.story_valid` is false:**
+            Display error using `INIT.story_error` and exit.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 2: VALIDATE & LOAD STORY                                     -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="validate-story" order="2">
+
+            **Story validation, parsing, metadata extraction, wiki reference extraction,
+            and path computation were all completed by `init research-story` in step 1.**
+            All data is available in the INIT JSON.
+
+            Read the story file content for analysis context:
+
+            **If `INIT.story_source` is `file`:**
+            Read the file at `INIT.paths.story_file`. Store as STORY_CONTENT.
+
+            **If `INIT.story_source` is `github-url` or `issue-number`:**
+            Fetch the issue body using INIT's GitHub project context:
+            ```bash
+            GH_STORY=$(gh issue view {issue_number} --repo {INIT.github_project.owner}/{INIT.github_project.repo} --json body -q .body)
+            ```
+            Store as STORY_CONTENT.
+
+            The story's User Story, Description, and Acceptance Criteria (from `INIT.user_story`,
+            `INIT.description`, `INIT.acceptance_criteria_count`) define WHAT functionality to
+            analyze for integration. The wiki references (from `INIT.wiki_references`) define
+            WHICH wiki documents to read for codebase context.
+
+            <!-- ── 2b: Load parent feature document ────────────────────────── -->
+
+            **If `INIT.has_feature_file` is true:**
+            Read the feature document at `INIT.paths.feature_file` and extract:
+            - Feature description and scope
+            - List of all stories in the feature (IDs, titles, descriptions)
+            - Dependencies between stories
+            - Shared components or services mentioned
+
+            **If `INIT.has_feature_file` is false:**
+            Proceed without — the analysis can still be done without feature context.
+
+            <!-- ── 2c: Display ───────────────────────────────────────────────── -->
+
+            Set pre-computed paths from INIT:
+            - `STORY_FILE = INIT.paths.story_file`
+            - `STORY_DIR = INIT.paths.story_dir`
+
+            Display:
+            ```
+              i  Story loaded: {INIT.story.id} — {INIT.story.title}
+                 Feature: {INIT.feature.id} — {INIT.feature.title}
+                 Epic: {INIT.epic.id} — {INIT.epic.title}
+                 Requirements: {INIT.acceptance_criteria_count} acceptance criteria scenarios
+                 Wiki references: {INIT.wiki_references.total_count} documents to load
+            ```
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 3: LOAD WIKI DOCUMENTS                                       -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="load-wiki-documents" order="3">
+
+            **[MANDATORY] Read ALL wiki documents referenced in the story's Relevant Wiki section.**
+
+            Wiki references were pre-extracted by `init research-story` and are available in
+            `INIT.wiki_references` (system_wide list + subsystem_docs list). File existence
+            was also pre-checked — see `INIT.wiki_docs_exist` (existing[] and missing[]).
+
+            The wiki IS the single source of codebase knowledge.
+
+            <!-- ── 3a: System-Wide documents (mandatory) ────────────────────── -->
+
+            **System-Wide documents — ALWAYS load these (from `INIT.wiki_references.system_wide`):**
+
+            Read each file and store its content:
+            - `.docs/wiki/system-wide/system-structure.md` — High-level tree showing where code is
+            - `.docs/wiki/system-wide/system-architecture.md` — Complete architectural overview
+            - `.docs/wiki/system-wide/coding-standards.md` — CRITICAL: coding standards — NO EXCEPTIONS
+            - `.docs/wiki/system-wide/testing-framework.md` — Testing patterns and frameworks
+
+            **For any file in `INIT.wiki_docs_exist.missing`:** Display warning (non-fatal):
+            ```
+              !  Wiki document not found: {path}
+                 Continuing without it.
+            ```
+
+            <!-- ── 3b: Subsystem documents ──────────────────────────────────── -->
+
+            **Subsystem documents — load all from `INIT.wiki_references.subsystem_docs`:**
+
+            For EACH entry in `INIT.wiki_references.subsystem_docs`:
+            1. Check if the path is in `INIT.wiki_docs_exist.existing` (already verified)
+            2. If exists: read the file completely, store its content keyed by file path
+            3. If missing: display warning (non-fatal) and continue
+
+            These subsystem documents provide the context that replaces:
+            - "documentation" parameter — wiki docs cover all relevant documentation
+            - "related-stories-implementations" — wiki documents capture knowledge from all stories
+            - "documented-features" — wiki documents catalog existing feature implementations
+
+            <!-- ── 3c: Display ───────────────────────────────────────────────── -->
+
+            Display:
+            ```
+              i  Wiki documents loaded: {INIT.wiki_docs_exist.existing.length}/{INIT.wiki_references.total_count} files
+                 System-wide: {count}/4 | Subsystem: {INIT.wiki_references.subsystem_docs.length} documents
+                 Missing: {INIT.wiki_docs_exist.missing.length} (warnings shown above if any)
+            ```
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 4: CHECK FOR EXTERNAL ANALYSIS                               -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="check-external-analysis" order="4">
+
+            **External analysis existence was pre-checked by `init research-story`.**
+
+            The external analysis is produced by pass 3 (`/ace:research-external-solution`).
+            It is NOT a required input, but when present it provides valuable context about
+            how external/industry-standard systems implement this functionality.
+
+            **If `INIT.has_external_analysis` is true:**
+            Read the file at `INIT.paths.external_analysis_file`. Store as EXTERNAL_ANALYSIS_CONTENT.
+            Display:
+            ```
+              i  External analysis found: {INIT.paths.external_analysis_file}
+                 Will incorporate external system insights into integration analysis.
+            ```
+
+            **If `INIT.has_external_analysis` is false:**
+            Set EXTERNAL_ANALYSIS_CONTENT = null.
+            Display:
+            ```
+              i  No external analysis found. Integration analysis will rely on
+                 wiki documents and direct codebase exploration.
+            ```
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 5: RESOLVE OUTPUT PATH                                       -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="resolve-output-path" order="5">
+
+            **Paths were pre-computed by `init research-story` in step 1.**
+
+            Set from INIT JSON:
+            - `STORY_DIR = INIT.paths.story_dir`
+            - `OUTPUT_FILE = INIT.paths.integration_analysis_file`
+
+            Ensure directory exists:
+            ```bash
+            mkdir -p {STORY_DIR}
+            ```
+
+            Display:
+            ```
+              i  Output: {OUTPUT_FILE}
+            ```
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 6: CHECK EXISTING ANALYSIS                                   -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="check-existing" order="6">
+
+            **If `INIT.has_integration_analysis` is true:**
+
+            Use AskUserQuestion:
+            - header: "Existing"
+            - question: "An integration analysis already exists at `{OUTPUT_FILE}`. What would you like to do?"
+            - options:
+              - "Overwrite" — Discard and create a new analysis from scratch
+              - "Skip" — Keep the current analysis as-is
+
+            **If "Overwrite":** Continue to step 7.
+            **If "Skip":** Display message and exit workflow:
+            ```
+              i  Keeping existing analysis. No changes made.
+            ```
+
+            **If not exists:** Continue to step 7.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 7: EXECUTE ANALYSIS                                          -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="execute-analysis" order="7">
+
+            Display:
+            ```
+            ┌──────────────────────────────────────────────────┐
+            │  ACE > Research Integration Solution > Analysis    │
+            └──────────────────────────────────────────────────┘
+
+              i  Starting deep codebase integration analysis.
+                 Reading wiki documents, exploring source code,
+                 and tracing integration points. This may take
+                 several minutes.
+            ```
+
+            **Execute the complete analysis following the template's `<analysis-process>` section.**
+            The template (`story-integration-solution.xml`) defines 4 mandatory phases.
+            You ARE the code-integration-analyst — perform the analysis directly.
+
+            <!-- ── 7a: Phase 1 — Context Loading (4 mandatory items) ─────────── -->
+
+            **Phase 1: Context Loading**
+
+            1. **[MANDATORY] Understand the story requirements:**
+               - Re-read STORY_CONTENT thoroughly — User Story, Description, all AC scenarios
+               - These define WHAT functionality needs to integrate into the codebase
+               - Extract the key behaviors, components, and patterns that will be needed
+               - If parent feature document was loaded, understand:
+                 - The broader feature context
+                 - What other stories exist and how they relate
+                 - Dependencies and shared components between stories
+
+            2. **[MANDATORY] Load and study wiki documents:**
+               - **Coding Standards** (from system-wide): STRONG EMPHASIS — NO EXCEPTIONS!
+                 New code MUST strictly follow all coding standards.
+               - **System Architecture** (from system-wide): Understand the complete system
+                 architecture and how this story fits into Clean Architecture layers.
+               - **System Structure** (from system-wide): Understand the codebase layout,
+                 where relevant code lives, and the project file organization.
+               - **Testing Framework** (from system-wide): Understand testing patterns,
+                 frameworks, and conventions.
+               - **All subsystem documents**: Read EVERY subsystem document referenced in the
+                 story's Relevant Wiki section. These contain:
+                 - System descriptions and boundaries
+                 - Design patterns in use
+                 - Cross-cutting concerns to respect
+                 - Architecture Decision Records (ADRs) that constrain design
+                 - Guides for common implementation tasks
+
+            3. **[MANDATORY] Load external analysis (if available):**
+               - If EXTERNAL_ANALYSIS_CONTENT is set, study it for:
+                 - How industry-standard systems implement this functionality
+                 - Algorithms and formulas to reuse
+                 - Design patterns from external implementations
+                 - Best practices that should inform our integration
+
+            4. **[MANDATORY] Load the parent feature document:**
+               - Understand the feature planning context
+               - Identify how this story fits within the broader feature
+               - Identify dependencies and integration points with other stories
+
+            <!-- ── 7b: Phase 2 — Deep Codebase Analysis (8 mandatory items) ──── -->
+
+            **Phase 2: Deep Codebase Analysis — ALL 8 items MANDATORY, skip NONE:**
+
+            1. **[MANDATORY] Architecture Compatibility Analysis:**
+               - Map how the new story fits into Clean Architecture layers:
+                 - **Domain Layer**: New entities, value objects, constants needed
+                 - **Application Layer**: Use cases, interfaces to create
+                 - **Infrastructure Layer**: Services and implementations required
+                 - **Presentation Layer**: UI components and API endpoints needed
+               - Verify Clean Architecture compliance: dependencies point inward
+               - Identify layer boundary violations that must be avoided
+
+            2. **[MANDATORY] Pattern Recognition & Existing Patterns:**
+               - Search for similar features/patterns in the codebase
+               - Reference them with specific file paths and line numbers
+               - Document:
+                 - Similar implementations to use as reference
+                 - Established naming conventions
+                 - Design patterns already in use (Strategy, Factory, Observer, etc.)
+                 - Error handling patterns
+                 - Logging approaches
+
+            3. **[MANDATORY] Integration Point Discovery (Layer-by-Layer):**
+               Examine each architectural layer for integration opportunities:
+               - **Domain Layer**: Entity extensions, value objects, business rules
+               - **Application Layer**: Service interfaces, use cases, DTOs
+               - **Infrastructure Layer**: Repository patterns, external services
+               - **Presentation Layer**: UI components, view models, controllers
+               Find:
+               - Existing interfaces that can be extended
+               - Abstract classes available for inheritance
+               - Event systems for loose coupling
+               - Middleware or pipeline patterns
+               - Plugin or extension points
+               - Configuration-based feature toggles
+
+            4. **[MANDATORY] File Dependency Analysis:**
+               - Identify ALL files that will be referenced or modified
+               - Document supporting files for the new implementation
+               - Map import chains and dependency graphs
+               - Identify potential circular dependency risks
+
+            5. **[MANDATORY] Convention Compliance Analysis:**
+               - Document existing conventions that MUST be followed
+               - Verify the new implementation doesn't violate coding standards
+               - Check naming conventions, file organization, error handling
+
+            6. **[MANDATORY] Testing Pattern Analysis:**
+               - Analyze current test patterns to ensure consistent validation approach
+               - Identify test utilities and helpers available for reuse
+               - Document testing conventions (unit, integration, e2e)
+               - Identify tests that need modification due to the new implementation
+
+            7. **[MANDATORY] CRITICAL: Hardcoded Values & Placeholder Code Discovery:**
+
+               THIS IS THE MOST CRITICAL PART OF THE INTEGRATION ANALYSIS!
+
+               When a new story implements a feature, there are ALWAYS existing hardcoded
+               values or placeholder implementations that the new feature is MEANT TO REPLACE.
+
+               YOU MUST EXHAUSTIVELY SEARCH FOR:
+
+               a. **Hardcoded Domain/Range Values:**
+                  - Search for hardcoded number ranges, dimensions, colors, sizes, offsets
+                  - Search for values that should come from the new entity/service
+                  - Use grep patterns like: `domain\(\[`, `= 0;`, `= 100`, `MIN_`, `MAX_`, `DEFAULT_`
+
+               b. **Placeholder/Stub Implementations:**
+                  - Search for TODO comments mentioning the feature being implemented
+                  - Search for "temporary", "placeholder", "stub", "mock" in comments
+                  - Search for methods that return hardcoded values instead of computed ones
+                  - Use grep patterns: `TODO`, `TEMPORARY`, `placeholder`, `HARDCODED`
+
+               c. **Disconnected Wiring:**
+                  - Search for classes/services that EXIST but are NOT USED where they should be
+                  - Find where the NEW entity/service SHOULD be injected but currently isn't
+                  - For every new entity/service being created, ask:
+                    - "What existing code currently does this job (probably poorly/hardcoded)?"
+                    - "Where should this entity be INJECTED that it currently ISN'T?"
+                    - "What hardcoded values exist that this entity should REPLACE?"
+
+               d. **Inline Calculations That Should Use New Service:**
+                  - Search for inline calculations done manually instead of using the new entity
+                  - Search for duplicate calculation logic across multiple files
+                  - Use grep patterns: `Math.min`, `Math.max`, inline formulas
+
+               e. **Manager/Service Classes with Hardcoded Defaults:**
+                  - Search manager/service classes that initialize with dummy values
+                  - These MUST be updated to receive values from the new entity
+                  - Find all `*Manager`, `*Service` classes in Infrastructure layer
+
+               f. **Renderer/Handler Classes Not Using New Entity:**
+                  - When implementing a new feature, ALL relevant renderers/handlers must be checked
+                  - Verify they use the new entity instead of hardcoded values or direct calculations
+
+               Output format for EACH discovered item:
+               ```yaml
+               FILE: [exact file path]
+                 LINE: [line number(s)]
+                 CURRENT CODE: |
+                   [actual code snippet from the file]
+                 PROBLEM: [why this is wrong]
+                 SHOULD BE: [what it should become after implementation]
+                 FIX REQUIRED: [specific action to take]
+               ```
+
+            8. **[MANDATORY] Impact Analysis:**
+               - Discover ALL code flows that might be impacted by the new implementation
+               - Include specific file references for each impacted flow
+               - Identify tests that need modification (include file paths)
+               - Document all documentation files/flows requiring updates
+
+            <!-- ── 7c: Phase 3 — Refactoring & Strategy (4 mandatory items) ──── -->
+
+            **Phase 3: Refactoring & Strategy Analysis — ALL 4 items MANDATORY:**
+
+            1. **[MANDATORY] Refactoring Requirements:**
+               Determine if existing code needs refactoring to support the new implementation
+               in a MAINTAINABLE / EXTENSIBLE way. Check for:
+
+               - **Consolidation**: Duplicate code that should be unified
+               - **Abstraction**: Concrete implementations that need interfaces
+               - **Separation**: Mixed concerns that need splitting
+               - **Generalization**: Specific code that could be made reusable
+               - **Simplification**: Complex code that could be streamlined
+               - **Standardization**: Inconsistent patterns needing alignment
+
+               Common refactoring scenarios:
+               - Pattern implementation violations (e.g., adding a new type when Strategy pattern should be used)
+               - Constants/configuration scattered across files (centralize in Domain layer)
+               - Model proliferation (extend existing models instead of creating duplicates)
+               - Method duplication (reuse existing methods, don't recreate)
+               - Incorrect layer violations (business logic in wrong layer)
+               - Service sprawl (extend existing services if cohesive)
+               - Event handler inconsistencies (follow established event patterns)
+               - State management violations (follow established state patterns)
+               - API integration inconsistencies (use existing API client services)
+               - Type definition duplication (import and reuse existing types)
+
+               **Even if no refactoring is needed, this section MUST be completed
+               with the conclusion "no refactoring required" and justification.**
+
+            2. **[MANDATORY] Implementation Guidelines:**
+               - Step-by-step implementation approach following coding standards
+               - Optimal architectural placement for new code
+               - Interface design for maximum flexibility
+               - Dependency management approach
+               - State management strategy
+               - Error handling patterns to follow
+               - Recommended implementation order
+
+            3. **[MANDATORY] Testing Strategy:**
+               - How to test without breaking existing tests
+               - Test patterns to follow (from testing framework doc)
+               - Required test types (unit, integration, e2e)
+               - Mocking strategies based on existing test patterns
+               - Edge cases to cover
+
+            4. **[MANDATORY] Risk Mitigation:**
+               - Backward compatibility considerations
+               - Migration path for existing functionality
+               - What existing functionality might be impacted
+               - Performance implications
+               - Breaking change risks
+
+            <!-- ── 7d: Phase 4 — AI Implementation Context (2 mandatory items) ── -->
+
+            **Phase 4: AI Implementation Context — ALL 2 items MANDATORY:**
+
+            1. **[MANDATORY] Complete Analysis Findings:**
+               Include ALL findings from the deep analysis:
+               - Every discovered pattern with file references
+               - Every relevant code snippet
+               - Every architectural decision
+               - Every potential issue
+               - Every integration consideration
+
+            2. **[MANDATORY] Implementation References:**
+               - **Internal Documentation**: List all relevant internal docs with full paths
+               - **Code References**: List all files that should be studied before implementation,
+                 including specific functions/classes to use as examples and utility functions to reuse
+               - **Design Patterns & Best Practices**: Link to specific design pattern documentation
+                 (e.g., https://refactoring.guru/design-patterns/strategy for Strategy pattern)
+               - **Domain knowledge**: All naming conventions, error handling patterns,
+                 logging standards, performance considerations
+
+            **CRITICAL REQUIREMENTS:**
+            - **STORY SCOPE ONLY**: Focus exclusively on code relevant to the story
+            - **COMPLETE COVERAGE**: Every file and method involved must be documented
+            - **EXACT IMPLEMENTATIONS**: Include actual code snippets with file paths and line numbers
+            - **CODING STANDARDS FIRST**: Verify ALL analysis against coding standards
+            - **NO ASSUMPTIONS**: Only document what you actually find in the code
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 8: WRITE OUTPUT                                              -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="write-output" order="8">
+
+            Write the complete analysis to `{OUTPUT_FILE}` following the template's
+            `<output-format>` section exactly. Include ALL sections:
+
+            1. Header (story, date, metrics)
+            2. Use Case Overview
+            3. Architecture Compatibility (layer-by-layer analysis)
+            4. Existing Patterns to Follow (with file references)
+            5. Required Refactoring (even if "none needed")
+            6. CRITICAL: Hardcoded Values & Placeholder Code (with actual code snippets)
+            7. Integration Points (all touchpoints with existing system)
+            8. Impact Analysis (all affected flows and components)
+            9. Implementation Guidelines (step-by-step approach)
+            10. Testing Strategy (preserving existing tests)
+            11. Complete Analysis Findings
+            12. Implementation References (internal docs, code refs, patterns)
+            13. AI Implementation Context (complete context for executing agent)
+
+            Use the Write tool to create the file. Include all findings from step 7.
+
+            This is NOT a summary — it is a COMPLETE INTEGRATION ANALYSIS. Every section
+            must contain actual code snippets, file paths with line numbers, and
+            concrete implementation details.
+
+            Display:
+            ```
+              +  Analysis written to {OUTPUT_FILE}
+            ```
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 9: VALIDATION                                                -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="validation" order="9">
+
+            Read the output file and verify against the validation checklist
+            defined in the template (story-integration-solution.xml):
+
+            **File Creation Requirements:**
+            - [ ] Analysis file created at {OUTPUT_FILE}
+            - [ ] Story directory exists
+            - [ ] File contains all required sections from template
+
+            **Content Requirements — Core Analysis:**
+            - [ ] Tree structure showing current codebase structure
+            - [ ] Tree structure showing proposed changes with new files
+            - [ ] Architecture compatibility analysis completed (layer-by-layer)
+            - [ ] All existing patterns identified with file references
+            - [ ] Integration points clearly documented
+            - [ ] Impact analysis showing affected components
+
+            **Architecture Analysis Requirements:**
+            - [ ] Clean Architecture compliance verified
+            - [ ] Dependency injection strategy documented
+            - [ ] Design patterns identified and documented
+            - [ ] Coding standards compliance verified
+            - [ ] Testing strategy that preserves existing tests
+
+            **Hardcoded Values & Placeholder Discovery (CRITICAL!):**
+            - [ ] Searched for hardcoded domain/range values
+            - [ ] Searched for placeholder/TODO comments related to the feature
+            - [ ] Identified ALL renderers/handlers that should use the new entity but don't
+            - [ ] Identified ALL manager/service classes with hardcoded defaults
+            - [ ] Found disconnected wiring (entity exists but not injected where needed)
+            - [ ] Hardcoded values section filled with ACTUAL CODE SNIPPETS (not placeholders!)
+            - [ ] Every hardcoded value includes: file path, line number, current code, fix required
+
+            **Refactoring Requirements:**
+            - [ ] Refactoring analysis completed (even if "no refactoring needed")
+            - [ ] Implementation guidelines provided
+            - [ ] Testing strategy documented
+            - [ ] Risk mitigation considered
+
+            **Total: 22 mandatory checklist items**
+
+            If the output is incomplete or missing sections, go back and fill in
+            the missing content before proceeding.
+
+            Display:
+            ```
+              {check_mark}  Analysis validated. {passed}/{total} checks passed.
+            ```
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 10: REVIEW AND APPROVE                                       -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="review" order="10">
+
+            Display a summary of the analysis:
+            ```
+              Analysis Summary:
+              ────────
+              Sections: {count}/13 | Checklist: {passed}/22
+              Wiki docs loaded: {N} | Code references: {M}
+              Hardcoded values found: {H} | Refactoring items: {R}
+            ```
+
+            Use AskUserQuestion:
+            - header: "Analysis"
+            - question: "Integration analysis written to `{OUTPUT_FILE}`. Review the file in your editor — does the analysis look comprehensive?"
+            - options:
+              - "Approve" — Looks good, commit it
+              - "Refine" — Some sections need more depth
+              - "Skip commit" — Keep the file but don't commit yet
+
+            **If "Approve":**
+            Continue to step 11.
+
+            **If "Refine":**
+            - Ask what sections need more depth or what's missing
+            - Go back to the relevant analysis phase, read more code, and update OUTPUT_FILE
+            - Re-run validation (step 9)
+            - Present for review again
+
+            **If "Skip commit":**
+            Display completion without commit:
+            ```
+            ╔══════════════════════════════════════════════════╗
+            ║  ACE > Integration Analysis Complete (uncommitted)║
+            ║  {Story ID} "{Story Title}"                      ║
+            ╚══════════════════════════════════════════════════╝
+
+              i  Analysis written to {OUTPUT_FILE}
+                 File not committed — commit manually when ready.
+            ```
+            Exit workflow.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 11: COMMIT                                                   -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="commit" order="11">
+
+            Stage and commit the analysis file:
+
+            ```bash
+            git add {OUTPUT_FILE}
+            ```
+
+            ```bash
+            git commit -m "docs: integration analysis for {Story ID} — {Story Title}"
+            ```
+
+            Display completion:
+
+            ```
+            ╔══════════════════════════════════════════════════╗
+            ║  ACE > Integration Analysis Complete              ║
+            ║  {Story ID} "{Story Title}"                      ║
+            ╚══════════════════════════════════════════════════╝
+
+              +  {OUTPUT_FILE} committed.
+
+              Metrics:
+              ────────
+              Wiki docs loaded: {N} | Code references: {M}
+              Hardcoded values found: {H} | Refactoring items: {R}
+
+              i  Integration analysis complete. This artifact will be consumed
+                 by the technical solution (pass 5) when running plan-story.
+
+              Next > Continue with story refinement:
+                     - Technical solution (pass 5)
+                   > /ace:research-integration-solution story=...
+                     Analyze another story's codebase integration.
+            ```
+        </step>
+
+    </process>
+
+    <success_criteria>
+        - Story loaded and requirements extracted (User Story, Description, Acceptance Criteria)
+        - All wiki references extracted from story's Relevant Wiki section
+        - All wiki documents loaded (system-wide mandatory, subsystem as referenced)
+        - Parent feature document loaded for broader context (if available)
+        - External analysis loaded if present in story directory (auto-detected)
+        - Output path resolved from story context
+        - All 4 analysis phases executed directly (18 mandatory items completed)
+        - Analysis file written with ALL template sections populated
+        - NO assumptions made — all findings backed by actual code references
+        - Hardcoded values section filled with ACTUAL CODE SNIPPETS
+        - Refactoring analysis completed (even if "no refactoring needed")
+        - Coding standards compliance verified throughout
+        - All 22 validation checklist items verified
+        - User reviewed and approved the analysis
+        - Document committed with appropriate message
+        - No modifications made to the story file or GitHub issues
+    </success_criteria>
+
+</workflow>

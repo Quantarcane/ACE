@@ -742,6 +742,330 @@ describe('write-github-settings command', () => {
   });
 });
 
+// ─── init research-story ─────────────────────────────────────────────────────
+
+const SAMPLE_STORY = `# S3: Display OAuth Provider Buttons
+
+**Feature**: F3 OAuth2 Login Flow | **Epic**: #45 User Authentication
+**Status**: Refined | **Size**: 3 | **Sprint**: Sprint 2 | **Link**: [#95](https://github.com/owner/repo/issues/95)
+
+## User Story
+
+> As a returning customer,
+> I want to click a Google or GitHub login button,
+> so that I can authenticate without remembering a site-specific password.
+
+## Description
+
+This story adds OAuth provider buttons to the login page. It builds on the
+auth service foundation (S1) and enables the token exchange flow (S4).
+
+## Acceptance Criteria
+
+### Scenario: Successful Google login
+
+**Given** the user is on the login page and has a valid Google account
+**When** they click the "Sign in with Google" button and complete Google's OAuth flow
+**Then** they are redirected to the dashboard and see their Google profile name
+
+### Scenario: Provider unavailable
+
+**Given** the user is on the login page and the Google OAuth service is unreachable
+**When** they click the "Sign in with Google" button
+**Then** they see an error message "Login service temporarily unavailable. Please try again."
+
+### Scenario: GitHub login button displayed
+
+**Given** the user navigates to the login page
+**When** the page loads
+**Then** they see a "Sign in with GitHub" button alongside the Google button
+
+## Out of Scope
+
+- Token refresh logic (handled by S4)
+- Account linking (future feature)
+
+## Dependencies
+
+### Blocked By
+- S1 Auth service foundation
+
+### Blocks
+- S4 Token exchange flow
+
+### External
+- Google OAuth API — available
+
+## Definition of Done
+
+- [ ] All acceptance criteria scenarios pass
+- [ ] Code reviewed and approved
+- [ ] Tests written and passing
+- [ ] CI pipeline green
+- [ ] Documentation updated (if applicable)
+- [ ] Product Owner verified
+
+## Relevant Wiki
+
+### System-Wide
+
+- \`.docs/wiki/system-wide/system-structure.md\` — Mandatory system-wide context
+- \`.docs/wiki/system-wide/system-architecture.md\` — Mandatory system-wide context
+- \`.docs/wiki/system-wide/coding-standards.md\` — Mandatory system-wide context
+- \`.docs/wiki/system-wide/testing-framework.md\` — Mandatory system-wide context
+
+### Systems
+- \`.docs/wiki/subsystems/auth/systems/oauth-provider.md\` — Implements the provider abstraction this story extends
+
+### Patterns
+- \`.docs/wiki/subsystems/auth/patterns/strategy-pattern.md\` — Each OAuth provider is a strategy; new provider must follow this
+
+### Decisions
+- \`.docs/wiki/subsystems/auth/decisions/adr-003-jwt-over-sessions.md\` — Constrains token format to JWT
+`;
+
+describe('init research-story command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+    fs.mkdirSync(path.join(tmpDir, '.ace'), { recursive: true });
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('parses story from file and extracts metadata', () => {
+    // Create story directory structure
+    const storyDir = path.join(tmpDir, '.ace', 'artifacts', 'product', '45-user-authentication', 'f3-oauth2-login-flow', 's3-display-oauth-provider-buttons');
+    fs.mkdirSync(storyDir, { recursive: true });
+    const storyFile = path.join(storyDir, 's3-display-oauth-provider-buttons.md');
+    fs.writeFileSync(storyFile, SAMPLE_STORY);
+
+    const relPath = path.relative(tmpDir, storyFile).replace(/\\/g, '/');
+    const result = runAceTools(`init research-story ${relPath}`, tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const data = JSON.parse(result.output);
+
+    assert.strictEqual(data.story_valid, true);
+    assert.strictEqual(data.story_error, null);
+    assert.strictEqual(data.story_source, 'file');
+    assert.strictEqual(data.story.id, 'S3');
+    assert.strictEqual(data.story.title, 'Display OAuth Provider Buttons');
+    assert.strictEqual(data.story.status, 'Refined');
+    assert.strictEqual(data.story.size, '3');
+    assert.strictEqual(data.feature.id, 'F3');
+    assert.strictEqual(data.feature.title, 'OAuth2 Login Flow');
+    assert.strictEqual(data.epic.id, '#45');
+    assert.strictEqual(data.epic.title, 'User Authentication');
+  });
+
+  test('extracts user story and description', () => {
+    const storyDir = path.join(tmpDir, '.ace', 'artifacts', 'product', 'epic', 'feat', 'story');
+    fs.mkdirSync(storyDir, { recursive: true });
+    const storyFile = path.join(storyDir, 'story.md');
+    fs.writeFileSync(storyFile, SAMPLE_STORY);
+
+    const relPath = path.relative(tmpDir, storyFile).replace(/\\/g, '/');
+    const result = runAceTools(`init research-story ${relPath}`, tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const data = JSON.parse(result.output);
+
+    assert.ok(data.user_story.includes('As a returning customer'), `user_story should contain persona: ${data.user_story}`);
+    assert.ok(data.user_story.includes('authenticate without remembering'), `user_story should contain benefit`);
+    assert.ok(data.description.includes('OAuth provider buttons'), `description should contain story details: ${data.description}`);
+    assert.strictEqual(data.acceptance_criteria_count, 3);
+  });
+
+  test('extracts wiki references with categories', () => {
+    const storyDir = path.join(tmpDir, '.ace', 'artifacts', 'product', 'epic', 'feat', 'story');
+    fs.mkdirSync(storyDir, { recursive: true });
+    const storyFile = path.join(storyDir, 'story.md');
+    fs.writeFileSync(storyFile, SAMPLE_STORY);
+
+    const relPath = path.relative(tmpDir, storyFile).replace(/\\/g, '/');
+    const result = runAceTools(`init research-story ${relPath}`, tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const data = JSON.parse(result.output);
+
+    assert.strictEqual(data.wiki_references.system_wide.length, 4);
+    assert.ok(data.wiki_references.system_wide.includes('.docs/wiki/system-wide/system-structure.md'));
+    assert.ok(data.wiki_references.system_wide.includes('.docs/wiki/system-wide/coding-standards.md'));
+
+    assert.strictEqual(data.wiki_references.subsystem_docs.length, 3);
+    const oauthDoc = data.wiki_references.subsystem_docs.find(d => d.path.includes('oauth-provider'));
+    assert.ok(oauthDoc, 'Should find oauth-provider doc');
+    assert.strictEqual(oauthDoc.category, 'systems');
+
+    const strategyDoc = data.wiki_references.subsystem_docs.find(d => d.path.includes('strategy-pattern'));
+    assert.ok(strategyDoc, 'Should find strategy-pattern doc');
+    assert.strictEqual(strategyDoc.category, 'patterns');
+
+    const adrDoc = data.wiki_references.subsystem_docs.find(d => d.path.includes('adr-003'));
+    assert.ok(adrDoc, 'Should find ADR doc');
+    assert.strictEqual(adrDoc.category, 'decisions');
+
+    assert.strictEqual(data.wiki_references.total_count, 7);
+  });
+
+  test('computes paths from file location', () => {
+    const storyDir = path.join(tmpDir, '.ace', 'artifacts', 'product', 'e1-auth', 'f3-oauth', 's3-buttons');
+    fs.mkdirSync(storyDir, { recursive: true });
+    const storyFile = path.join(storyDir, 's3-buttons.md');
+    fs.writeFileSync(storyFile, SAMPLE_STORY);
+
+    const relPath = path.relative(tmpDir, storyFile).replace(/\\/g, '/');
+    const result = runAceTools(`init research-story ${relPath}`, tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const data = JSON.parse(result.output);
+
+    assert.ok(data.paths, 'paths should be present');
+    assert.ok(data.paths.story_dir.includes('s3-buttons'), `story_dir should contain story slug: ${data.paths.story_dir}`);
+    assert.ok(data.paths.external_analysis_file.endsWith('external-analysis.md'), `external_analysis_file: ${data.paths.external_analysis_file}`);
+    assert.ok(data.paths.integration_analysis_file.endsWith('integration-analysis.md'));
+    assert.ok(data.paths.feature_file.endsWith('f3-oauth.md'), `feature_file: ${data.paths.feature_file}`);
+  });
+
+  test('detects existing artifacts', () => {
+    const storyDir = path.join(tmpDir, '.ace', 'artifacts', 'product', 'epic', 'feat', 'story');
+    fs.mkdirSync(storyDir, { recursive: true });
+    const storyFile = path.join(storyDir, 'story.md');
+    fs.writeFileSync(storyFile, SAMPLE_STORY);
+    // Create external analysis
+    fs.writeFileSync(path.join(storyDir, 'external-analysis.md'), '# External Analysis');
+
+    const relPath = path.relative(tmpDir, storyFile).replace(/\\/g, '/');
+    const result = runAceTools(`init research-story ${relPath}`, tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const data = JSON.parse(result.output);
+
+    assert.strictEqual(data.has_external_analysis, true);
+    assert.strictEqual(data.has_integration_analysis, false);
+  });
+
+  test('verifies wiki doc existence', () => {
+    const storyDir = path.join(tmpDir, '.ace', 'artifacts', 'product', 'epic', 'feat', 'story');
+    fs.mkdirSync(storyDir, { recursive: true });
+    const storyFile = path.join(storyDir, 'story.md');
+    fs.writeFileSync(storyFile, SAMPLE_STORY);
+
+    // Create some wiki docs but not all
+    fs.mkdirSync(path.join(tmpDir, '.docs', 'wiki', 'system-wide'), { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, '.docs', 'wiki', 'system-wide', 'system-structure.md'), '# Structure');
+    fs.writeFileSync(path.join(tmpDir, '.docs', 'wiki', 'system-wide', 'coding-standards.md'), '# Standards');
+
+    const relPath = path.relative(tmpDir, storyFile).replace(/\\/g, '/');
+    const result = runAceTools(`init research-story ${relPath}`, tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const data = JSON.parse(result.output);
+
+    assert.ok(data.wiki_docs_exist.existing.length >= 2, `Should find at least 2 existing: ${JSON.stringify(data.wiki_docs_exist.existing)}`);
+    assert.ok(data.wiki_docs_exist.missing.length >= 2, `Should find at least 2 missing: ${JSON.stringify(data.wiki_docs_exist.missing)}`);
+    assert.ok(data.wiki_docs_exist.existing.includes('.docs/wiki/system-wide/system-structure.md'));
+  });
+
+  test('returns error for non-existent file', () => {
+    const result = runAceTools('init research-story nonexistent.md', tmpDir);
+    assert.ok(result.success, `Command should still succeed with error in JSON: ${result.error}`);
+    const data = JSON.parse(result.output);
+
+    assert.strictEqual(data.story_valid, false);
+    assert.ok(data.story_error.includes('not found'), `story_error: ${data.story_error}`);
+  });
+
+  test('returns error for no parameter', () => {
+    const result = runAceTools('init research-story', tmpDir);
+    assert.ok(result.success, `Command should still succeed with error in JSON: ${result.error}`);
+    const data = JSON.parse(result.output);
+
+    assert.strictEqual(data.story_valid, false);
+    assert.ok(data.story_error !== null, 'Should have a story_error');
+  });
+
+  test('includes model and environment fields', () => {
+    const storyDir = path.join(tmpDir, '.ace', 'artifacts', 'product', 'epic', 'feat', 'story');
+    fs.mkdirSync(storyDir, { recursive: true });
+    const storyFile = path.join(storyDir, 'story.md');
+    fs.writeFileSync(storyFile, SAMPLE_STORY);
+
+    const relPath = path.relative(tmpDir, storyFile).replace(/\\/g, '/');
+    const result = runAceTools(`init research-story ${relPath}`, tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const data = JSON.parse(result.output);
+
+    assert.ok(typeof data.analyst_model === 'string', 'analyst_model should be a string');
+    assert.ok(typeof data.mapper_model === 'string', 'mapper_model should be a string');
+    assert.ok(typeof data.has_git === 'boolean', 'has_git should be boolean');
+    assert.ok(typeof data.has_gh_cli === 'boolean', 'has_gh_cli should be boolean');
+    assert.ok(typeof data.commit_docs === 'boolean', 'commit_docs should be boolean');
+    assert.ok(data.github_project !== undefined, 'github_project should be present');
+  });
+
+  test('handles story without Relevant Wiki section', () => {
+    const minimalStory = `# S1: Basic Story
+
+**Feature**: F1 Auth | **Epic**: E1 Security
+**Status**: Todo | **Size**: 2
+
+## User Story
+
+> As a user,
+> I want to log in,
+> so that I can access my account.
+
+## Description
+
+Basic login functionality.
+
+## Acceptance Criteria
+
+### Scenario: Successful login
+
+**Given** valid credentials
+**When** user submits login form
+**Then** user is redirected to dashboard
+
+## Definition of Done
+
+- [ ] All AC pass
+`;
+    const storyDir = path.join(tmpDir, '.ace', 'artifacts', 'product', 'epic', 'feat', 'story');
+    fs.mkdirSync(storyDir, { recursive: true });
+    const storyFile = path.join(storyDir, 'story.md');
+    fs.writeFileSync(storyFile, minimalStory);
+
+    const relPath = path.relative(tmpDir, storyFile).replace(/\\/g, '/');
+    const result = runAceTools(`init research-story ${relPath}`, tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const data = JSON.parse(result.output);
+
+    assert.strictEqual(data.story_valid, true);
+    assert.strictEqual(data.wiki_references.total_count, 0);
+    assert.strictEqual(data.acceptance_criteria_count, 1);
+    assert.strictEqual(data.story.id, 'S1');
+  });
+
+  test('classifies GitHub URL correctly', () => {
+    // We can't actually fetch from GitHub in tests, but we can verify it tries
+    const result = runAceTools('init research-story https://github.com/owner/repo/issues/123', tmpDir);
+    assert.ok(result.success, `Command should succeed: ${result.error}`);
+    const data = JSON.parse(result.output);
+
+    assert.strictEqual(data.story_source, 'github');
+    // It will either fail due to no gh cli or fail to fetch — both are valid
+    // The point is it classified correctly
+  });
+
+  test('classifies issue number correctly', () => {
+    const result = runAceTools('init research-story 42', tmpDir);
+    assert.ok(result.success, `Command should succeed: ${result.error}`);
+    const data = JSON.parse(result.output);
+
+    assert.strictEqual(data.story_source, 'github');
+  });
+});
+
 // ─── CLI error handling ───────────────────────────────────────────────────────
 
 describe('CLI error handling', () => {

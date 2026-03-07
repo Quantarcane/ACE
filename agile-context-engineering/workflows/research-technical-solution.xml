@@ -1,0 +1,762 @@
+<workflow>
+
+    <purpose>
+        Design a COMPREHENSIVE TECHNICAL SOLUTION for a specific story. Load the story
+        requirements and wiki references, validate inputs, load wiki documents, integration
+        analysis (MANDATORY), and optional external analysis, then execute exhaustive
+        solution design following the template's analysis-process phases. Write the
+        technical solution directly INTO the story file and update the GitHub issue.
+
+        This is pass 5 of the story specification pipeline (see story.xml composition).
+        The technical solution is APPENDED to the story file as the `## Technical Solution`
+        section. No separate artifact file is produced.
+
+        Output is written to:
+        - The story file (appended/replaced `## Technical Solution` section)
+        - The GitHub issue body (if applicable)
+
+        This workflow is executed by the `ace-technical-application-architect` agent
+        (spawned via `subagent_type="ace-technical-application-architect"`).
+    </purpose>
+
+    <mandatory-context>
+        Read all files referenced by the invoking command's execution-context before starting.
+        Also read any document or text passed as parameter ($ARGUMENTS) in the invoking command.
+    </mandatory-context>
+
+    <process>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 1: SETUP                                                     -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="setup" order="1">
+            **MANDATORY FIRST STEP — Execute environment detection and story initialization:**
+
+            ```bash
+            INIT=$(node ~/.claude/agile-context-engineering/src/ace-tools.js init research-story {story_param})
+            ```
+
+            This single call validates the story parameter, extracts metadata/requirements/wiki
+            references, computes all paths and slugs, and checks artifact existence.
+
+            Parse INIT JSON for:
+            - **Environment**: `has_git`, `has_gh_cli`, `github_project`, `analyst_model`
+            - **Story validation**: `story_valid`, `story_error`, `story_source`
+            - **Story metadata**: `story` (id, title, status, size), `feature` (id, title), `epic` (id, title)
+            - **Requirements**: `user_story`, `description`, `acceptance_criteria_count`
+            - **Paths**: `paths.*` (story_dir, story_file, integration_analysis_file, external_analysis_file, feature_dir, feature_file, etc.)
+            - **Wiki**: `wiki_references` (system_wide, subsystem_docs, total_count), `wiki_docs_exist`
+            - **Artifacts**: `has_external_analysis`, `has_integration_analysis`, `has_feature_file`
+
+            Display stage banner:
+
+            ```
+            ╔══════════════════════════════════════════════════════════════╗
+            ║  ACE > Research Technical Solution                            ║
+            ╚══════════════════════════════════════════════════════════════╝
+            ```
+
+            **If `has_git` is false:** Initialize git:
+            ```bash
+            git init
+            ```
+
+            **If `INIT.story_valid` is false:**
+            Display error using `INIT.story_error` and exit.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 2: VALIDATE & LOAD STORY                                     -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="validate-story" order="2">
+
+            **Story validation, parsing, metadata extraction, wiki reference extraction,
+            and path computation were all completed by `init research-story` in step 1.**
+            All data is available in the INIT JSON.
+
+            Read the story file content for analysis context:
+
+            **If `INIT.story_source` is `file`:**
+            Read the file at `INIT.paths.story_file`. Store as STORY_CONTENT.
+
+            **If `INIT.story_source` is `github-url` or `issue-number`:**
+            Fetch the issue body using INIT's GitHub project context:
+            ```bash
+            GH_STORY=$(gh issue view {issue_number} --repo {INIT.github_project.owner}/{INIT.github_project.repo} --json body -q .body)
+            ```
+            Store as STORY_CONTENT.
+
+            The story's User Story, Description, and Acceptance Criteria (from `INIT.user_story`,
+            `INIT.description`, `INIT.acceptance_criteria_count`) define WHAT functionality to
+            design a technical solution for. The wiki references (from `INIT.wiki_references`)
+            define WHICH wiki documents to read for codebase context.
+
+            <!-- ── 2b: Load parent feature document ────────────────────────── -->
+
+            **If `INIT.has_feature_file` is true:**
+            Read the feature document at `INIT.paths.feature_file` and extract:
+            - Feature description, scope, and the COMPLETE feature vision
+            - List of all stories in the feature (IDs, titles, descriptions)
+            - Dependencies between stories
+            - Shared components or services mentioned
+            Store as FEATURE_CONTENT.
+
+            **If `INIT.has_feature_file` is false:**
+            Proceed without — the solution can still be designed without feature context.
+
+            <!-- ── 2c: Display ───────────────────────────────────────────────── -->
+
+            Set pre-computed paths from INIT:
+            - `STORY_FILE = INIT.paths.story_file`
+            - `STORY_DIR = INIT.paths.story_dir`
+
+            Display:
+            ```
+              i  Story loaded: {INIT.story.id} — {INIT.story.title}
+                 Feature: {INIT.feature.id} — {INIT.feature.title}
+                 Epic: {INIT.epic.id} — {INIT.epic.title}
+                 Requirements: {INIT.acceptance_criteria_count} acceptance criteria scenarios
+                 Wiki references: {INIT.wiki_references.total_count} documents to load
+            ```
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 3: LOAD WIKI DOCUMENTS                                       -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="load-wiki-documents" order="3">
+
+            **[MANDATORY] Read ALL wiki documents referenced in the story's Relevant Wiki section.**
+
+            Wiki references were pre-extracted by `init research-story` and are available in
+            `INIT.wiki_references` (system_wide list + subsystem_docs list). File existence
+            was also pre-checked — see `INIT.wiki_docs_exist` (existing[] and missing[]).
+
+            The wiki IS the single source of codebase knowledge.
+
+            <!-- ── 3a: System-Wide documents (mandatory) ────────────────────── -->
+
+            **System-Wide documents — ALWAYS load these (from `INIT.wiki_references.system_wide`):**
+
+            Read each file and store its content:
+            - `.docs/wiki/system-wide/system-structure.md` — High-level tree showing where code is
+            - `.docs/wiki/system-wide/system-architecture.md` — Complete architectural overview
+            - `.docs/wiki/system-wide/coding-standards.md` — **CRITICAL: Read BEFORE generating any solution code — NO EXCEPTIONS**
+            - `.docs/wiki/system-wide/testing-framework.md` — Testing patterns and frameworks
+
+            **STRONG EMPHASIS on coding-standards.md**: This file MUST be read and internalized
+            BEFORE any class diagrams, interfaces, code snippets, or implementation patterns
+            are produced. Every piece of code in the solution MUST comply with coding standards.
+
+            **For any file in `INIT.wiki_docs_exist.missing`:** Display warning (non-fatal):
+            ```
+              !  Wiki document not found: {path}
+                 Continuing without it.
+            ```
+
+            <!-- ── 3b: Subsystem documents ──────────────────────────────────── -->
+
+            **Subsystem documents — load all from `INIT.wiki_references.subsystem_docs`:**
+
+            For EACH entry in `INIT.wiki_references.subsystem_docs`:
+            1. Check if the path is in `INIT.wiki_docs_exist.existing` (already verified)
+            2. If exists: read the file completely, store its content keyed by file path
+            3. If missing: display warning (non-fatal) and continue
+
+            These subsystem documents provide the context that replaces:
+            - "documentation" parameter — wiki docs cover all relevant documentation
+            - "high-level-architecture" — system-architecture.md provides this
+            - "sourcecode" parameter — system-structure.md has a high-level tree
+            - "related-stories-implementations" — wiki documents capture knowledge from all stories
+            - "documented-features" — wiki documents catalog existing feature implementations
+            - "feature-planning" — the feature file provides this context
+
+            <!-- ── 3c: Display ───────────────────────────────────────────────── -->
+
+            Display:
+            ```
+              i  Wiki documents loaded: {INIT.wiki_docs_exist.existing.length}/{INIT.wiki_references.total_count} files
+                 System-wide: {count}/4 | Subsystem: {INIT.wiki_references.subsystem_docs.length} documents
+                 Missing: {INIT.wiki_docs_exist.missing.length} (warnings shown above if any)
+            ```
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 4: LOAD INTEGRATION ANALYSIS (MANDATORY)                     -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="load-integration-analysis" order="4">
+
+            **Integration analysis existence was pre-checked by `init research-story`.**
+
+            The integration analysis is produced by pass 4 (`/ace:research-integration-solution`).
+            It is a MANDATORY input — the technical solution CANNOT be designed without it.
+
+            **If `INIT.has_integration_analysis` is true:**
+            Read the file at `INIT.paths.integration_analysis_file`. Store as INTEGRATION_ANALYSIS_CONTENT.
+            Display:
+            ```
+              i  Integration analysis found: {INIT.paths.integration_analysis_file}
+                 Will use integration points, refactoring needs, and codebase patterns
+                 to design a seamless technical solution.
+            ```
+
+            **If `INIT.has_integration_analysis` is false:**
+            Display error and EXIT:
+            ```
+              x  Integration analysis NOT FOUND at {INIT.paths.integration_analysis_file}
+                 The integration analysis (pass 4) is MANDATORY for technical solution design.
+                 Run /ace:research-integration-solution first.
+            ```
+            **STOP — do not proceed without integration analysis.**
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 5: CHECK FOR EXTERNAL ANALYSIS (OPTIONAL)                    -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="check-external-analysis" order="5">
+
+            **External analysis existence was pre-checked by `init research-story`.**
+
+            The external analysis is produced by pass 3 (`/ace:research-external-solution`).
+            It is NOT a required input, but when present it provides valuable context about
+            how external/industry-standard systems implement this functionality.
+
+            **If `INIT.has_external_analysis` is true:**
+            Read the file at `INIT.paths.external_analysis_file`. Store as EXTERNAL_ANALYSIS_CONTENT.
+            Display:
+            ```
+              i  External analysis found: {INIT.paths.external_analysis_file}
+                 Will consider external system algorithms and patterns where they are
+                 the MOST EFFICIENT AND PERFORMANT approach.
+            ```
+
+            **If `INIT.has_external_analysis` is false:**
+            Set EXTERNAL_ANALYSIS_CONTENT = null.
+            Display:
+            ```
+              i  No external analysis found. Technical solution will rely on
+                 wiki documents, integration analysis, and Clean Architecture principles.
+            ```
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 6: CHECK EXISTING SOLUTION                                   -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="check-existing" order="6">
+
+            Check if the story file already contains a `## Technical Solution` section.
+
+            **If the story file contains `## Technical Solution` with substantive content
+            (more than just the placeholder comment):**
+
+            Use AskUserQuestion:
+            - header: "Existing"
+            - question: "The story already contains a Technical Solution section. What would you like to do?"
+            - options:
+              - "Overwrite" — Discard and create a new solution from scratch
+              - "Skip" — Keep the current solution as-is
+
+            **If "Overwrite":** Continue to step 7.
+            **If "Skip":** Display message and exit workflow:
+            ```
+              i  Keeping existing technical solution. No changes made.
+            ```
+
+            **If no existing solution:** Continue to step 7.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 7: EXECUTE SOLUTION DESIGN                                   -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="execute-solution-design" order="7">
+
+            Display:
+            ```
+            ┌──────────────────────────────────────────────────────────────┐
+            │  ACE > Research Technical Solution > Design                    │
+            └──────────────────────────────────────────────────────────────┘
+
+              i  Starting comprehensive technical solution design.
+                 Reading wiki documents, integration analysis, coding standards,
+                 and designing architecture. This may take several minutes.
+            ```
+
+            **Execute the complete solution design following the template's `&lt;analysis-process&gt;` section.**
+            The template (`story-technical-solution.xml`) defines the mandatory phases.
+            You ARE the technical-application-architect — perform the design directly.
+
+            <!-- ═══════════════════════════════════════════════════════════ -->
+            <!-- Phase 1: INITIAL DISCOVERY                                  -->
+            <!-- ═══════════════════════════════════════════════════════════ -->
+
+            <phase name="initial-discovery" order="1">
+
+                <item name="understand-story" mandatory="true">
+                    **[MANDATORY] Understand the Story:**
+
+                    - If story is a file path: Read the markdown file directly
+                    - If story is GitHub URL/number: Use GitHub CLI (`gh issue view`)
+                    - Fully understand what functionality needs to be implemented
+                    - Identify ALL acceptance criteria scenarios (each will need a sequence diagram)
+                </item>
+
+                <item name="extract-business-requirements" mandatory="true">
+                    **[MANDATORY] Extract Business Requirements from Story:**
+
+                    - Thoroughly analyze the story's User Story, Description, and Acceptance Criteria
+                    - Extract business requirements and constraints
+                    - **CRITICAL**: Identify ALL scenarios from Acceptance Criteria — each will need a sequence diagram
+                    - Understand the business context and value
+                    - The story IS the source of truth for business requirements
+                </item>
+
+                <item name="study-external-analysis" mandatory="false">
+                    **[CONDITIONAL] Study External/Industry-Standard Analysis:**
+
+                    **WHEN TO RUN**: Only if EXTERNAL_ANALYSIS_CONTENT is available.
+
+                    The external analysis provides insights from industry-standard implementations.
+                    **USE WITH JUDGMENT** — extract and use:
+
+                    - **Algorithms**: Use the same algorithms IF they are the MOST EFFICIENT AND PERFORMANT.
+                      If you can identify a better approach, use the better approach.
+                    - **Formulas**: Use the same mathematical formulas and calculations IF they are optimal.
+                      If you know a more efficient formula, use it.
+                    - **Constants**: Consider the same constant values and thresholds as starting points.
+                    - **Business Logic**: Adopt proven business rules and validations.
+                    - **Design Patterns**: Follow their patterns where they align with Clean Architecture.
+                    - **Data Structures**: Use similar data models where appropriate.
+                    - **Event Flows**: Consider their event handling approaches.
+                    - **Error Handling**: Adopt their error handling strategies where they fit.
+
+                    **CRITICAL PHILOSOPHY**: The external analysis is a REFERENCE, not a blueprint.
+                    Use external patterns when they are the most efficient and performant approach.
+                    Improve upon them when you can identify a better way.
+                </item>
+
+                <item name="feature-planning-context" mandatory="true">
+                    **[MANDATORY] Feature Planning Context (from feature file):**
+
+                    If FEATURE_CONTENT is available, analyze it for:
+
+                    - **Feature Scope**: What is the COMPLETE feature trying to achieve?
+                    - **Story Dependencies**: Which stories must be completed before/after this one?
+                    - **Shared Components**: What components are used by MULTIPLE stories?
+                    - **Data Flow Between Stories**: How does data flow from one story to another?
+                    - **Integration Points**: Where do stories connect and interact?
+                    - **Feature-Level Patterns**: What patterns span across all stories?
+
+                    Use this to:
+                    - Ensure this story aligns with the overall feature architecture
+                    - Design components that can be reused by other stories
+                    - Create interfaces that support future stories
+                    - Avoid creating silos — think feature-wide!
+
+                    **NEVER DESIGN IN ISOLATION** — Consider the complete feature!
+
+                    If no feature file available, proceed but note this in the solution.
+                </item>
+
+            </phase>
+
+            <!-- ═══════════════════════════════════════════════════════════ -->
+            <!-- Phase 2: OUR SYSTEM ARCHITECTURE UNDERSTANDING              -->
+            <!-- ═══════════════════════════════════════════════════════════ -->
+
+            <phase name="system-architecture-understanding" order="2">
+
+                <item name="comprehensive-architecture" mandatory="true">
+                    **[MANDATORY] Comprehensive System Architecture (from wiki):**
+
+                    Using the wiki documents loaded in step 3:
+
+                    - **system-architecture.md**: FULLY review for COMPREHENSIVE architectural overview
+                    - Understand the complete system architecture (not just the story)
+                    - Identify architectural layers and their responsibilities
+                    - Map where this story's components will fit in the overall architecture
+                    - Understand existing patterns and conventions
+
+                    - **system-structure.md**: Understand the codebase layout,
+                      where relevant code lives, and the project file organization
+                </item>
+
+                <item name="wiki-subsystem-knowledge" mandatory="true">
+                    **[MANDATORY] Subsystem Knowledge (from wiki documents):**
+
+                    Using the subsystem wiki documents loaded in step 3, study ALL:
+
+                    - **Systems**: Understand system descriptions, boundaries, and APIs
+                      that relate to this story
+                    - **Patterns**: Catalog design patterns in use (Strategy, Factory, Observer, etc.)
+                      that MUST be followed for consistency
+                    - **Decisions (ADRs)**: Architecture Decision Records that constrain design choices
+                    - **Cross-Cutting Concerns**: Shared concerns to respect (auth, logging, errors, etc.)
+                    - **Guides**: Implementation guides for common tasks relevant to this story
+
+                    These wiki documents replace the obsolete command's parameters:
+                    - "related-stories-implementations" — wiki captures this knowledge
+                    - "documented-features" — wiki catalogs existing implementations
+                    - "documentation" — wiki IS the documentation
+
+                    **Extract from wiki documents:**
+
+                    ```yaml
+                    INTERFACES TO EXTEND (not recreate):
+                      - [Interface name and location from wiki]
+
+                    CLASSES TO COMPOSE (not duplicate):
+                      - [Class name and location from wiki]
+
+                    PATTERNS PROVEN SUCCESSFUL:
+                      - [Pattern and where documented in wiki]
+
+                    CONSTANTS TO REUSE (not duplicate):
+                      - [Constant file and values from wiki]
+                    ```
+                </item>
+
+                <item name="integration-analysis-study" mandatory="true">
+                    **[MANDATORY] Deep Study of Integration Analysis:**
+
+                    **THOROUGHLY ANALYZE** the INTEGRATION_ANALYSIS_CONTENT (from step 4).
+                    **CRITICAL**: This document tells you EXACTLY how to integrate without breaking the codebase.
+
+                    **Extract ALL:**
+                    - **Integration Points**: Where the new code connects to existing code
+                    - **Required Refactoring**: What existing code MUST be refactored for proper integration
+                    - **Patterns to Follow**: Existing patterns that MUST be followed
+                    - **Files to Modify**: Which existing files need changes
+                    - **Dependencies**: What the new code depends on and what depends on it
+                    - **Hardcoded Values**: All hardcoded values and placeholder code that MUST be replaced
+                    - **Architecture Compatibility**: How the story fits into Clean Architecture layers
+                    - **Testing Strategy**: How to test without breaking existing tests
+
+                    **USE THIS TO:**
+                    - Design refactoring strategies that maintain extensibility
+                    - Ensure seamless integration without breaking existing functionality
+                    - Keep the codebase maintainable and follow SOLID principles
+
+                    **NEVER SKIP REFACTORING** if the integration analysis identifies it's needed!
+                </item>
+
+            </phase>
+
+            <!-- ═══════════════════════════════════════════════════════════ -->
+            <!-- Phase 3: CODEBASE ANALYSIS                                  -->
+            <!-- ═══════════════════════════════════════════════════════════ -->
+
+            <phase name="codebase-analysis" order="3">
+
+                <item name="coding-standards-review" mandatory="true">
+                    **[MANDATORY] Coding Standards Review:**
+
+                    **CRITICAL** — Read and internalize `.docs/wiki/system-wide/coding-standards.md`
+                    BEFORE generating ANY solution code, class diagrams, or interfaces.
+
+                    Verify you understand and will enforce:
+                    - Zero hardcoding rules
+                    - Single responsibility (one class/interface/type per file!)
+                    - Interface-first design (code against interfaces)
+                    - No assumptions — verify by reading actual code
+                    - No dead code policy
+                    - File size limits
+                    - Naming conventions
+                    - Layer placement rules
+
+                    **EVERY piece of code in the technical solution MUST comply with coding standards.**
+                </item>
+
+                <item name="source-code-analysis" mandatory="true">
+                    **[MANDATORY] Source Code Analysis (guided by wiki and integration analysis):**
+
+                    Using system-structure.md as guide, and integration analysis for specific files:
+                    - Identify existing patterns and structures
+                    - Find reusable components and services
+                    - Map current layer structures
+                    - Document naming conventions
+                    - Identify external dependencies and APIs
+
+                    **Focus on files identified by the integration analysis** — don't search blindly.
+                </item>
+
+            </phase>
+
+            <!-- ═══════════════════════════════════════════════════════════ -->
+            <!-- Phase 4: SOLUTION DESIGN                                    -->
+            <!-- ═══════════════════════════════════════════════════════════ -->
+
+            <phase name="solution-design" order="4">
+
+                After loading all context from phases 1-3, you should have:
+                - Complete understanding of the story and business requirements
+                - Knowledge of industry standard approaches (if external analysis available)
+                - Full system architecture understanding from wiki
+                - Feature context and story dependencies
+                - Codebase patterns and conventions from wiki
+                - Integration requirements and constraints from integration analysis
+                - Coding standards internalized
+
+                Use ALL this information to design a viable technical solution that:
+                - Respects Clean Architecture principles
+                - Follows established patterns from wiki
+                - Integrates seamlessly per integration analysis
+                - Maintains extensibility
+                - Enables testability
+                - Strictly follows coding standards
+
+                **Generate the complete technical solution following the template's `&lt;output-format&gt;`
+                section in story-technical-solution.xml. This includes ALL of the following sections.**
+
+            </phase>
+
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 8: WRITE OUTPUT TO STORY FILE                                -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="write-output" order="8">
+
+            **Write the complete technical solution INTO the story file.**
+
+            The output follows the template's `&lt;output-format&gt;` section exactly.
+            It includes ALL sections from the design phases above.
+
+            <!-- ── 8a: Write to local story file ──────────────────────────── -->
+
+            Read the current STORY_FILE content.
+
+            **If the story file contains a `## Technical Solution` section placeholder:**
+            Replace the placeholder section (from `## Technical Solution` up to the next `## `
+            heading or end-of-file metadata section `---`) with the full technical solution.
+
+            **If the story file does NOT contain a `## Technical Solution` section:**
+            Append the technical solution after the `## Relevant Wiki` section
+            (before the metadata section `---` at the end if it exists).
+
+            Write the updated content back to STORY_FILE using the Write or Edit tool.
+
+            Display:
+            ```
+              +  Technical solution written to {STORY_FILE}
+            ```
+
+            <!-- ── 8b: Update GitHub issue (if applicable) ───────────────── -->
+
+            **If the story was loaded from GitHub OR the story file header contains a GitHub link:**
+
+            Extract the issue number from the story.
+
+            **If `has_gh_cli` is true AND issue number is available:**
+
+            Read the current GitHub issue body:
+            ```bash
+            GH_BODY=$(gh issue view {issue_number} --repo {REPO} --json body -q .body)
+            ```
+
+            Replace or append the `## Technical Solution` section in the issue body
+            (same logic as local file — find and replace existing section, or append).
+
+            Update the issue:
+            ```bash
+            gh issue edit {issue_number} --repo {REPO} --body "{updated_body}"
+            ```
+
+            Display:
+            ```
+              +  GitHub issue #{issue_number} updated with Technical Solution section.
+            ```
+
+            **If GitHub CLI not available or no issue number:**
+            Display:
+            ```
+              i  No GitHub issue to update. Local file only.
+            ```
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 9: VALIDATION                                                -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="validation" order="9">
+
+            Read the story file and verify the technical solution against the validation
+            checklist defined in the template (story-technical-solution.xml):
+
+            **Story File Requirements:**
+            - [ ] Technical solution section exists in the story file
+            - [ ] Section contains all required subsections from template
+
+            **Architecture Requirements:**
+            - [ ] Component and Boundary Architecture with Mermaid diagram
+            - [ ] Layer Architecture Analysis (Domain, Application, Infrastructure, Presentation)
+            - [ ] Clean Architecture compliance verified (dependencies point inward)
+            - [ ] Dependency injection strategy documented
+
+            **Design Requirements:**
+            - [ ] Design patterns documented with purpose and implementation
+            - [ ] Technical decisions documented with rationale and trade-offs
+            - [ ] Class diagrams with complete interface definitions
+            - [ ] EVERY interface/class/type in its OWN SEPARATE FILE (coding standards!)
+            - [ ] Data models and structures defined with TypeScript types
+
+            **Algorithm Requirements:**
+            - [ ] Algorithms documented with mathematical formulas
+            - [ ] Constants and configuration values defined (NO hardcoding!)
+            - [ ] Business rules documented with implementations
+            - [ ] Example calculations provided
+
+            **Sequence Diagram Requirements (CRITICAL!):**
+            - [ ] Sequence diagram for EVERY AC scenario
+            - [ ] Full flow from entry point to exit through ALL layers
+            - [ ] Real method names used (not generic placeholders)
+            - [ ] Error handling paths included (alt blocks)
+            - [ ] Data structures shown at each step
+
+            **Implementation Requirements:**
+            - [ ] Complete file structure tree (new + modified files)
+            - [ ] DI container configuration specified
+            - [ ] Refactoring plan from integration analysis incorporated
+            - [ ] Testing strategy (unit, integration, e2e)
+            - [ ] Implementation order with dependencies
+            - [ ] Implementation checklist
+
+            **Compliance Requirements:**
+            - [ ] Coding standards compliance verified throughout
+            - [ ] Integration analysis findings incorporated
+            - [ ] No hardcoded values in any code snippets
+            - [ ] All code follows Clean Architecture layers
+
+            **Total: 25 mandatory checklist items**
+
+            If the output is incomplete or missing sections, go back and fill in
+            the missing content before proceeding.
+
+            Display:
+            ```
+              {check_mark}  Solution validated. {passed}/{total} checks passed.
+            ```
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 10: REVIEW AND APPROVE                                       -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="review" order="10">
+
+            Display a summary of the solution:
+            ```
+              Solution Summary:
+              ────────
+              Sections: {count}/13 | Checklist: {passed}/25
+              Wiki docs loaded: {N} | Integration analysis: loaded
+              External analysis: {loaded/not found}
+              AC scenarios: {M} | Sequence diagrams: {M}
+              New files: {F} | Modified files: {G}
+              Design patterns: {P} | Refactoring items: {R}
+            ```
+
+            Use AskUserQuestion:
+            - header: "Solution"
+            - question: "Technical solution written to `{STORY_FILE}`. Review the file in your editor — does the solution look comprehensive?"
+            - options:
+              - "Approve" — Looks good, commit it
+              - "Refine" — Some sections need more depth
+              - "Skip commit" — Keep the file but don't commit yet
+
+            **If "Approve":**
+            Continue to step 11.
+
+            **If "Refine":**
+            - Ask what sections need more depth or what's missing
+            - Go back to the relevant design phase, read more code, and update the story file
+            - Re-run validation (step 9)
+            - Present for review again
+
+            **If "Skip commit":**
+            Display completion without commit:
+            ```
+            ╔══════════════════════════════════════════════════════════════╗
+            ║  ACE > Technical Solution Complete (uncommitted)              ║
+            ║  {Story ID} "{Story Title}"                                  ║
+            ╚══════════════════════════════════════════════════════════════╝
+
+              i  Technical solution written to {STORY_FILE}
+                 File not committed — commit manually when ready.
+            ```
+            Exit workflow.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 11: COMMIT                                                   -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="commit" order="11">
+
+            Stage and commit the story file:
+
+            ```bash
+            git add {STORY_FILE}
+            ```
+
+            ```bash
+            git commit -m "docs: technical solution for {Story ID} — {Story Title}"
+            ```
+
+            Display completion:
+
+            ```
+            ╔══════════════════════════════════════════════════════════════╗
+            ║  ACE > Technical Solution Complete                            ║
+            ║  {Story ID} "{Story Title}"                                  ║
+            ╚══════════════════════════════════════════════════════════════╝
+
+              +  {STORY_FILE} committed.
+
+              Metrics:
+              ────────
+              Wiki docs loaded: {N} | Integration analysis: incorporated
+              External analysis: {incorporated/not available}
+              AC scenarios covered: {M} sequence diagrams
+              New files designed: {F} | Modified files: {G}
+
+              i  Technical solution complete. The story is now fully refined
+                 (pass 5) and ready for implementation.
+
+              Next > Continue with story execution:
+                     - /ace:execute-story story=... — Implement the story
+                     - /ace:research-technical-solution story=... — Design another story
+                     - /ace:help — Check project initialization status
+            ```
+        </step>
+
+    </process>
+
+    <success_criteria>
+        - Story loaded and requirements extracted (User Story, Description, Acceptance Criteria)
+        - All wiki references extracted from story's Relevant Wiki section
+        - All wiki documents loaded (system-wide mandatory, subsystem as referenced)
+        - Coding standards read and internalized BEFORE generating solution code
+        - Parent feature document loaded for broader context (if available)
+        - Integration analysis loaded and studied (MANDATORY — exit if missing)
+        - External analysis loaded if present in story directory (auto-detected, OPTIONAL)
+        - All 4 design phases executed (Initial Discovery, System Architecture, Codebase Analysis, Solution Design)
+        - Technical solution written to story file with ALL template sections populated
+        - Sequence diagrams created for EVERY acceptance criteria scenario
+        - Every interface/class/type designed as its own separate file
+        - NO hardcoded values in any code snippets
+        - All code follows Clean Architecture layers and coding standards
+        - Integration analysis findings fully incorporated (refactoring, patterns, hardcoded values)
+        - All 25 validation checklist items verified
+        - GitHub issue updated with technical solution (if applicable)
+        - User reviewed and approved the solution
+        - Document committed with appropriate message
+    </success_criteria>
+
+</workflow>

@@ -1,0 +1,1014 @@
+<integration-solution>
+
+    <purpose>
+        Template for `.ace/artifacts/product/&lt;id-epic_name&gt;/&lt;id-feature_name&gt;/&lt;id-story_name&gt;/integration-analysis.md` —
+        a COMPREHENSIVE, IN-DEPTH System Integration Analysis that ensures new story
+        implementations integrate seamlessly with existing systems without breaking
+        functionality or violating architectural principles.
+
+        This is pass 4 of the story specification pipeline (see story.xml composition).
+        It produces a separate artifact in the story directory — NOT appended to the story file.
+        The analysis is consumed by pass 5 (technical solution) as input for designing
+        the implementation approach with full codebase integration context.
+
+        **[MANDATORY]** Identify how a new story would PROPERLY integrate with the existing
+        codebase while maintaining architectural integrity, maintainability, and extensibility
+        while strictly following CODING STANDARDS.
+
+        You are operating within a PRODUCTION-GRADE, CLEAN, COMPLEX CODEBASE — new code
+        must be added thoughtfully and systematically. The purpose is to analyze HOW TO ADD
+        NEW FUNCTIONALITY WHILE KEEPING THE CODE MAINTAINABLE AND EXTENSIBLE.
+
+        This document does NOT modify the story file. It lives as a separate artifact
+        in the story directory. Only the technical solution (pass 5) consumes it.
+
+        CRITICAL: This analysis output will be used as PROMPT CONTEXT for the AI agent
+        implementing this feature. Therefore:
+        - INCLUDE ALL FINDINGS — don't summarize or omit details
+        - PROVIDE COMPLETE CONTEXT — the implementing AI needs every piece of information
+        - BE EXPLICIT — don't assume the implementing AI will know anything not explicitly stated
+    </purpose>
+
+    <output-format>
+
+        <section name="header">
+            # System Integration Analysis: [Story Name]
+
+            ## Analysis Context
+            - **Story**: [Story ID] — [Story Title]
+            - **Feature**: [Feature ID] — [Feature Title]
+            - **Epic**: [Epic ID] — [Epic Title]
+            - **Analysis Date**: [Current date]
+            - **Wiki Documents Loaded**: [N] files
+            - **External Analysis**: [Available/Not available]
+            - **Code References**: [N] references documented
+            - **Hardcoded Values Found**: [N] items
+            - **Refactoring Items**: [N] items
+        </section>
+
+        <section name="use-case-overview">
+            ## 1. Use Case Overview
+
+            [Brief description of what needs to be implemented — extracted from the story's
+            User Story statement, Description, and Acceptance Criteria.
+
+            Include:
+            - What the user can do when this story is done
+            - Key behaviors and requirements from acceptance criteria
+            - How this story relates to other stories in the feature
+            - What the parent feature context provides]
+        </section>
+
+        <section name="architecture-compatibility">
+            ## 2. Architecture Compatibility
+
+            &lt;!-- How this story fits into the Clean Architecture layers.
+                 For EACH layer, document what new components are needed
+                 and how they integrate with existing components. --&gt;
+
+            ### Domain Layer
+            &lt;!-- New entities, value objects, constants, business rules needed.
+                 How they relate to existing domain objects.
+                 Domain events that may be needed.
+                 File paths to relevant existing domain code. --&gt;
+            - **New Entities**: [entities to create with proposed file paths]
+            - **Value Objects**: [value objects needed]
+            - **Constants**: [new constants or extensions to existing constant files]
+            - **Business Rules**: [domain rules this story introduces]
+            - **Existing Domain Code**: [relevant existing domain files with paths]
+
+            ### Application Layer
+            &lt;!-- Use cases, interfaces, DTOs to create.
+                 How they interact with existing application services.
+                 Dependency injection registrations needed. --&gt;
+            - **Use Cases**: [use cases to create]
+            - **Interfaces**: [interfaces to define or extend]
+            - **DTOs**: [data transfer objects needed]
+            - **Existing Services**: [application services that will be affected]
+
+            ### Infrastructure Layer
+            &lt;!-- Services, implementations, repositories required.
+                 External service integrations.
+                 How they implement application layer interfaces. --&gt;
+            - **Services**: [infrastructure services to implement]
+            - **Implementations**: [interface implementations needed]
+            - **Repositories**: [data access patterns to follow]
+            - **Existing Infrastructure**: [existing infrastructure code affected]
+
+            ### Presentation Layer
+            &lt;!-- UI components, API endpoints, view models needed.
+                 How they connect to application layer.
+                 User interaction patterns to follow. --&gt;
+            - **Components**: [UI components or API endpoints needed]
+            - **View Models**: [presentation models needed]
+            - **Existing Presentation Code**: [existing presentation code affected]
+
+            ### Dependency Rule Compliance
+            &lt;!-- Verify that all proposed changes maintain the dependency rule:
+                 dependencies point inward (Presentation → Application → Domain).
+                 Infrastructure implements Application interfaces.
+                 No layer knows about outer layers. --&gt;
+            - [Compliance verification for each proposed change]
+        </section>
+
+        <section name="existing-patterns">
+            ## 3. Existing Patterns to Follow
+
+            &lt;!-- Specific patterns found in the codebase that this story MUST follow.
+                 Each pattern includes file references with line numbers.
+                 The implementing agent must study these files before coding. --&gt;
+
+            ### Similar Implementations
+            &lt;!-- Reference existing code that implements similar functionality.
+                 The new implementation should follow these as examples. --&gt;
+            - **[Implementation Name]** at `[file:line-range]` — [what to learn from it]
+
+            ### Established Conventions
+            &lt;!-- Naming patterns, file organization, code structure conventions. --&gt;
+            - **Naming**: [naming conventions with examples from codebase]
+            - **File Organization**: [how files are organized with examples]
+            - **Code Structure**: [class/function structure patterns]
+
+            ### Design Patterns in Use
+            &lt;!-- Which design patterns are already used that must be followed. --&gt;
+
+            #### [Pattern Name] (e.g., Strategy, Factory, Observer)
+            - **Where**: [File/component where pattern is used — with path]
+            - **Why**: [Why this pattern was chosen]
+            - **Implementation Example**:
+              ```typescript
+              // From [file:line-range]
+              [Code example showing the pattern]
+              ```
+            - **How to Follow**: [How the new code should use this pattern]
+
+            &lt;!-- Repeat for each identified pattern --&gt;
+
+            ### Error Handling Patterns
+            - [How errors are handled — with code references]
+
+            ### Logging Patterns
+            - [How logging is done — with code references]
+
+            ### Constants &amp; Configuration Patterns
+            - [How constants are organized — with code references]
+            - [Where to add new constants]
+        </section>
+
+        <section name="required-refactoring">
+            ## 4. Required Refactoring
+
+            &lt;!-- List any existing code that needs refactoring to support the new implementation.
+                 Include justification for each refactoring decision.
+                 Impact assessment of changes.
+                 Even if no refactoring is needed, complete this section with that conclusion. --&gt;
+
+            ### Refactoring Items
+
+            &lt;!-- For each item:
+                 - What code needs to change (file path, line numbers)
+                 - Current state (what it is now)
+                 - Proposed change (what it should become)
+                 - Justification (why this refactoring is needed)
+                 - Impact (what else is affected by this change)
+
+                 Common scenarios:
+                 - Pattern violations: Direct implementations that should use Strategy/Factory
+                 - Constants chaos: Magic strings/numbers that should be centralized
+                 - Model proliferation: Duplicate models that should be unified
+                 - Method duplication: Duplicate logic that should be extracted
+                 - Layer violations: Business logic in wrong architectural layer
+                 - Service sprawl: Services that should be extended vs. duplicated
+                 - Event handler inconsistencies: Inconsistent event handling patterns
+                 - State management violations: State managed inconsistently
+                 - API integration inconsistencies: Direct API calls instead of services
+                 - Type definition duplication: Redefined types that should be imported --&gt;
+
+            #### [Refactoring Item Name]
+            - **File**: `[file:line-range]`
+            - **Current State**: [what it is now]
+            - **Proposed Change**: [what it should become]
+            - **Justification**: [why this is needed for the new implementation]
+            - **Impact**: [what else is affected]
+
+            &lt;!-- Repeat for each refactoring item.
+                 If no refactoring needed, state: "No refactoring required. [justification]." --&gt;
+        </section>
+
+        <section name="hardcoded-values-critical">
+            ## 5. CRITICAL: Hardcoded Values &amp; Placeholder Code That MUST Be Replaced
+
+            &lt;!-- THIS IS THE MOST CRITICAL SECTION OF THE INTEGRATION ANALYSIS!
+
+                 THE #1 REASON INTEGRATION ANALYSES FAIL:
+                 The analysis identifies what NEW code to create but FAILS to identify
+                 what EXISTING code must be MODIFIED or REPLACED.
+
+                 For every new entity/service being created, ask:
+                 - "What existing code currently does this job (probably poorly/hardcoded)?"
+                 - "Where should this entity be INJECTED that it currently ISN'T?"
+                 - "What hardcoded values exist that this entity should REPLACE?"
+
+                 MANDATORY SEARCHES:
+                 - Hardcoded numeric ranges, dimensions, colors, sizes
+                 - TODO comments mentioning the feature
+                 - "temporary", "placeholder", "stub", "mock" in comments
+                 - Methods returning hardcoded values instead of computed ones
+                 - Classes/services that exist but aren't used where they should be
+                 - Inline calculations that should use the new service
+                 - Manager/Service classes with hardcoded defaults
+                 - Renderers/handlers not using the new entity
+
+                 This section MUST be filled with ACTUAL CODE SNIPPETS from the codebase!
+                 The implementing AI agent NEEDS to know EXACTLY what to change and WHERE. --&gt;
+
+            ### Hardcoded Values to Replace
+
+            ```yaml
+            FILE: [exact file path]
+              LINE: [line number(s)]
+              CURRENT CODE: |
+                [actual code snippet from the file]
+              PROBLEM: [why this is wrong]
+              SHOULD BE: [what it should become after implementation]
+              FIX REQUIRED: [specific action to take]
+            ```
+
+            &lt;!-- Repeat for EACH hardcoded value found --&gt;
+
+            ### Disconnected Wiring to Fix
+
+            ```yaml
+            ENTITY/SERVICE EXISTS: [path to entity/service that should be used]
+            CURRENTLY NOT CONNECTED TO:
+              - [File 1]: [what it uses instead]
+              - [File 2]: [what it uses instead]
+            REQUIRED CONNECTIONS:
+              - [Where to inject and how]
+            ```
+
+            &lt;!-- Repeat for EACH disconnected wiring found --&gt;
+
+            ### Placeholder/TODO Code to Implement
+
+            ```yaml
+            FILE: [file path]
+              LINE: [line number]
+              TODO COMMENT: "[exact TODO text]"
+              CURRENT IMPLEMENTATION: [what it does now — probably hardcoded]
+              REQUIRED IMPLEMENTATION: [what needs to be implemented]
+            ```
+
+            &lt;!-- Repeat for EACH placeholder found --&gt;
+
+            ### Renderers/Services Not Using New Entity
+
+            ```yaml
+            NEW ENTITY: [entity name and path]
+            RENDERERS/HANDLERS THAT MUST USE IT:
+              - [Renderer/Handler 1]: Currently uses [X], must use [new entity]
+              - [Renderer/Handler 2]: Currently uses [X], must use [new entity]
+            SERVICES THAT MUST USE IT:
+              - [Service 1]: Currently [behavior], must [new behavior]
+            ```
+
+            &lt;!-- Repeat for EACH new entity --&gt;
+        </section>
+
+        <section name="integration-points">
+            ## 6. Integration Points
+
+            &lt;!-- All touchpoints between the new implementation and the existing system.
+                 Categorize by architectural layer and component type. --&gt;
+
+            ### Domain Layer Integration
+            - [Integration point — how the new domain code connects with existing domain]
+
+            ### Application Layer Integration
+            - [Integration point — new use cases, service interfaces, DI registrations]
+
+            ### Infrastructure Layer Integration
+            - [Integration point — new service implementations, repository patterns]
+
+            ### Presentation Layer Integration
+            - [Integration point — new UI components, API endpoints, event handlers]
+
+            ### Cross-Cutting Integration
+            &lt;!-- Event systems, middleware, DI container, logging, error handling --&gt;
+            - [Integration point — cross-cutting concerns this story must respect]
+        </section>
+
+        <section name="impact-analysis">
+            ## 7. Impact Analysis
+
+            &lt;!-- ALL code flows that might be impacted by the new implementation.
+                 Include specific file references for each impacted flow. --&gt;
+
+            ### Affected Code Flows
+            - **[Flow Name]**: [description of impact] — `[file:line-range]`
+
+            ### Affected Tests
+            &lt;!-- Tests that may need modification due to the new implementation --&gt;
+            - `[test-file:line-range]` — [what needs to change and why]
+
+            ### Affected Documentation
+            &lt;!-- Documentation files/wiki docs that may need updates --&gt;
+            - `[doc-file]` — [what needs updating]
+
+            ### Performance Implications
+            - [Performance consideration — with mitigation strategy]
+
+            ### Breaking Change Risks
+            - [Risk — with mitigation strategy]
+        </section>
+
+        <section name="codebase-tree">
+            ## 8. Codebase Structure
+
+            ### Current Structure (Relevant Files)
+            &lt;!-- Tree structure showing ACTUAL current files relevant to this story.
+                 NOT the entire codebase — only files that are involved.
+                 Include file paths and one-line purpose. --&gt;
+
+            ```
+            [Current relevant file tree]
+            ```
+
+            ### Proposed Structure (With New Files)
+            &lt;!-- Tree structure showing what the codebase will look like
+                 after implementing this story. Mark new files clearly. --&gt;
+
+            ```
+            [Proposed file tree with new files marked]
+            ```
+        </section>
+
+        <section name="implementation-guidelines">
+            ## 9. Implementation Guidelines
+
+            &lt;!-- Step-by-step approach following coding standards.
+                 The implementing agent should follow this order. --&gt;
+
+            ### Recommended Implementation Order
+
+            1. **[Step 1]**: [What to implement first and why]
+               - Files to create/modify: [list]
+               - Pattern to follow: [reference to existing pattern]
+
+            2. **[Step 2]**: [What to implement next]
+               - Files to create/modify: [list]
+               - Pattern to follow: [reference]
+
+            &lt;!-- Continue for all implementation steps --&gt;
+
+            ### Dependency Management
+            - [How to manage dependencies — DI registrations, imports, etc.]
+
+            ### Error Handling Approach
+            - [Error handling strategy for the new implementation]
+
+            ### State Management Strategy
+            - [How state should be managed in the new implementation]
+        </section>
+
+        <section name="testing-strategy">
+            ## 10. Testing Strategy
+
+            &lt;!-- How to test without breaking existing tests.
+                 Follow the testing framework patterns from wiki. --&gt;
+
+            ### Test Types Required
+            - **Unit Tests**: [what to unit test, mocking strategy]
+            - **Integration Tests**: [what integration scenarios to cover]
+            - **E2E Tests**: [end-to-end scenarios if applicable]
+
+            ### Existing Test Patterns to Follow
+            - [Pattern 1 — with reference to existing test file]
+            - [Pattern 2 — with reference to existing test file]
+
+            ### Test Data Patterns
+            - [How test data is managed in existing tests]
+
+            ### Ensuring Existing Tests Pass
+            - [Steps to verify existing tests still pass after changes]
+            - [Tests that may need adjustment and why]
+        </section>
+
+        <section name="complete-findings">
+            ## 11. Complete Analysis Findings
+
+            &lt;!-- INCLUDE ALL FINDINGS from the deep analysis.
+                 This is the comprehensive dump of everything discovered.
+                 The implementing AI needs every piece of information.
+
+                 Include:
+                 - Every discovered pattern with file references
+                 - Every relevant code snippet
+                 - Every architectural decision
+                 - Every potential issue
+                 - Every integration consideration --&gt;
+
+            ### Discovered Patterns
+            - [Pattern — file reference — relevance to this story]
+
+            ### Relevant Code Snippets
+            ```typescript
+            // From [file:line-range]
+            // [Why this snippet is relevant]
+            [actual code]
+            ```
+
+            ### Architectural Constraints
+            - [Constraint — source (coding standards, ADR, etc.) — impact on implementation]
+
+            ### Potential Issues
+            - [Issue — likelihood — mitigation]
+        </section>
+
+        <section name="implementation-references">
+            ## 12. Implementation References
+
+            ### Internal Documentation
+            &lt;!-- All relevant internal docs with full paths --&gt;
+            - `[path]` — [what to learn from this doc]
+
+            ### Code References
+            &lt;!-- All files that should be studied before implementation --&gt;
+            - `[file:line-range]` — [what to learn from this code]
+
+            ### Design Patterns &amp; Best Practices
+            &lt;!-- Links to pattern documentation --&gt;
+            - [Pattern Name] — [link to documentation, e.g., refactoring.guru]
+
+            ### External Resources
+            &lt;!-- Official documentation links for libraries used --&gt;
+            - [Resource] — [link]
+        </section>
+
+        <section name="ai-implementation-context">
+            ## 13. AI Implementation Context
+
+            &lt;!-- CRITICAL SECTION — This will be the primary context for the implementing AI.
+                 Everything the implementing agent needs to know in one place. --&gt;
+
+            ### Domain Knowledge
+            - [All domain-specific knowledge the implementing agent needs]
+
+            ### Constraints &amp; Limitations
+            - [All constraints from coding standards, architecture, ADRs]
+
+            ### Naming Conventions
+            - [All naming conventions observed in the codebase with examples]
+
+            ### Error Handling Standards
+            - [Error handling patterns with code references]
+
+            ### Logging Standards
+            - [Logging approach with code references]
+
+            ### Performance Considerations
+            - [Performance requirements and optimization approaches]
+
+            ### Example Code Snippets
+            &lt;!-- Code snippets from similar implementations that serve as templates --&gt;
+            ```typescript
+            // From [file:line-range]
+            // [This serves as a template for implementing [component]]
+            [actual code from similar implementation]
+            ```
+        </section>
+
+    </output-format>
+
+    <analysis-process>
+
+        &lt;!-- This section defines the analysis methodology that the code-integration-analyst
+             agent must follow. It mirrors the workflow steps but provides detailed
+             instructions for each analysis phase.
+
+             MANDATORY COMPLETION REQUIREMENTS:
+             - Phase 1: ALL 4 items (Context Loading) — MANDATORY
+             - Phase 2: ALL 8 items (Deep Codebase Analysis) — MANDATORY
+             - Phase 3: ALL 4 items (Refactoring &amp; Strategy) — MANDATORY
+             - Phase 4: ALL 2 items (AI Implementation Context) — MANDATORY
+             - Total: 18 mandatory analysis items — SKIP NONE --&gt;
+
+        <phase name="context-loading" order="1">
+            &lt;!-- ALL 4 items are MANDATORY --&gt;
+
+            <item name="understand-story" mandatory="true">
+                **[MANDATORY] Understand the story requirements:**
+                - Read the story thoroughly: User Story, Description, all AC scenarios
+                - These define WHAT functionality needs to integrate into the codebase
+                - Extract key behaviors, components, and patterns needed
+                - The story's acceptance criteria define the SCOPE of the analysis
+                - **Requirements come from the story** — do NOT seek requirements
+                  from other sources. The story IS the source of truth.
+                - If a parent feature document is available, read it to understand:
+                  - The broader feature context
+                  - What other stories exist and how they relate
+                  - Dependencies and shared components between stories
+            </item>
+
+            <item name="load-wiki-documents" mandatory="true">
+                **[MANDATORY] Load and study ALL wiki documents from the story's Relevant Wiki section:**
+
+                These wiki documents provide the COMPLETE codebase context:
+
+                - **System-Wide** (always present):
+                    - `system-structure.md` — High-level codebase tree and organization
+                    - `system-architecture.md` — Complete architectural overview
+                    - `coding-standards.md` — CRITICAL: coding standards — NO EXCEPTIONS!
+                    - `testing-framework.md` — Testing patterns and frameworks
+
+                - **Subsystem Documents** (as referenced by story):
+                    - **Systems**: System descriptions, boundaries, APIs
+                    - **Patterns**: Design patterns in use with examples
+                    - **Cross-Cutting Concerns**: Shared concerns (auth, logging, errors, etc.)
+                    - **Guides**: How-to guides for common implementation tasks
+                    - **Decisions (ADRs)**: Architecture decisions that constrain design
+                    - **Architecture**: Subsystem architecture documents
+
+                Read EVERY document. These replace the obsolete command's separate parameters:
+                - sourcecode → system-structure.md (high-level tree)
+                - high-level-architecture → system-architecture.md
+                - documentation → all wiki documents combined
+                - related-stories-implementations → wiki documents capture story knowledge
+                - documented-features → wiki documents catalog feature implementations
+            </item>
+
+            <item name="load-external-analysis" mandatory="true">
+                **[MANDATORY] Check and load external analysis if available:**
+                - Automatically check for `{STORY_DIR}/external-analysis.md`
+                - This is the artifact from pass 3 (`/ace:research-external-solution`)
+                - If present, study it for:
+                  - How industry-standard systems implement this functionality
+                  - Algorithms and formulas to reuse
+                  - Design patterns from external implementations
+                  - Best practices that should inform our integration
+                - If not present, proceed without — note this in the analysis
+            </item>
+
+            <item name="load-feature-document" mandatory="true">
+                **[MANDATORY] Load the parent feature document:**
+                - The feature file path can be extracted from the story metadata
+                - Understand the feature planning context
+                - Identify how this story fits within the broader feature
+                - Identify dependencies and integration points with other stories
+                - If not found, proceed without — the analysis can still be done
+            </item>
+        </phase>
+
+        <phase name="deep-codebase-analysis" order="2">
+            &lt;!-- ALL 8 items are MANDATORY — skip NONE --&gt;
+
+            <item name="architecture-compatibility" mandatory="true">
+                **[MANDATORY] Architecture Compatibility Analysis:**
+
+                Map how the new story fits into Clean Architecture layers:
+
+                - **Domain Layer**: New entities, value objects, constants needed.
+                  How they relate to existing domain objects. Domain events needed.
+                - **Application Layer**: Use cases and interfaces to create.
+                  How they interact with existing application services. DI registrations.
+                - **Infrastructure Layer**: Services and implementations required.
+                  External service integrations. How they implement application interfaces.
+                - **Presentation Layer**: UI components and API endpoints needed.
+                  How they connect to application layer. User interaction patterns.
+
+                Verify Clean Architecture compliance:
+                - Dependencies point inward toward domain
+                - Each layer knows only about inner layers
+                - Depend on abstractions, not concretions
+                - All business logic independently testable
+            </item>
+
+            <item name="pattern-recognition" mandatory="true">
+                **[MANDATORY] Pattern Recognition &amp; Existing Patterns:**
+
+                Search for similar features/patterns in the codebase and reference them
+                with specific file paths and line numbers:
+
+                - **Similar Implementations**: Find existing code that does something similar
+                - **Naming Conventions**: Document exact naming patterns with examples
+                - **Design Patterns**: Catalog patterns in use (Strategy, Factory, Observer, etc.)
+                - **Error Handling**: Document error handling approaches with code references
+                - **Logging**: Document logging approaches
+                - **Constants Organization**: How constants are organized and where to add new ones
+            </item>
+
+            <item name="integration-points" mandatory="true">
+                **[MANDATORY] Integration Point Discovery (Layer-by-Layer):**
+
+                Examine each architectural layer for integration opportunities:
+
+                - **Domain Layer**: Entity extensions, value objects, business rules
+                - **Application Layer**: Service interfaces, use cases, DTOs
+                - **Infrastructure Layer**: Repository patterns, external services
+                - **Presentation Layer**: UI components, view models, controllers
+
+                Find:
+                - Existing interfaces that can be extended
+                - Abstract classes available for inheritance
+                - Event systems for loose coupling
+                - Middleware or pipeline patterns
+                - Plugin or extension points
+                - Configuration-based feature toggles
+                - DI container registrations needed
+            </item>
+
+            <item name="file-dependencies" mandatory="true">
+                **[MANDATORY] File Dependency Analysis:**
+
+                - Identify ALL files that will be referenced or modified
+                - Document supporting files for the new implementation
+                - Map import chains and dependency graphs
+                - Identify potential circular dependency risks
+                - List all current files that will support the new implementation
+            </item>
+
+            <item name="convention-compliance" mandatory="true">
+                **[MANDATORY] Convention Compliance Analysis:**
+
+                - Document existing conventions that MUST be followed
+                - Verify the new implementation doesn't violate CODING STANDARDS
+                - Check naming conventions, file organization, error handling
+                - Verify SOLID principles compliance
+                - Verify Clean Architecture layer boundaries
+            </item>
+
+            <item name="testing-patterns" mandatory="true">
+                **[MANDATORY] Testing Pattern Analysis:**
+
+                - Analyze current test patterns for consistent validation approach
+                - Identify test utilities and helpers available for reuse
+                - Document testing conventions (unit, integration, e2e)
+                - Identify tests that need modification due to the new implementation
+                - Extract mocking strategies used
+            </item>
+
+            <item name="hardcoded-values-discovery" mandatory="true">
+                **[MANDATORY] CRITICAL: Hardcoded Values &amp; Placeholder Code Discovery:**
+
+                THIS IS THE MOST CRITICAL PART OF THE INTEGRATION ANALYSIS!
+
+                When a new story implements a feature, there are ALWAYS existing hardcoded
+                values or placeholder implementations that the new feature is MEANT TO REPLACE.
+
+                YOU MUST EXHAUSTIVELY SEARCH FOR:
+
+                <search-category name="hardcoded-domain-values">
+                    **Hardcoded Domain/Range Values:**
+                    - Search for hardcoded number ranges, dimensions, colors, sizes, offsets
+                    - Search for values that should come from the new entity/service
+                    - Grep patterns: `domain\(\[`, `= 0;`, `= 100`, `MIN_`, `MAX_`, `DEFAULT_`
+                </search-category>
+
+                <search-category name="placeholder-stubs">
+                    **Placeholder/Stub Implementations:**
+                    - Search for TODO comments mentioning the feature being implemented
+                    - Search for "temporary", "placeholder", "stub", "mock" in comments
+                    - Search for methods returning hardcoded values instead of computed ones
+                    - Grep patterns: `TODO`, `TEMPORARY`, `placeholder`, `HARDCODED`
+                </search-category>
+
+                <search-category name="disconnected-wiring">
+                    **Disconnected Wiring:**
+                    - Classes/services that EXIST but are NOT USED where they should be
+                    - Find where the NEW entity/service SHOULD be injected but currently isn't
+                    - For every new entity/service, ask:
+                      - "What existing code currently does this job?"
+                      - "Where should this entity be INJECTED?"
+                      - "What hardcoded values exist that this entity should REPLACE?"
+                </search-category>
+
+                <search-category name="inline-calculations">
+                    **Inline Calculations That Should Use New Service:**
+                    - Inline calculations done manually instead of using the new entity
+                    - Duplicate calculation logic across multiple files
+                    - Grep patterns: `Math.min`, `Math.max`, inline formulas
+                </search-category>
+
+                <search-category name="manager-service-defaults">
+                    **Manager/Service Classes with Hardcoded Defaults:**
+                    - Manager/service classes initializing with dummy values
+                    - These MUST be updated to receive values from the new entity
+                    - Search: `*Manager`, `*Service` classes in Infrastructure layer
+                </search-category>
+
+                <search-category name="renderers-not-using-entity">
+                    **Renderers/Handlers Not Using New Entity:**
+                    - When implementing a new feature, ALL relevant renderers/handlers must be checked
+                    - Verify they use the new entity instead of hardcoded values
+                    - Search: `*Renderer`, `*Handler`, `*Controller` classes
+                </search-category>
+
+                Output format for EACH discovered item:
+                ```yaml
+                FILE: [exact file path]
+                  LINE: [line number(s)]
+                  CURRENT CODE: |
+                    [actual code snippet from the file]
+                  PROBLEM: [why this is wrong]
+                  SHOULD BE: [what it should become after implementation]
+                  FIX REQUIRED: [specific action to take]
+                ```
+
+                CRITICAL: This section MUST be filled with ACTUAL CODE SNIPPETS from the codebase!
+                The implementing AI agent NEEDS to know EXACTLY what to change and WHERE.
+            </item>
+
+            <item name="impact-analysis" mandatory="true">
+                **[MANDATORY] Impact Analysis:**
+
+                - Discover ALL code flows that might be impacted by the new implementation
+                - Include specific file references for each impacted flow
+                - Identify tests that need modification (include file paths)
+                - Document documentation files/flows requiring updates
+                - Assess performance implications
+                - Identify breaking change risks
+            </item>
+        </phase>
+
+        <phase name="refactoring-strategy" order="3">
+            &lt;!-- ALL 4 items are MANDATORY --&gt;
+
+            <item name="refactoring-requirements" mandatory="true">
+                **[MANDATORY] Refactoring Requirements:**
+
+                Determine if existing code needs refactoring for the new implementation
+                to be MAINTAINABLE / EXTENSIBLE. Check for:
+
+                <refactoring-scenario name="consolidation">
+                    Duplicate code that should be unified before adding more
+                </refactoring-scenario>
+                <refactoring-scenario name="abstraction">
+                    Concrete implementations that need interfaces for extensibility
+                </refactoring-scenario>
+                <refactoring-scenario name="separation">
+                    Mixed concerns that need splitting before adding new functionality
+                </refactoring-scenario>
+                <refactoring-scenario name="generalization">
+                    Specific code that could be made reusable by the new implementation
+                </refactoring-scenario>
+                <refactoring-scenario name="simplification">
+                    Complex code that could be streamlined
+                </refactoring-scenario>
+                <refactoring-scenario name="standardization">
+                    Inconsistent patterns needing alignment before extending
+                </refactoring-scenario>
+
+                Common refactoring scenarios to check:
+                - Pattern violations (adding a new type when Strategy pattern should be used)
+                - Constants scattered across files (centralize in Domain layer)
+                - Model proliferation (extend existing vs. create duplicate)
+                - Method duplication (reuse existing methods)
+                - Layer violations (business logic in wrong layer)
+                - Service sprawl (extend existing services if cohesive)
+                - Event handler inconsistencies
+                - State management violations
+                - API integration inconsistencies
+                - Type definition duplication
+
+                **Even if no refactoring is needed, this section MUST be completed
+                with the conclusion "no refactoring required" and justification.**
+            </item>
+
+            <item name="implementation-guidelines" mandatory="true">
+                **[MANDATORY] Implementation Guidelines:**
+
+                - Step-by-step implementation approach following coding standards
+                - Optimal architectural placement for new code
+                - Interface design for maximum flexibility
+                - Dependency management approach (DI registrations)
+                - State management strategy
+                - Error handling patterns to follow
+                - Recommended implementation order
+            </item>
+
+            <item name="testing-strategy" mandatory="true">
+                **[MANDATORY] Testing Strategy:**
+
+                - How to test without breaking existing tests
+                - Test patterns to follow (from testing framework doc)
+                - Required test types (unit, integration, e2e)
+                - Mocking strategies based on existing patterns
+                - Edge cases to cover from acceptance criteria
+                - Test data patterns to follow
+            </item>
+
+            <item name="risk-mitigation" mandatory="true">
+                **[MANDATORY] Risk Mitigation:**
+
+                - Backward compatibility considerations
+                - Migration path for existing functionality
+                - What existing functionality might be impacted
+                - Performance implications
+                - Breaking change risks
+                - Rollback strategies if needed
+            </item>
+        </phase>
+
+        <phase name="ai-context" order="4">
+            &lt;!-- ALL 2 items are MANDATORY --&gt;
+
+            <item name="complete-findings" mandatory="true">
+                **[MANDATORY] Complete Analysis Findings:**
+
+                Include ALL findings from the deep analysis:
+                - Every discovered pattern with file references
+                - Every relevant code snippet
+                - Every architectural decision
+                - Every potential issue
+                - Every integration consideration
+
+                CRITICAL REQUIREMENT: This analysis output will be used as PROMPT CONTEXT
+                for the AI agent implementing this feature. Therefore:
+                - INCLUDE ALL FINDINGS — don't summarize or omit details
+                - PROVIDE COMPLETE CONTEXT — the implementing AI needs every piece of information
+                - BE EXPLICIT — don't assume the implementing AI will know anything not stated
+            </item>
+
+            <item name="implementation-references" mandatory="true">
+                **[MANDATORY] Implementation References:**
+
+                - **Internal Documentation**: All relevant internal docs with full paths,
+                  including architecture diagrams and ADRs
+                - **Code References**: All files to study before implementation,
+                  specific functions/classes as examples, utility functions to reuse
+                - **Design Patterns &amp; Best Practices**: Links to pattern documentation
+                  (e.g., https://refactoring.guru/design-patterns/strategy)
+                - **External Resources**: Official docs for libraries used, best practice guides
+                - **Domain Knowledge**: All naming conventions, error handling patterns,
+                  logging standards, performance considerations
+            </item>
+        </phase>
+
+    </analysis-process>
+
+    <validation-checklist>
+        &lt;!-- Mark each item as complete before finishing.
+             Total: 22 mandatory items — DO NOT PROCEED until ALL are verified.
+
+             COMMON MISTAKE PREVENTION:
+             - Tree structures must show ACTUAL current files, not placeholders
+             - Refactoring analysis is required even if conclusion is "no refactoring needed"
+             - Integration points must reference actual existing code with file paths
+             - Testing strategy must ensure existing tests continue to pass
+             - Hardcoded values section MUST have actual code snippets, not descriptions
+             - All output goes ONLY to the analysis file — NO GitHub updates --&gt;
+
+        <category name="file-creation">
+            <check>[MANDATORY] Analysis file created at story-directory/integration-analysis.md</check>
+            <check>[MANDATORY] Story directory created if it didn't exist</check>
+            <check>[MANDATORY] File contains all required sections from template</check>
+        </category>
+
+        <category name="core-analysis">
+            <check>[MANDATORY] Tree structure showing current codebase structure</check>
+            <check>[MANDATORY] Tree structure showing proposed changes with new files</check>
+            <check>[MANDATORY] Architecture compatibility analysis completed (layer-by-layer)</check>
+            <check>[MANDATORY] All existing patterns identified with file references</check>
+            <check>[MANDATORY] Integration points clearly documented</check>
+            <check>[MANDATORY] Impact analysis showing affected components</check>
+        </category>
+
+        <category name="architecture">
+            <check>[MANDATORY] Clean Architecture compliance verified</check>
+            <check>[MANDATORY] Dependency injection strategy documented</check>
+            <check>[MANDATORY] Design patterns identified and documented</check>
+            <check>[MANDATORY] Coding standards compliance verified</check>
+            <check>[MANDATORY] Testing strategy that preserves existing tests</check>
+        </category>
+
+        <category name="hardcoded-values-critical">
+            <check>[MANDATORY &amp; CRITICAL] Searched for hardcoded domain/range values</check>
+            <check>[MANDATORY &amp; CRITICAL] Searched for placeholder/TODO comments related to the feature</check>
+            <check>[MANDATORY &amp; CRITICAL] Identified ALL renderers/handlers that should use new entity but don't</check>
+            <check>[MANDATORY &amp; CRITICAL] Identified ALL manager/service classes with hardcoded defaults</check>
+            <check>[MANDATORY &amp; CRITICAL] Found disconnected wiring (entity exists but not injected where needed)</check>
+            <check>[MANDATORY &amp; CRITICAL] Section 5 filled with ACTUAL CODE SNIPPETS (not placeholders!)</check>
+            <check>[MANDATORY &amp; CRITICAL] Every hardcoded value includes: file path, line number, current code, fix required</check>
+        </category>
+    </validation-checklist>
+
+    <guidelines>
+
+        <guideline name="accuracy-first">
+            NO ASSUMPTIONS are tolerated. The analysis must reflect 100% accurate code.
+            Only document what you actually find in the code. Never infer behavior
+            that isn't explicitly implemented. Every claim must be traceable to
+            actual code references with file paths and line numbers.
+        </guideline>
+
+        <guideline name="story-scope">
+            Focus exclusively on code paths related to the story.
+            Do NOT document the entire codebase — only files, functions,
+            and constants that are directly involved in implementing the story's
+            functionality as defined by its acceptance criteria.
+        </guideline>
+
+        <guideline name="coding-standards-first">
+            STRONG EMPHASIS ON CODING STANDARDS — NO EXCEPTIONS!
+            Every proposed change, new file, and integration point must be verified
+            against the project's coding standards (from wiki system-wide docs).
+            Standards compliance is not optional — it is the primary quality gate.
+        </guideline>
+
+        <guideline name="code-level-depth">
+            This is a DEEP TECHNICAL ANALYSIS, not a summary:
+            - ACTUAL CODE SNIPPETS must be included, not descriptions
+            - COMPLETE FILE PATHS WITH LINE NUMBERS for every reference
+            - EXACT INTEGRATION POINTS with specific method signatures
+            - NO HIGH-LEVEL SUMMARIES — only detailed, code-level analysis
+
+            This output will be used as the PRIMARY TECHNICAL REFERENCE for
+            implementing this story. Without complete code-level detail, the
+            analysis is USELESS.
+        </guideline>
+
+        <guideline name="thoroughness">
+            THOROUGH &amp; COMPREHENSIVE: Cover every aspect of the integration.
+            100% SUBSTANTIVE: Only include relevant, actionable information.
+            TAKE ALL TIME NEEDED: Read EVERY line of relevant code.
+            ACCURACY IS PARAMOUNT: This will guide the implementation.
+        </guideline>
+
+        <guideline name="hardcoded-values-critical">
+            The hardcoded values discovery is the MOST IMPORTANT section.
+            THE #1 REASON INTEGRATION ANALYSES FAIL is identifying what NEW code
+            to create but FAILING to identify what EXISTING code must be MODIFIED.
+
+            For EVERY new entity/service being created:
+            1. "What existing code currently does this job (probably poorly/hardcoded)?"
+            2. "Where should this entity be INJECTED that it currently ISN'T?"
+            3. "What hardcoded values exist that this entity should REPLACE?"
+
+            This section MUST contain ACTUAL CODE SNIPPETS with file paths and line numbers.
+        </guideline>
+
+        <guideline name="wiki-as-context">
+            Wiki documents are the SINGLE SOURCE of codebase knowledge.
+            They replace all obsolete separate parameters (sourcecode, high-level-architecture,
+            documentation, related-stories-implementations, documented-features).
+            Read ALL wiki documents referenced in the story's Relevant Wiki section.
+        </guideline>
+
+        <guideline name="no-github-updates">
+            All output is written ONLY to the integration-analysis.md file.
+            NO GitHub updates, NO modifications to the story file.
+            This is a standalone artifact consumed by pass 5 (technical solution).
+        </guideline>
+
+        <guideline name="github-compatibility">
+            The analysis document must render cleanly in GitHub markdown viewers.
+            - Use markdown tables (no HTML tables)
+            - No custom CSS or HTML styling
+            - Code blocks with language hints for syntax highlighting
+            - YAML blocks for structured data (hardcoded values, wiring)
+        </guideline>
+
+        <guideline name="refactoring-always-addressed">
+            The refactoring section MUST be completed even if the conclusion is
+            "no refactoring required." The analysis must explicitly state whether
+            refactoring is needed and provide justification either way.
+        </guideline>
+
+        <guideline name="common-mistakes">
+            Common mistakes to avoid:
+            - Tree structures must show ACTUAL current files, not placeholders
+            - Refactoring analysis is required even if "no refactoring needed"
+            - Integration points must reference actual existing code with file paths
+            - Testing strategy must ensure existing tests continue to pass
+            - Hardcoded values section MUST have actual code snippets
+            - Don't identify only NEW code — also identify what EXISTING code must CHANGE
+            - Don't miss disconnected wiring (entities that exist but aren't injected)
+        </guideline>
+
+    </guidelines>
+
+    <evolution>
+
+        **Creation (research-integration-solution — pass 4):**
+        This is pass 4 of the story specification pipeline.
+        A single run produces the complete integration-analysis.md document.
+        All sections must be filled, all checklist items verified.
+
+        **Consumption (story-technical-solution — pass 5):**
+        The integration-analysis.md is consumed as input by pass 5 (technical solution).
+        The technical solution uses insights from this analysis to design the
+        implementation approach — file changes, integration points, refactoring,
+        hardcoded values to replace, testing strategy.
+
+        **Re-analysis (exception, not norm):**
+        Only when the story scope changes significantly or the codebase changes
+        substantially. Re-running overwrites the existing analysis.
+
+        **This analysis does NOT modify the story file.**
+        It lives as a separate artifact in the story directory.
+        The story.xml template has no sections that reference this analysis directly.
+        Only the technical solution (pass 5) consumes it.
+
+    </evolution>
+
+</integration-solution>

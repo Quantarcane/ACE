@@ -1,0 +1,832 @@
+<external-solution>
+
+    <purpose>
+        Template for `.ace/artifacts/product/&lt;id-epic_name&gt;/&lt;id-feature_name&gt;/&lt;id-story_name&gt;/external-analysis.md` —
+        a COMPREHENSIVE, IN-DEPTH, CODE-LEVEL analysis of how a specific story's functionality
+        is implemented in an external reference system (industry-standard codebase).
+
+        This is pass 3 of the story specification pipeline (see story.xml composition).
+        It produces a separate artifact in the story directory — NOT appended to the story file.
+        The analysis is consumed by pass 5 (technical solution) as input for designing
+        our own implementation.
+
+        This is NOT a high-level overview. It is a DEEP DIVE into:
+        - EXACT code implementations with line-by-line analysis
+        - COMPLETE algorithms and formulas extracted verbatim from code
+        - ALL design patterns with actual code examples
+        - EVERY file, function, and constant involved in the story
+        - FULL execution paths traced 5+ levels deep minimum
+
+        The analysis ensures our implementation:
+        - Follows established patterns and best practices (with code proof)
+        - Uses exact algorithms and formulas (copied from their code)
+        - Maintains compatibility with industry standards (matching their APIs)
+
+        This document does NOT modify the story file. It lives as a separate artifact
+        in the story directory. Only the technical solution (pass 5) consumes it.
+    </purpose>
+
+    <output-format>
+
+        <section name="header">
+            # External Implementation Analysis: [Story Name]
+
+            ## Repository Analyzed
+            - **Source**: [Repository name/URL]
+            - **Version/Commit**: [Specific version or commit hash analyzed]
+            - **Story/Use Case**: [Description of story functionality analyzed]
+            - **Analysis Date**: [Current date]
+            - **Metrics**: Files read: [X] | Code references: [Y] | Call depth: [Z]
+        </section>
+
+        <section name="implementation-overview">
+            ## Implementation Overview
+
+            [COMPREHENSIVE, DETAILED analysis of EXACTLY how the external system implements
+            this story's functionality. Describe the overall approach, architecture, and
+            key implementation decisions. This is a holistic view of the implementation
+            with complete code paths.
+
+            This is NOT a summary — it is a complete technical description of the
+            implementation approach, covering how the components work together to
+            deliver the functionality described in the story's acceptance criteria.]
+        </section>
+
+        <section name="entry-points">
+            ## Entry Points &amp; Triggers
+
+            &lt;!-- Document ALL entry points into the story functionality.
+                 For EACH entry point include:
+                 - Entry Point Type: [User Action/API/Event/Scheduled/External]
+                 - File: src/path/file.ts:line-range
+                 - Trigger: exact trigger description
+                 - Parameters: list all parameters with types
+                 - Example usage: show actual usage example from the code
+
+                 Format each entry point as:
+                 ```typescript
+                 // Entry Point Type: [User Action/API/Event/etc.]
+                 // File: src/path/file.ts:45-60
+                 // Trigger: [Exact trigger description]
+                 // Parameters: [List all parameters with types]
+                 // Example usage: [Show actual usage example]
+                 ```
+
+                 Omit any category that has no entry points for this story. --&gt;
+
+            ### User Action Triggers
+            [Button clicks, form submissions, keyboard shortcuts — with code references and line numbers]
+
+            ### API Entry Points
+            [REST endpoints, GraphQL mutations, RPC calls — with code references and line numbers]
+
+            ### Event-Based Triggers
+            [WebSocket messages, system events, pub/sub messages — with code references and line numbers]
+
+            ### Scheduled / Automated Triggers
+            [Cron jobs, timers, intervals — with code references and line numbers]
+
+            ### External System Triggers
+            [Webhooks, callbacks, integrations — with code references and line numbers]
+        </section>
+
+        <section name="file-tree">
+            ## Story-Specific File Tree
+
+            &lt;!-- Document ONLY files involved in this story. NOT the entire codebase.
+                 Categorize files by role: CORE, SUPPORT, CONFIG, TEST.
+                 Include file size (line count) and one-line purpose.
+
+                 Example:
+                 ```
+                 chart-container/
+                 ├── entry-points/ [CORE]
+                 │   ├── ChartWidget.ts (150 lines) - User interaction entry point
+                 │   └── ChartAPI.ts (200 lines) - Public API entry point
+                 ├── core-logic/ [CORE]
+                 │   ├── ChartModel.ts (300 lines) - Chart state management
+                 │   └── LayoutManager.ts (250 lines) - Layout calculations
+                 ├── models/ [SUPPORT]
+                 │   └── ChartOptions.ts (100 lines) - Configuration types
+                 ├── utilities/ [SUPPORT]
+                 │   └── SizeHelpers.ts (80 lines) - Size calculation helpers
+                 ├── config/ [CONFIG]
+                 │   └── Defaults.ts (50 lines) - Default configuration
+                 └── tests/ [TEST]
+                     ├── chart.test.ts (200 lines) - Unit tests
+                     └── chart.integration.test.ts (150 lines) - Integration tests
+
+                 Total: X files, Y lines of code specific to this story
+                 ``` --&gt;
+
+            ```
+            [story-specific file tree here]
+            ```
+        </section>
+
+        <section name="constants">
+            ## Constants &amp; Configuration
+
+            &lt;!-- Extract ALL constants and configuration values used by the story.
+                 Include actual values from code, NOT placeholders.
+                 Group by category: performance limits, business thresholds, magic numbers.
+                 Always include the source file path and line numbers.
+
+                 Example:
+                 ```typescript
+                 // From src/config/defaults.ts:10-50
+                 export const CHART_DEFAULTS = {
+                     // Performance limits
+                     MAX_BARS: 10000,
+                     BATCH_SIZE: 100,
+                     THROTTLE_MS: 16,
+
+                     // Rendering thresholds
+                     MIN_PIXEL_RATIO: 1,
+                     MAX_PIXEL_RATIO: 4,
+
+                     // Sizing constants
+                     DEFAULT_WIDTH: 600,
+                     DEFAULT_HEIGHT: 300
+                 };
+                 ``` --&gt;
+
+            ```typescript
+            // From [file:line-range]
+            [Actual constants extracted from external codebase]
+            ```
+        </section>
+
+        <section name="core-implementation">
+            ## Core Implementation
+
+            ### Algorithms &amp; Calculations
+
+            &lt;!-- For EACH algorithm or calculation found, document:
+                 - Purpose: What it calculates/achieves
+                 - Formula: Exact mathematical formula or logic
+                 - Implementation: Code snippet showing implementation
+                 - Example: Sample input/output with explanation
+                 - Edge Cases: How they handle special cases --&gt;
+
+            #### [Algorithm/Formula Name]
+
+            **Purpose**: [What it calculates/achieves]
+
+            **Formula**:
+            ```
+            [Exact mathematical formula or logical expression]
+            ```
+
+            **Implementation**:
+            ```typescript
+            // From src/path/file.ts:line-range
+            [Actual code extracted from their implementation with inline comments]
+            ```
+
+            **Example**:
+            - Input: [sample input values]
+            - Output: [expected output]
+            - Explanation: [how the algorithm produces this result]
+
+            **Edge Cases**:
+            - [How they handle edge case 1]
+            - [How they handle edge case 2]
+
+            &lt;!-- Repeat for each algorithm/calculation found --&gt;
+
+            ### Data Flow
+
+            &lt;!-- MANDATORY Mermaid sequence diagram showing:
+                 - Complete execution flow with ALL branches
+                 - Actual method names and parameters
+                 - Data flow between components
+                 - State changes and side effects
+                 - Error handling paths
+
+                 The diagram must use ACTUAL method names from the code,
+                 not generic placeholders. --&gt;
+
+            ```mermaid
+            sequenceDiagram
+                participant User
+                participant Controller
+                participant Service
+                participant DataStore
+
+                User->>Controller: triggerAction(params)
+                Controller->>Service: processRequest(data)
+                Service->>DataStore: query(criteria)
+                DataStore-->>Service: results
+                Service-->>Controller: processedData
+                Controller-->>User: response
+            ```
+
+            ### Key Components
+
+            &lt;!-- Detailed breakdown of each component involved in the story.
+                 For each component include:
+                 - File path with line range
+                 - Purpose (what this component does in the story)
+                 - Public API (methods/properties exposed)
+                 - Internal Logic (key implementation details)
+                 - Dependencies (other components it depends on) --&gt;
+
+            #### [Component Name]
+
+            - **File**: [path:line-range]
+            - **Purpose**: [what this component does in the context of this story]
+            - **Public API**:
+              - `methodName(params): returnType` — [description]
+            - **Internal Logic**: [key implementation details with code references]
+            - **Dependencies**: [other components it depends on]
+        </section>
+
+        <section name="code-examples">
+            ## Code Examples
+
+            &lt;!-- Actual code extracted from external implementation.
+                 Include inline comments explaining the logic.
+                 Group by algorithm/feature/component.
+                 Always include source file path and line numbers. --&gt;
+
+            ### [Algorithm/Feature Name]
+
+            ```typescript
+            // From src/path/file.ts:line-range
+            // [Explanation of what this code does and why]
+            [Actual code from external implementation]
+            ```
+
+            &lt;!-- Repeat for each significant code example --&gt;
+        </section>
+
+        <section name="test-patterns">
+            ## Test Patterns
+
+            &lt;!-- Extract test cases from the external system.
+                 Include actual test code with assertions.
+                 Document test scenarios, edge cases, mocking strategies.
+
+                 Example:
+                 ```typescript
+                 // From tests/chart.test.ts:50-80
+                 describe('ChartContainer', () => {
+                     it('should initialize with default dimensions', () => {
+                         const chart = createChart(container);
+                         expect(chart.width()).toBe(DEFAULT_WIDTH);
+                         expect(chart.height()).toBe(DEFAULT_HEIGHT);
+                     });
+
+                     it('should handle resize events', () => {
+                         const chart = createChart(container);
+                         chart.resize(800, 600);
+                         expect(chart.width()).toBe(800);
+                     });
+                 });
+                 ``` --&gt;
+
+            ```typescript
+            // From [test file:line-range]
+            [Actual test code from external system]
+            ```
+
+            ### Test Scenarios Covered
+            - [Scenario 1 — what it tests and why]
+            - [Scenario 2 — what it tests and why]
+
+            ### Edge Cases Tested
+            - [Edge case 1 — how it's tested]
+
+            ### Mocking Strategies
+            - [What they mock and how — with code examples if notable]
+        </section>
+
+        <section name="validation-security">
+            ## Validation &amp; Security
+
+            &lt;!-- Extract validation and security measures.
+                 Include actual validation code with rules.
+
+                 Example:
+                 ```typescript
+                 // From src/validators/options.ts:20-45
+                 function validateOptions(options: ChartOptions): void {
+                     if (options.width <= 0) {
+                         throw new Error('Width must be positive');
+                     }
+                     if (options.height <= 0) {
+                         throw new Error('Height must be positive');
+                     }
+                 }
+                 ``` --&gt;
+
+            ```typescript
+            // From [file:line-range]
+            [Actual validation/security code from external system]
+            ```
+
+            ### Input Validation Rules
+            - [Rule 1 — what is validated, how, and error behavior]
+            - [Rule 2 — what is validated, how, and error behavior]
+
+            ### Security Measures
+            - [Measure 1 — what security check is performed]
+
+            ### Error Handling Patterns
+            - [Pattern 1 — how errors are caught, propagated, and displayed]
+        </section>
+
+        <section name="performance">
+            ## Performance Optimizations
+
+            &lt;!-- Document specific optimizations found in the code.
+                 Include code references for each optimization. --&gt;
+
+            ### Caching Strategies
+            - [What is cached, how, when invalidated — with code references]
+
+            ### Algorithm Optimizations
+            - [Optimization 1 — what it does, why, with code reference]
+
+            ### Resource Management
+            - [How they manage memory, connections, handles — with code references]
+
+            ### Throttling / Debouncing
+            - [Patterns used for rate limiting — with code references]
+
+            ### Batch Processing
+            - [How they handle bulk operations — with code references]
+        </section>
+
+        <section name="architecture-decisions">
+            ## Architecture Decisions
+
+            &lt;!-- Why they made specific architectural choices for this story's functionality.
+                 Each decision should include code examples showing the pattern. --&gt;
+
+            ### Design Patterns Identified
+
+            &lt;!-- Document all design patterns used (Strategy, Observer, Factory, etc.)
+                 For EACH pattern:
+                 - Where it's used (file/component)
+                 - Why they chose it
+                 - Code example showing the pattern implementation
+                 - Whether it's shared with other parts of the system --&gt;
+
+            #### [Pattern Name]
+            - **Where**: [File/component where pattern is used]
+            - **Why**: [Why this pattern was chosen for this functionality]
+            - **Implementation**:
+              ```typescript
+              // From [file:line-range]
+              [Code example showing the pattern]
+              ```
+            - **Shared**: [Whether other components also use this pattern]
+
+            ### Component Lifecycle
+            - **Initialization**: [sequence — with code references]
+            - **State Management**: [approach — with code references]
+            - **Cleanup/Disposal**: [mechanisms — with code references]
+            - **Memory Management**: [considerations — with code references]
+
+            ### Error Handling &amp; Edge Cases
+            - [How they handle errors at each architectural level]
+            - [Validation approaches with code references]
+            - [Fallback mechanisms]
+            - [Boundary conditions and how they're handled]
+        </section>
+
+        <section name="story-integration">
+            ## Story Integration Within Feature
+
+            &lt;!-- How this story's functionality relates to other stories in the feature.
+                 This section helps understand boundaries and integration points. --&gt;
+
+            ### Dependencies on Other Stories
+            &lt;!-- List stories this depends on and what it needs from them.
+                 Based on both the external system analysis and the parent feature document. --&gt;
+            - [Story ID — what this story needs from it]
+
+            ### Provided to Other Stories
+            &lt;!-- List what this story provides that other stories consume. --&gt;
+            - [Story ID — what this story provides to it]
+
+            ### Shared Components
+            &lt;!-- Components/services used across multiple stories in the feature. --&gt;
+            - [Component — which stories share it and how]
+
+            ### Integration Points
+            &lt;!-- How this story connects with other stories in the feature.
+                 APIs, events, data flows, shared state. --&gt;
+            - [Integration point — how stories communicate]
+        </section>
+
+        <section name="lessons">
+            ## Lessons for Our Implementation
+
+            &lt;!-- Key takeaways specific to implementing this story.
+                 This is the most actionable section — it directly guides our implementation.
+
+                 Cover:
+                 - How to ensure compatibility with other stories in the feature
+                 - Shared patterns to maintain consistency across stories
+                 - Integration considerations for feature completeness
+                 - Algorithms and formulas to reuse
+                 - Pitfalls to avoid based on the external system's approach
+                 - Performance strategies worth adopting --&gt;
+
+            - [Key insight 1 — how it impacts our design]
+            - [Key insight 2 — algorithms to use or adapt]
+            - [Key insight 3 — patterns to follow]
+            - [Key insight 4 — compatibility considerations]
+            - [Key insight 5 — performance strategies to adopt]
+        </section>
+
+        <section name="file-reference">
+            ## Complete File Reference
+
+            &lt;!-- Detailed list of ALL files involved with their specific roles in the story.
+                 Include file path, line count, and role description.
+                 This serves as a quick reference index for all analyzed code. --&gt;
+
+            | File | Lines | Role |
+            |------|-------|------|
+            | [src/path/file.ts] | [N] | [Role in this story's functionality] |
+
+            &lt;!-- Example:
+            | File | Lines | Role |
+            |------|-------|------|
+            | src/chart/ChartWidget.ts | 450 | Main chart widget, user interaction entry point |
+            | src/chart/ChartModel.ts | 320 | Chart state management and data model |
+            | src/chart/LayoutManager.ts | 280 | Layout calculations and resize handling |
+            | src/config/defaults.ts | 60 | Default configuration constants |
+            | tests/chart.test.ts | 200 | Unit tests for chart functionality |
+            --&gt;
+        </section>
+
+    </output-format>
+
+    <analysis-process>
+
+        &lt;!-- This section defines the analysis methodology that the code-discovery-analyst
+             agent must follow. It mirrors the workflow steps but provides detailed
+             instructions for each analysis phase.
+
+             MANDATORY COMPLETION REQUIREMENTS:
+             - Phase 1: ALL 3 items (Initial Discovery) — MANDATORY
+             - Phase 2: ALL 9 items (Deep Implementation Analysis) — MANDATORY
+             - Phase 3: ALL 4 items (Pattern &amp; Architecture Analysis) — MANDATORY
+             - Total: 16 mandatory analysis items — SKIP NONE --&gt;
+
+        <phase name="initial-discovery" order="1">
+            &lt;!-- ALL 3 items are MANDATORY --&gt;
+
+            <item name="understand-story" mandatory="true">
+                **[MANDATORY] Understand the use case described in the story:**
+                - If story is a file path: Read the markdown file directly
+                - If story is GitHub URL/number: Use GitHub CLI (`gh issue view`)
+                - Fully understand what functionality needs to be analyzed
+                - Extract the key behaviors, algorithms, and patterns to look for
+                - The story's acceptance criteria define the SCOPE of the analysis
+                - **Requirements come from the story** — do NOT seek requirements
+                  from other sources. The story IS the source of truth.
+                - If a parent feature document is available, read it to understand:
+                  - The broader feature context
+                  - What other stories exist and how they relate
+                  - Dependencies and shared components between stories
+            </item>
+
+            <item name="explore-docs" mandatory="true">
+                **[MANDATORY] Explore available documentation:**
+                - **external-docs** (if provided):
+                  - Review for implementation context, API documentation, architecture overview
+                  - Use this to guide your code exploration
+                - **context7 MCP server** (if installed — PREFERRED):
+                  - Query for relevant library/framework documentation
+                  - Use `mcp__context7__resolve-library-id` to find the library
+                  - Use `mcp__context7__get-library-docs` to fetch relevant docs
+                  - Get up-to-date API references and usage patterns
+                  - **ALWAYS prefer context7** over manual doc fetching when the external
+                    system is a known library/framework
+                - If neither available: rely entirely on code exploration
+            </item>
+
+            <item name="locate-implementation" mandatory="true">
+                **[MANDATORY] Locate the implementation in the external codebase:**
+                - Find where the story's functionality is implemented
+                - Start with likely entry points: exports, public APIs, event handlers
+                - Use grep/glob to find relevant files by keywords from the story
+                - Build an initial map of involved files before deep diving
+                - Read README files and documentation in the external codebase
+                  for structural guidance
+            </item>
+        </phase>
+
+        <phase name="deep-implementation" order="2">
+            &lt;!-- ALL 9 items are MANDATORY — skip NONE --&gt;
+
+            <item name="entry-points" mandatory="true">
+                **[MANDATORY] Complete Entry Points &amp; Triggers Identification (CRITICAL):**
+                Document ALL entry points into the story functionality:
+                - **User Action Triggers**: Button clicks, form submissions, keyboard shortcuts
+                - **API Entry Points**: REST endpoints, GraphQL mutations, RPC calls
+                - **Event-Based Triggers**: WebSocket messages, system events, pub/sub messages
+                - **Scheduled/Automated Triggers**: Cron jobs, timers, intervals
+                - **External System Triggers**: Webhooks, callbacks, integrations
+
+                For EACH entry point document:
+                ```typescript
+                // Entry Point Type: [User Action/API/Event/etc.]
+                // File: src/path/file.ts:45-60
+                // Trigger: [Exact trigger description]
+                // Parameters: [List all parameters with types]
+                // Example usage: [Show actual usage example]
+                ```
+            </item>
+
+            <item name="code-paths" mandatory="true">
+                **[MANDATORY] Complete Code Path Mapping:**
+                - Follow EVERY code path from entry to completion
+                - Include ALL branches, conditionals, and edge cases
+                - Document every file, class, method, and function involved
+                - Track all data transformations and state changes
+                - Minimum call depth: 5+ levels
+            </item>
+
+            <item name="file-tree" mandatory="true">
+                **[MANDATORY] Story-Specific File Tree:**
+                Document ONLY files involved in this story (NOT the entire codebase).
+                Categorize as: CORE, SUPPORT, CONFIG, TEST.
+                Include line counts and one-line purpose for each file.
+                Include total file count and line count at the bottom.
+            </item>
+
+            <item name="constants" mandatory="true">
+                **[MANDATORY] Constants &amp; Configuration Extraction:**
+                Extract ALL constants and configuration values used by the story.
+                Include ACTUAL values from code, NOT placeholders.
+                Group by category: performance limits, business thresholds, magic numbers.
+                Always include source file path and line numbers.
+            </item>
+
+            <item name="algorithms" mandatory="true">
+                **[MANDATORY] Algorithm &amp; Formula Documentation:**
+                For each calculation or algorithm found:
+                - **Purpose**: What it calculates/achieves
+                - **Formula**: Exact mathematical formula or logic
+                - **Implementation**: Code snippet showing implementation
+                - **Example**: Sample input/output with explanation
+                - **Edge Cases**: How they handle special cases
+            </item>
+
+            <item name="flow-diagram" mandatory="true">
+                **[MANDATORY] Comprehensive Flow Diagram:**
+                Create a detailed Mermaid sequence diagram showing:
+                - Complete execution flow with ALL branches
+                - Actual method names and parameters (NOT generic names)
+                - Data flow between components
+                - State changes and side effects
+                - Error handling paths
+                This diagram is MANDATORY, not optional.
+            </item>
+
+            <item name="test-patterns" mandatory="true">
+                **[MANDATORY] Test Patterns Extraction:**
+                Extract test cases from the external system:
+                - Include actual test code snippets with assertions
+                - Document test scenarios covered
+                - Note edge cases tested
+                - Extract test data patterns
+                - Identify mocking strategies used
+            </item>
+
+            <item name="performance" mandatory="true">
+                **[MANDATORY] Performance Considerations:**
+                Document any performance optimizations found:
+                - Caching strategies used
+                - Algorithm optimizations
+                - Throttling/debouncing patterns
+                - Memory management techniques
+                - Batch processing approaches
+                Include code references for each optimization.
+            </item>
+
+            <item name="validation-security" mandatory="true">
+                **[MANDATORY] Validation &amp; Security:**
+                Extract validation and security measures:
+                - Input validation rules with actual validation code
+                - Data sanitization methods
+                - Security checks implemented
+                - Error boundaries
+                Include actual code snippets showing validation logic.
+            </item>
+        </phase>
+
+        <phase name="pattern-architecture" order="3">
+            &lt;!-- ALL 4 items are MANDATORY --&gt;
+
+            <item name="design-patterns" mandatory="true">
+                **[MANDATORY] Design Patterns Identified:**
+                - Document all design patterns used (Strategy, Observer, Factory, etc.)
+                - Explain WHY they chose each pattern
+                - Include code examples of pattern implementation
+                - Note patterns shared with other parts of the system
+                - Identify if patterns enable component integration/communication
+            </item>
+
+            <item name="lifecycle" mandatory="true">
+                **[MANDATORY] Component Lifecycle:**
+                - Initialization sequence
+                - State management approach
+                - Cleanup/disposal mechanisms
+                - Memory management considerations
+            </item>
+
+            <item name="optimizations" mandatory="true">
+                **[MANDATORY] Performance Optimizations:**
+                - Caching strategies
+                - Algorithm optimizations
+                - Rendering optimizations (if applicable)
+                - Data structure choices for performance
+            </item>
+
+            <item name="error-handling" mandatory="true">
+                **[MANDATORY] Error Handling &amp; Edge Cases:**
+                - How they handle errors at each architectural level
+                - Validation approaches
+                - Fallback mechanisms
+                - Boundary conditions
+            </item>
+        </phase>
+
+    </analysis-process>
+
+    <validation-checklist>
+        &lt;!-- Mark each item as complete before finishing.
+             Total: 23 mandatory items — DO NOT PROCEED until ALL are verified.
+
+             COMMON MISTAKE PREVENTION:
+             - Story-Specific File Tree must show ONLY files involved in the story, not entire codebase
+             - Entry Points must be categorized by type (User/API/Event/External)
+             - Constants must include actual values from code, not placeholders
+             - Test Patterns must show actual test code from external system
+             - The Mermaid diagram is MANDATORY, not optional
+             - Extract ACTUAL code and formulas, not descriptions
+             - Document file paths and line numbers for ALL references --&gt;
+
+        <category name="file-creation">
+            <check>[MANDATORY] Analysis file created at story-directory/external-analysis.md</check>
+            <check>[MANDATORY] Story directory created if it didn't exist</check>
+            <check>[MANDATORY] File contains all required sections from template</check>
+        </category>
+
+        <category name="core-analysis">
+            <check>[MANDATORY &amp; CRITICAL] No assumptions — analysis reflects 100% accurate code, no guessing</check>
+            <check>[MANDATORY] Complete Entry Points &amp; Triggers section with ALL trigger types</check>
+            <check>[MANDATORY] Story-Specific File Tree showing ONLY files involved in story</check>
+            <check>[MANDATORY] Constants &amp; Configuration section with actual values</check>
+            <check>[MANDATORY] Mermaid sequence diagram showing complete data flow</check>
+            <check>[MANDATORY] All algorithms and formulas extracted with explanations</check>
+            <check>[MANDATORY] Code examples included from external implementation</check>
+            <check>[MANDATORY] Architecture patterns identified and documented</check>
+        </category>
+
+        <category name="enhanced-sections">
+            <check>[MANDATORY] Test Patterns section with actual test code</check>
+            <check>[MANDATORY] Validation &amp; Security section with validation rules</check>
+            <check>[MANDATORY] Performance Optimizations documented</check>
+            <check>[MANDATORY] Story Integration Within Feature section completed</check>
+            <check>[MANDATORY] Complete File Reference with file roles</check>
+        </category>
+
+        <category name="quality">
+            <check>[MANDATORY] All entry points categorized (User/API/Event/External)</check>
+            <check>[MANDATORY] Complete code path mapping documented (5+ levels deep)</check>
+            <check>[MANDATORY] Error handling approaches analyzed</check>
+            <check>[MANDATORY] No assumptions made — only documented what was found in code</check>
+            <check>[MANDATORY] Lessons for our implementation clearly stated</check>
+        </category>
+
+        <category name="metrics">
+            <check>[MANDATORY] Minimum 30+ files read for the story</check>
+            <check>[MANDATORY] Minimum 50+ code references documented</check>
+            <check>[MANDATORY] Minimum 5+ call depth traced</check>
+            <check>[MANDATORY] All metrics reported in output header</check>
+        </category>
+    </validation-checklist>
+
+    <guidelines>
+
+        <guideline name="accuracy-first">
+            NO ASSUMPTIONS are tolerated. The analysis must reflect 100% accurate code.
+            Only document what you actually find in the code. Never infer behavior
+            that isn't explicitly implemented. Every claim must be traceable to
+            actual code references with file paths and line numbers.
+        </guideline>
+
+        <guideline name="story-scope">
+            Focus exclusively on code paths related to the story.
+            Do NOT document the entire external codebase — only files, functions,
+            and constants that are directly involved in implementing the story's
+            functionality as defined by its acceptance criteria.
+        </guideline>
+
+        <guideline name="code-level-depth">
+            This is a DEEP TECHNICAL ANALYSIS, not a summary:
+            - EVERY LINE OF CODE related to the story must be analyzed
+            - ACTUAL CODE SNIPPETS must be included, not descriptions
+            - EXACT FORMULAS AND ALGORITHMS must be extracted verbatim
+            - COMPLETE FILE PATHS WITH LINE NUMBERS for every reference
+            - NO HIGH-LEVEL SUMMARIES — only detailed, code-level analysis
+
+            This output will be used as the PRIMARY TECHNICAL REFERENCE for
+            implementing this story. Without complete code-level detail, the
+            analysis is USELESS.
+        </guideline>
+
+        <guideline name="thoroughness">
+            THOROUGH &amp; COMPREHENSIVE: Cover every aspect of the implementation.
+            100% SUBSTANTIVE: Only include relevant, actionable information.
+            TAKE ALL TIME NEEDED: Read EVERY line of relevant code.
+            ACCURACY IS PARAMOUNT: This will guide our own implementation.
+        </guideline>
+
+        <guideline name="minimum-metrics">
+            Every analysis must meet these minimum metrics:
+            - 30+ files read for the story
+            - 50+ code references documented
+            - 5+ call depth traced
+            All metrics must be reported in the output header.
+        </guideline>
+
+        <guideline name="mermaid-required">
+            The Mermaid sequence diagram is MANDATORY, not optional.
+            It must show complete execution flow with actual method names
+            (from the code, not generic placeholders), all branches,
+            data flow between components, state changes, and error handling paths.
+            GitHub renders Mermaid natively in markdown files.
+        </guideline>
+
+        <guideline name="context7-preference">
+            When the external system is a known library or framework,
+            PREFER using the context7 MCP server (if installed) to fetch
+            up-to-date documentation. This provides more accurate and
+            current information than static docs.
+            Use `mcp__context7__resolve-library-id` to find the library,
+            then `mcp__context7__get-library-docs` to fetch relevant documentation.
+        </guideline>
+
+        <guideline name="requirements-from-story">
+            Requirements for the analysis come from the story document.
+            The story's User Story, Description, and Acceptance Criteria
+            define WHAT to analyze in the external codebase.
+            Do NOT seek requirements from other sources — the story IS
+            the source of truth for what functionality to analyze.
+        </guideline>
+
+        <guideline name="github-compatibility">
+            The analysis document must render cleanly in GitHub markdown viewers.
+            - Mermaid diagrams are supported via ```mermaid fenced code blocks
+            - Use markdown tables (no HTML tables)
+            - No custom CSS or HTML styling
+            - Code blocks with language hints for syntax highlighting
+        </guideline>
+
+        <guideline name="common-mistakes">
+            Common mistakes to avoid:
+            - Story-Specific File Tree must show ONLY files involved in the story, not entire codebase
+            - Entry Points must be categorized by type (User/API/Event/External)
+            - Constants must include actual values from code, not placeholders
+            - Test Patterns must show actual test code from external system
+            - Extract ACTUAL code and formulas, not descriptions of code
+            - Document file paths and line numbers for ALL references
+            - Do not mix story-level analysis with feature-level analysis
+        </guideline>
+
+    </guidelines>
+
+    <evolution>
+
+        **Creation (research-external-solution — pass 3):**
+        This is pass 3 of the story specification pipeline.
+        A single run produces the complete external-analysis.md document.
+        All sections must be filled, all metrics met, all checklist items verified.
+
+        **Consumption (story-technical-solution — pass 5):**
+        The external-analysis.md is consumed as input by pass 5 (technical solution).
+        The technical solution uses insights from this analysis to design our
+        own implementation approach — algorithms, patterns, architecture decisions.
+
+        **Re-analysis (exception, not norm):**
+        Only when the story scope changes significantly or the external system
+        version changes. Re-running overwrites the existing analysis.
+
+        **This analysis does NOT modify the story file.**
+        It lives as a separate artifact in the story directory.
+        The story.xml template has no sections that reference this analysis directly.
+        Only the technical solution (pass 5) consumes it.
+
+    </evolution>
+
+</external-solution>

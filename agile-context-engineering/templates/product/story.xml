@@ -1,0 +1,409 @@
+<story>
+
+    <purpose>
+        Template for `.ace/artifacts/product/&lt;id-epic_name&gt;/&lt;id-feature_name&gt;/&lt;id-story_name&gt;/&lt;id-story_name&gt;.md` —
+        a story specification document that describes a single implementable unit of work,
+        its INVEST-compliant user story statement, Gherkin acceptance criteria, definition of done,
+        scope boundaries, and relevant wiki references for technical solution design.
+        This document defines EXACTLY what will be built — no more, no less.
+
+        The acceptance criteria are the SINGLE SOURCE OF TRUTH for story scope.
+        If a behavior is not captured in a named scenario, it is not in scope.
+
+        This is the COMPOSITION ROOT for the story specification pipeline.
+        The full story document is built incrementally across up to 3 passes
+        that write sections into the story file, plus up to 2 external research
+        artifacts that feed into the technical solution but live outside the story:
+
+        Pass 1 — Business Requirements (this template, sections 1-8)
+        Pass 2 — Wiki Research (story-wiki.xml) — appended to story
+        Pass 3 — External Analysis (external-solution.xml) — OPTIONAL, external artifact
+        Pass 4 — Integration Analysis (integration-solution.xml) — external artifact
+        Pass 5 — Technical Solution (story-technical-solution.xml) — appended to story
+
+        Passes 3 and 4 produce separate research artifacts in the story directory.
+        They are consumed as inputs by pass 5 but are NOT embedded in the story file.
+        The pipeline is sequential — earlier passes are inputs to later passes.
+
+        This document serves as both a local markdown file and a GitHub issue description.
+        All formatting must render cleanly in GitHub issue bodies.
+    </purpose>
+
+    <composition>
+        &lt;!-- The story specification pipeline. Passes 1, 2, 5 write into the story file.
+             Passes 3, 4 produce external artifacts in the story directory that feed pass 5.
+
+             Story directory: .ace/artifacts/product/&lt;epic&gt;/&lt;feature&gt;/&lt;story&gt;/
+             Story file:      &lt;story&gt;.md
+             External artifacts: external-analysis.md, integration-analysis.md --&gt;
+
+        <pass order="1" template="story.xml" output="story-file" required="true">
+            Business Requirements — sections 1-8 (header through DoD).
+            Input: plain-text story seed from parent feature document.
+        </pass>
+        <pass order="2" template="story-wiki.xml" output="story-file" required="true">
+            Wiki Research — relevant-wiki section.
+            Input: User Story + Description + AC from pass 1.
+            Agent scans `.docs/wiki/` for documents relevant to technical solution.
+        </pass>
+        <pass order="3" template="external-solution.xml" output="external-analysis.md" required="false">
+            External Analysis — analyze reference implementations or external systems.
+            Input: story requirements + wiki refs from passes 1-2 + external code/docs.
+            OPTIONAL: only when the story or feature references external systems.
+            Output: separate artifact in story directory, NOT appended to story file.
+        </pass>
+        <pass order="4" template="integration-solution.xml" output="integration-analysis.md" required="true">
+            Integration Analysis — analyze our own codebase for integration points.
+            Input: story requirements + wiki refs + optional external analysis.
+            Agent reads relevant wiki docs and explores codebase to map affected code.
+            Output: separate artifact in story directory, NOT appended to story file.
+        </pass>
+        <pass order="5" template="story-technical-solution.xml" output="story-file" required="true">
+            Technical Solution — design the implementation approach.
+            Input: ALL prior passes (story file + external artifacts).
+            Produces the technical-solution section appended to the story file.
+        </pass>
+    </composition>
+
+    <output-format>
+
+        <section name="header">
+            # [ID]: [Story Title]
+
+            **Feature**: [Feature ID] [Feature Title] | **Epic**: [Epic ID] [Epic Title]
+            **Status**: [Status] | **Size**: [Size] | **Sprint**: [Sprint] | **Link**: [Link]
+
+            &lt;!-- Example:
+            # S3: Display OAuth Provider Buttons
+            **Feature**: F3 OAuth2 Login Flow | **Epic**: #45 User Authentication
+            **Status**: Refined | **Size**: 3 | **Sprint**: Sprint 2 | **Link**: [#95](https://github.com/owner/repo/issues/95)
+            --&gt;
+        </section>
+
+        <section name="user-story">
+            ## User Story
+
+            &gt; As a [persona/role],
+            &gt; I want [action/capability],
+            &gt; so that [benefit/value].
+
+            &lt;!-- The user story MUST follow the As/I want/So that format exactly.
+                 - Persona must match a persona defined in the product vision.
+                 - Action describes observable user behavior, not system internals.
+                 - Benefit ties to the parent feature's benefit hypothesis.
+                 Example:
+                 "As a returning customer, I want to click a Google or GitHub login button,
+                  so that I can authenticate without remembering a site-specific password."
+            --&gt;
+        </section>
+
+        <section name="description">
+            ## Description
+
+            [What this story delivers and why it matters within the parent feature. 2-4 sentences.
+            Describe observable user behavior — what the user can do when this story is done.
+            How this story relates to adjacent stories in the feature (what it builds on, what it enables).
+            Focus on WHAT and WHY, not HOW.]
+        </section>
+
+        <section name="acceptance-criteria">
+            ## Acceptance Criteria
+
+            &lt;!-- Gherkin scenarios are the SINGLE SOURCE OF TRUTH for this story's scope.
+                 If a behavior is not captured in a named scenario, it is NOT in scope.
+                 Do not implement or test behaviors not defined here.
+
+                 Minimum coverage: happy path + at least one edge case + at least one error path.
+                 Each scenario must be independent — no scenario depends on another's state.
+                 If more than 6-8 scenarios are needed, the story is likely too large — split it. --&gt;
+
+            ### Scenario: [Short descriptive name]
+
+            **Given** [precondition — the starting state]
+            **When** [action — what the user or system does]
+            **Then** [expected outcome — observable result]
+
+            ### Scenario: [Short descriptive name]
+
+            **Given** [precondition]
+            **When** [action]
+            **Then** [expected outcome]
+
+            &lt;!-- Example:
+            ### Scenario: Successful Google login
+
+            **Given** the user is on the login page and has a valid Google account
+            **When** they click the "Sign in with Google" button and complete Google's OAuth flow
+            **Then** they are redirected to the dashboard and see their Google profile name
+
+            ### Scenario: Provider unavailable
+
+            **Given** the user is on the login page and the Google OAuth service is unreachable
+            **When** they click the "Sign in with Google" button
+            **Then** they see an error message "Login service temporarily unavailable. Please try again."
+            --&gt;
+        </section>
+
+        <section name="out-of-scope">
+            ## Out of Scope
+
+            &lt;!-- Explicitly excluded items to prevent scope creep. Only list things that someone
+                 might reasonably assume are included but are NOT part of this story.
+                 Do not list everything in the universe — only meaningful exclusions. --&gt;
+
+            - [Excluded item — brief reason why it is not part of this story]
+            - [Excluded item — brief reason why it is not part of this story]
+        </section>
+
+        <section name="dependencies">
+            ## Dependencies
+
+            ### Blocked By
+            &lt;!-- Stories, features, or external items that must be completed before this story can start. --&gt;
+            - [Story ID or item — brief reason for the dependency]
+
+            ### Blocks
+            &lt;!-- Stories or items that cannot start until this story is complete. --&gt;
+            - [Story ID or item — what it needs from this story]
+
+            ### External
+            &lt;!-- Third-party services, APIs, approvals, or infrastructure needed. --&gt;
+            - [External dependency — current status]
+        </section>
+
+        <section name="definition-of-done">
+            ## Definition of Done
+
+            - [ ] All acceptance criteria scenarios pass
+            - [ ] Code reviewed and approved
+            - [ ] Tests written and passing
+            - [ ] CI pipeline green
+            - [ ] Documentation updated (if applicable)
+            - [ ] Product Owner verified
+        </section>
+
+        <section name="relevant-wiki" pass="2" template="story-wiki.xml">
+            ## Relevant Wiki
+
+            &lt;!-- Pass 2. Populated by story-wiki.xml template.
+                 A research agent reads the User Story, Description, and AC,
+                 then scans `.docs/wiki/` to select documents relevant to
+                 designing a good technical solution for this story.
+                 See story-wiki.xml for full section structure and selection criteria. --&gt;
+        </section>
+
+        <section name="technical-solution" pass="5" template="story-technical-solution.xml">
+            ## Technical Solution
+
+            &lt;!-- Pass 5. Populated by story-technical-solution.xml template.
+                 Consumes ALL prior passes as input:
+                 - Story file (sections 1-8 + relevant wiki)
+                 - external-analysis.md (if it exists in story directory)
+                 - integration-analysis.md (from story directory)
+                 See story-technical-solution.xml for full section structure. --&gt;
+        </section>
+
+        <section name="metadata">
+            ---
+            *Created: [date] | Last refined: [date] | Refinements: [count]*
+            *Feature: [relative path to parent feature.md]*
+        </section>
+
+    </output-format>
+
+    <field-definitions>
+
+        <field name="ID">
+            S[number] for local stories, #[issue_number] for GitHub-linked.
+            Sequential within the parent feature. IDs are stable — never renumber after assignment.
+            When a local story gets a GitHub issue, ID changes from S[N] to #[issue_number]
+            and the parent feature's story index table is updated.
+        </field>
+
+        <field name="Status">
+            <allowed-values>
+                <value name="Todo">Story seed exists in feature doc, not yet formally specified</value>
+                <value name="Refined">Formal spec complete — user story, AC, DoD all defined and clear</value>
+                <value name="In Progress">Implementation has started</value>
+                <value name="Done">All AC scenarios verified, DoD met, story closed</value>
+            </allowed-values>
+        </field>
+
+        <field name="Size">
+            <allowed-values>
+                <value name="1">Trivial — a few hours of work</value>
+                <value name="2">Small — about a day</value>
+                <value name="3">Medium — 2-3 days</value>
+                <value name="5">Large — most of a sprint</value>
+                <value name="8">Very large — full sprint (1 dev / 10 days OR 1 AI agent - 1 day)</value>
+            </allowed-values>
+            Fibonacci relative sizing (NOT x10 like features).
+            If a story exceeds 8 points, it MUST be split into smaller stories.
+        </field>
+
+        <field name="Priority">
+            <allowed-values>
+                <value name="Critical">Blocks other work or has external deadline</value>
+                <value name="High">Core functionality, high user impact</value>
+                <value name="Medium">Important but not blocking</value>
+                <value name="Low">Nice to have, can be deferred</value>
+            </allowed-values>
+        </field>
+
+        <field name="Persona">
+            Must match a persona defined in the product vision document.
+            Do not introduce new personas at story level — update the product vision first.
+        </field>
+
+    </field-definitions>
+
+    <guidelines>
+
+        <guideline name="invest-compliance">
+            Every story MUST pass the INVEST checklist before it can move to "Refined" status:
+            - **Independent**: Can be developed without requiring another in-progress story
+            - **Negotiable**: Scope is defined by AC, not hardcoded implementation details
+            - **Valuable**: User story statement describes real user benefit
+            - **Estimable**: Can be sized in Fibonacci points (1, 2, 3, 5, 8)
+            - **Small**: Completable within a single sprint
+            - **Testable**: AC scenarios have clear pass/fail conditions
+
+            If any INVEST criterion fails, the story is not ready to be refined.
+        </guideline>
+
+        <guideline name="acceptance-criteria-as-scope">
+            Acceptance criteria define 100% of this story's scope.
+            No behavior should be implemented or tested unless it is captured in a named scenario.
+
+            - If it's not in the AC, it's OUT OF SCOPE
+            - If it's implied but not stated, it's OUT OF SCOPE
+            - If it would be "nice to have", it's OUT OF SCOPE
+            - ONLY build what the AC scenarios explicitly describe
+
+            This is the primary scope control mechanism. Adding requirements beyond the AC
+            causes scope creep. Extra features = extra work = missed deadlines.
+        </guideline>
+
+        <guideline name="gherkin-quality">
+            Gherkin scenarios must follow these rules:
+            - **Given**: Describes state or precondition — NEVER an action
+            - **When**: Describes exactly ONE action — the trigger being tested
+            - **Then**: Describes an observable outcome — NEVER internal system state
+              (Bad: "Then the database has a new row" — Good: "Then the user sees a confirmation message")
+            - Scenarios MUST be independent — no scenario depends on another scenario's state
+            - Use **And** for additional conditions within Given/When/Then, not separate steps
+
+            Bad: "Given the user clicks login" (action, not state)
+            Good: "Given the user is on the login page"
+        </guideline>
+
+        <guideline name="story-sizing">
+            Stories use Fibonacci sizing: 1, 2, 3, 5, 8 (NOT x10 like features).
+            If a story is estimated at more than 8 points, it MUST be split.
+            If a story requires more than 6-8 AC scenarios, it is likely too large — split it.
+
+            AC scenario count is a reliable proxy for complexity:
+            - 1-2 scenarios: likely a 1-2 point story
+            - 3-4 scenarios: likely a 3 point story
+            - 5-6 scenarios: likely a 5 point story
+            - 7-8 scenarios: likely an 8 point story; above 8 consider splitting
+        </guideline>
+
+        <guideline name="github-compatibility">
+            The entire story document must render cleanly as a GitHub issue body.
+            - Mermaid diagrams are supported and encouraged — GitHub renders them natively
+              in issue bodies and markdown files via ```mermaid fenced code blocks
+            - No HTML tables (use markdown tables only - make sure titles are aligned with columns)
+            - No custom CSS or HTML styling
+            - Named scenario H3 headers render as distinct sections in GitHub
+            - Blockquote (&gt;) for the user story statement renders correctly
+        </guideline>
+
+        <guideline name="github-identity">
+            - GitHub-linked stories: ID = #[issue_number], Title = EXACT GitHub issue title
+            - Local stories: ID = S[N], sequential within the parent feature
+            - IDs are stable — never renumber after assignment
+            - When a story gets a GitHub issue, ID changes from S[N] to #[issue_number]
+            - The parent feature's story index table must be updated to reflect the new ID
+        </guideline>
+
+        <guideline name="definition-of-done">
+            The inline DoD checklist must stay compact: 5-10 items maximum.
+            It covers the universal quality bar for any story. Items are:
+            - Acceptance criteria verified (functional correctness)
+            - Code quality (review, tests, CI)
+            - Documentation (only when applicable)
+            - Product validation (PO sign-off)
+
+            Story-specific DoD items may be added when genuinely unique to that story
+            (e.g., "PCI compliance reviewed" for a payment story), but the default
+            checklist should suffice for most stories.
+        </guideline>
+
+        <guideline name="relevant-wiki-selection">
+            The Relevant Wiki section is populated by pass 2 using story-wiki.xml.
+            It runs AFTER sections 1-8 are complete.
+            See story-wiki.xml for detailed selection/exclusion criteria and section structure.
+        </guideline>
+
+        <guideline name="completeness">
+            Every run of plan-story should produce a COMPLETE story specification —
+            user story, description, all AC scenarios, out-of-scope, dependencies, DoD.
+            Do not defer sections to "later passes."
+
+            Re-running plan-story on the same story is supported for scope changes
+            or AC gaps, but is the exception, not the workflow.
+            When re-running, increment the metadata refinement count and update
+            the "Last refined" date.
+        </guideline>
+
+    </guidelines>
+
+    <evolution>
+
+        **Pass 1 — Business Requirements (story.xml → story file):**
+        The plan-story command takes the plain-text story seed from the parent feature
+        document and fills sections 1-8 (header through DoD).
+        All business requirements sections are complete after this pass.
+
+        **Pass 2 — Wiki Research (story-wiki.xml → story file):**
+        A research agent reads the User Story, Description, and AC from pass 1,
+        then scans `.docs/wiki/` to populate the Relevant Wiki section with documents
+        that inform the technical solution.
+
+        **Pass 3 — External Analysis (external-solution.xml → external-analysis.md) — OPTIONAL:**
+        When the story or feature references external systems, libraries, or reference
+        implementations, an agent analyzes that external code/documentation for insights.
+        Output is a separate artifact in the story directory — NOT part of the story file.
+        Skipped when no external references exist.
+
+        **Pass 4 — Integration Analysis (integration-solution.xml → integration-analysis.md):**
+        An agent reads the wiki references from pass 2 (and external analysis from pass 3
+        if present), then explores our own codebase to map affected files, existing APIs,
+        code patterns, and architectural constraints for this story.
+        Output is a separate artifact in the story directory — NOT part of the story file.
+
+        **Pass 5 — Technical Solution (story-technical-solution.xml → story file):**
+        Consumes ALL prior outputs: story file (requirements + wiki) plus the external
+        artifacts (external-analysis.md and integration-analysis.md from story directory).
+        Designs the implementation approach and appends the Technical Solution section
+        to the story file.
+        Story status moves from "Todo" to "Refined" in the parent feature's story index.
+
+        **Refinement (re-run any pass — exception, not norm):**
+        Only when scope changes, new information surfaces, or gaps are found.
+        Re-running an earlier pass may invalidate later passes — downstream passes
+        and their artifacts should be re-evaluated.
+        Updates metadata refinement count and "Last refined" date.
+
+        **During implementation:**
+        Story status moves from Refined to In Progress in the parent feature's story index.
+        The story spec itself does not change during implementation.
+
+        **Completion:**
+        All AC scenarios verified. DoD checklist complete. Story status moves to Done.
+        Parent feature's story index updated. If GitHub-linked, the issue is closed.
+
+    </evolution>
+
+</story>

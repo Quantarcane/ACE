@@ -1,0 +1,1025 @@
+<technical-solution>
+
+    <purpose>
+        Template for the `## Technical Solution` section that is APPENDED directly into
+        the story file (`.ace/artifacts/product/&lt;id-epic_name&gt;/&lt;id-feature_name&gt;/&lt;id-story_name&gt;/&lt;id-story_name&gt;.md`).
+
+        This is pass 5 of the story specification pipeline (see story.xml composition).
+        Unlike passes 3-4 which produce separate artifacts, pass 5 writes directly into the
+        story file. The entire technical solution (1000-2000+ lines) is appended as the
+        `## Technical Solution` section.
+
+        The technical solution uses:
+        - Business requirements from the story (User Story, Description, AC — passes 1-2)
+        - Wiki references from the story's Relevant Wiki section (pass 2)
+        - Integration analysis from the story directory (pass 4 — MANDATORY)
+        - External analysis from the story directory (pass 3 — OPTIONAL)
+        - Feature file for broader context
+
+        To create a concrete technical solution design following Clean Architecture principles,
+        SOLID patterns, OOP best practices, considering the external analysis for approach,
+        algorithms and formulas (when most efficient and performant), while following the
+        integration analysis so that we don't break our already complex codebase.
+
+        **CRITICAL**: The technical solution MUST include detailed sequence diagrams for EVERY
+        scenario in the Acceptance Criteria, showing the complete flow of data and control
+        through all architectural layers.
+
+        This document serves as both a local markdown section in the story file and a
+        GitHub issue section. All formatting must render cleanly in GitHub issue bodies.
+
+        CRITICAL: This technical solution output will be used as PROMPT CONTEXT for the AI agent
+        implementing this feature. Therefore:
+        - INCLUDE ALL DETAILS — don't summarize or omit
+        - PROVIDE COMPLETE CONTEXT — the implementing AI needs every piece of information
+        - BE EXPLICIT — don't assume the implementing AI will know anything not explicitly stated
+        - INCLUDE ALL DIAGRAMS — class, sequence, component diagrams are essential
+    </purpose>
+
+    <output-format>
+
+        <!-- ═══════════════════════════════════════════════════════════════════ -->
+        <!-- SECTION 1: HEADER                                                   -->
+        <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+        <section name="header">
+            ## Technical Solution
+
+            ### Solution Context
+            - **Story**: [Story ID] — [Story Title]
+            - **Feature**: [Feature ID] — [Feature Title]
+            - **Epic**: [Epic ID] — [Epic Title]
+            - **Design Date**: [Current date]
+            - **Wiki Documents Loaded**: [N] files
+            - **Integration Analysis**: Incorporated
+            - **External Analysis**: [Incorporated / Not available]
+            - **AC Scenarios**: [N] (each with sequence diagram)
+            - **New Files**: [N] | **Modified Files**: [N]
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════════════════════ -->
+        <!-- SECTION 2: ARCHITECTURE OVERVIEW                                    -->
+        <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+        <section name="architecture-overview">
+            ### Architecture Overview
+
+            [Brief description of the technical approach — 3-5 sentences covering:
+            - What the solution implements
+            - Key architectural decisions
+            - How it integrates with the existing codebase
+            - Clean Architecture compliance]
+
+            #### Clean Architecture Compliance
+            - **Domain Layer**: [Key domain entities and value objects]
+            - **Application Layer**: [Use cases and service interfaces]
+            - **Infrastructure Layer**: [Technical implementations]
+            - **Presentation Layer**: [API/UI components]
+
+            #### Key Technical Decisions
+            1. [Decision 1 with rationale]
+            2. [Decision 2 with rationale]
+            3. [Additional decisions...]
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════════════════════ -->
+        <!-- SECTION 3: COMPONENT & BOUNDARY ARCHITECTURE                        -->
+        <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+        <section name="component-boundary-architecture">
+            ### V.1. Component &amp; Boundary Architecture
+
+            &lt;!-- Document the comprehensive component architecture and system boundaries
+                 SPECIFIC to this story. --&gt;
+
+            #### Story Boundary Diagram
+
+            &lt;!-- Map ALL components, their boundaries, and external interactions for THIS STORY.
+                 Use Mermaid diagrams — GitHub renders them natively. --&gt;
+
+            ```mermaid
+            graph TB
+                subgraph "Story: [Name] Boundary"
+                    subgraph "Presentation Layer"
+                        P1[ComponentName&lt;br/&gt;file-path:lines&lt;br/&gt;Responsibility: exact purpose]
+                    end
+
+                    subgraph "Application Layer"
+                        A1[UseCaseName&lt;br/&gt;file-path:lines&lt;br/&gt;Responsibility: orchestration]
+                    end
+
+                    subgraph "Domain Layer"
+                        D1[EntityName&lt;br/&gt;file-path:lines&lt;br/&gt;Responsibility: business logic]
+                    end
+
+                    subgraph "Infrastructure Layer"
+                        I1[ServiceName&lt;br/&gt;file-path:lines&lt;br/&gt;Responsibility: external integration]
+                    end
+                end
+
+                External1[External System/Actor]
+                External1 -->|protocol/format| P1
+            ```
+
+            #### Component Documentation
+            - Each component's EXACT responsibility in this story
+            - Communication protocols between components
+            - Data formats exchanged
+            - State management requirements
+            - Error propagation paths
+
+            #### Layer Architecture Analysis
+
+            ```mermaid
+            graph TD
+                subgraph "Clean Architecture Placement"
+                    direction TB
+                    A[Domain: Story Entities &amp; Business Rules]
+                    B[Application: Story Use Cases &amp; Orchestration]
+                    C[Infrastructure: Story Technical Implementations]
+                    D[Presentation: Story UI/API Components]
+                end
+            ```
+
+            **Layer Responsibilities for This Story:**
+            - **Domain**: [Specific entities, value objects, business rules]
+            - **Application**: [Specific use cases, service interfaces]
+            - **Infrastructure**: [Specific implementations, external services]
+            - **Presentation**: [Specific controllers, views, DTOs]
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════════════════════ -->
+        <!-- SECTION 4: DESIGN PATTERNS & TECHNICAL DECISIONS                    -->
+        <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+        <section name="design-patterns-decisions">
+            ### V.2. Design Patterns &amp; Technical Decisions
+
+            &lt;!-- Document ALL design patterns required for THIS STORY and technical decisions. --&gt;
+
+            #### Identified Design Patterns
+
+            &lt;!-- For EACH pattern: --&gt;
+
+            **Pattern: [Pattern Name]**
+            - **Purpose in This Story**: Why needed for this specific story
+            - **Problem Solved**: What story-specific problem it addresses
+            - **Implementation**:
+              ```typescript
+              // Exact implementation for this story
+              interface IStoryPattern {
+                  method(): void;
+              }
+
+              class ConcreteImplementation implements IStoryPattern {
+                  // Story-specific implementation
+              }
+              ```
+            - **Integration Points**: Where this pattern connects in the story flow
+            - **Rationale**: Why this pattern over alternatives
+
+            &lt;!-- Repeat for each identified pattern --&gt;
+
+            #### Technical Decisions
+
+            &lt;!-- For EACH decision: --&gt;
+
+            **Decision: [Technology/Approach Choice]**
+            - **Options Considered**: [List alternatives evaluated]
+            - **Decision**: [What was chosen]
+            - **Rationale**: [Why this choice for this story]
+            - **Trade-offs**: [Pros and cons]
+            - **Impact**: [How it affects implementation]
+
+            &lt;!-- Repeat for each decision --&gt;
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════════════════════ -->
+        <!-- SECTION 5: CLASS DIAGRAMS & INTERFACES                              -->
+        <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+        <section name="class-diagrams-interfaces">
+            ### V.3. Complete Class Diagrams &amp; Interfaces
+
+            &lt;!-- CRITICAL CODING STANDARDS ENFORCEMENT:
+                 EVERY interface, class, type, enum MUST be in its OWN SEPARATE FILE!
+                 NEVER put multiple interfaces/classes/types in one file!
+                 Each code block below represents a SEPARATE FILE!
+
+                 File naming: Each interface/class/type gets its own file named exactly after it:
+                   IChartApi interface → IChartApi.ts
+                   ChartOptions interface → ChartOptions.ts
+                   LineStyle type → LineStyle.ts
+                   ChartType enum → ChartType.ts --&gt;
+
+            ```mermaid
+            classDiagram
+                class StoryMainClass {
+                    -privateField: Type
+                    +publicField: Type
+                    +constructor(params)
+                    +publicMethod(param: Type): ReturnType
+                    -privateMethod(): void
+                }
+
+                class IStoryInterface {
+                    &lt;&lt;interface&gt;&gt;
+                    +requiredMethod(): Type
+                    +property: Type
+                }
+
+                StoryMainClass ..|> IStoryInterface : implements
+            ```
+
+            #### Domain Layer Interfaces
+            &lt;!-- Each interface in its OWN FILE --&gt;
+
+            ```typescript
+            // File: domain/interfaces/IStoryEntity.ts
+            export interface IStoryEntity {
+                // Properties with exact types
+                id: string;
+                data: StoryData;
+
+                // Methods with full signatures
+                process(input: Input): Output;
+                validate(): ValidationResult;
+            }
+            ```
+
+            #### Application Layer Interfaces
+            &lt;!-- Each interface in its OWN FILE --&gt;
+
+            ```typescript
+            // File: application/interfaces/IStoryUseCase.ts
+            export interface IStoryUseCase {
+                execute(command: StoryCommand): Promise&lt;StoryResult&gt;;
+            }
+            ```
+
+            &lt;!-- Repeat for ALL interfaces, classes, types needed --&gt;
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════════════════════ -->
+        <!-- SECTION 6: DATA MODELS & STRUCTURES                                 -->
+        <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+        <section name="data-models">
+            ### V.4. Data Models &amp; Structures
+
+            &lt;!-- EACH MODEL/INTERFACE IN SEPARATE FILE
+                 - domain/interfaces/IChartApi.ts (ONE interface)
+                 - domain/types/ChartOptions.ts (ONE type)
+                 - domain/enums/ChartType.ts (ONE enum)
+                 - NEVER: domain/interfaces/AllInterfaces.ts (MULTIPLE - VIOLATION!) --&gt;
+
+            #### Core Data Models
+            ```typescript
+            // File: domain/models/StoryData.ts
+            export interface StoryData {
+                id: string;
+                timestamp: number;
+                payload: {
+                    // Complete structure
+                };
+            }
+            ```
+
+            #### DTOs
+            ```typescript
+            // File: application/dtos/StoryRequestDTO.ts
+            export interface StoryRequestDTO {
+                // Input structure
+            }
+
+            // File: application/dtos/StoryResponseDTO.ts
+            export interface StoryResponseDTO {
+                // Output structure
+            }
+            ```
+
+            #### State Management Structure
+            ```typescript
+            // File: [appropriate layer]/state/StoryState.ts
+            interface StoryState {
+                // Component state
+                data: StoryData[];
+                loading: boolean;
+                error: Error | null;
+
+                // UI state
+                selectedItem: string | null;
+                filters: FilterOptions;
+            }
+            ```
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════════════════════ -->
+        <!-- SECTION 7: ALGORITHMS & BUSINESS LOGIC                              -->
+        <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+        <section name="algorithms-business-logic">
+            ### V.5. Algorithms &amp; Business Logic
+
+            &lt;!-- If external analysis is available:
+                 Consider the external system's algorithms and formulas as REFERENCE.
+                 Use them when they are the MOST EFFICIENT AND PERFORMANT approach.
+                 If you can identify a better approach, use the better approach.
+                 DO NOT blindly copy — USE JUDGMENT.
+
+                 If no external analysis:
+                 Design algorithms based on requirements, industry best practices,
+                 and Clean Architecture principles. --&gt;
+
+            #### Constants &amp; Configuration
+            ```typescript
+            // File: domain/constants/StoryConstants.ts
+            // ALL constants centralized — NO hardcoding anywhere in the codebase!
+            export const STORY_CONSTANTS = {
+                // Configuration values with clear names
+                MAX_ITEMS: 10000,
+                BATCH_SIZE: 100,
+                THROTTLE_MS: 16,          // 60 FPS
+                DEBOUNCE_MS: 300,
+
+                // Calculation constants
+                SMOOTHING_FACTOR: 0.3,
+                WEIGHT_COEFFICIENT: 2.5,
+                NORMALIZATION_BASE: 100,
+
+                // Thresholds
+                MIN_ZOOM: 0.1,
+                MAX_ZOOM: 1000,
+                VISIBILITY_THRESHOLD: 0.01,
+            } as const;
+            ```
+
+            #### Core Algorithms
+
+            &lt;!-- For EACH algorithm: --&gt;
+
+            **Algorithm: [Name]**
+            - **Source**: [Designed from requirements / Adapted from external analysis section X.Y]
+            - **Purpose**: [What this algorithm achieves]
+            - **Mathematical Formula**:
+              ```
+              result = (value * SMOOTHING_FACTOR + previousValue * (1 - SMOOTHING_FACTOR)) / NORMALIZATION_BASE
+              ```
+            - **Implementation**:
+              ```typescript
+              // File: domain/services/[ServiceName].ts
+              function algorithmName(input: Input): Output {
+                  // Step 1: [description]
+                  const smoothed = input.value * STORY_CONSTANTS.SMOOTHING_FACTOR +
+                                   this.previousValue * (1 - STORY_CONSTANTS.SMOOTHING_FACTOR);
+
+                  // Step 2: [description]
+                  const normalized = smoothed / STORY_CONSTANTS.NORMALIZATION_BASE;
+
+                  // Step 3: Edge case handling
+                  if (normalized > MAX_VALUE) return MAX_VALUE;
+                  if (normalized < MIN_VALUE) return MIN_VALUE;
+
+                  // Step 4: Precision
+                  return Math.round(normalized * 100) / 100;
+              }
+              ```
+            - **Example Calculation**:
+              ```
+              Input: value = 150, previousValue = 100
+              Step 1: 150 * 0.3 = 45
+              Step 2: 100 * 0.7 = 70
+              Step 3: 45 + 70 = 115
+              Step 4: 115 / 100 = 1.15
+              Output: 1.15
+              ```
+
+            &lt;!-- Repeat for each algorithm --&gt;
+
+            #### Business Rules
+            ```typescript
+            // File: domain/rules/StoryBusinessRules.ts
+            class StoryBusinessRules {
+                // Validation rules
+                validateInput(input: Input): boolean {
+                    if (!input?.value) return false;
+                    if (input.value < STORY_CONSTANTS.MIN_THRESHOLD) return false;
+                    if (input.value > STORY_CONSTANTS.MAX_THRESHOLD) return false;
+                    return true;
+                }
+
+                // Business constraints
+                checkConstraints(data: Data): ConstraintResult {
+                    const validTransitions = STATE_TRANSITIONS[data.currentState];
+                    return validTransitions.includes(data.nextState);
+                }
+            }
+            ```
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════════════════════ -->
+        <!-- SECTION 8: EVENT FLOW & ENTRY POINTS                                -->
+        <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+        <section name="event-flow-entry-points">
+            ### V.6. Event Flow &amp; Entry Points
+
+            &lt;!-- Map ALL event flows and entry points for THIS STORY. --&gt;
+
+            #### Entry Points
+            1. **User Actions**:
+               - [Action type]: `methodName()` at [file:line]
+
+            2. **API Endpoints**:
+               - [Protocol]: `[endpoint]` at [file:line]
+
+            3. **Event Triggers**:
+               - [Event type]: `on('[event-name]')` at [file:line]
+
+            #### Event Flow Sequences
+            ```mermaid
+            sequenceDiagram
+                participant User
+                participant UI
+                participant App
+                participant Domain
+
+                User->>UI: Trigger Action
+                UI->>App: Process Command
+                App->>Domain: Execute Business Logic
+                Domain-->>App: Return Result
+                App-->>UI: Update View
+                UI-->>User: Show Result
+            ```
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════════════════════ -->
+        <!-- SECTION 9: MANDATORY SEQUENCE DIAGRAMS FOR ALL AC                   -->
+        <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+        <section name="sequence-diagrams-mandatory">
+            ### V.7. MANDATORY Sequence Diagrams for ALL Acceptance Criteria
+
+            &lt;!-- CRITICAL REQUIREMENTS:
+                 - One detailed sequence diagram for EVERY AC scenario
+                 - FULL FLOW from entry point to exit through ALL layers
+                 - Include EVERY step — no skipping intermediate steps
+                 - ALL LAYERS: Presentation → Application → Domain → Infrastructure and back
+                 - REAL METHOD NAMES from the design
+                 - EXACT DATA STRUCTURES passed at each step
+                 - Include error handling paths (alt blocks)
+                 - Include flow documentation with Given/When/Then from AC --&gt;
+
+            &lt;!-- For EACH acceptance criteria scenario: --&gt;
+
+            #### Scenario: [Exact AC Scenario Title]
+
+            **AC Reference:**
+            - **Given**: [exact given clause from AC]
+            - **When**: [exact when clause from AC]
+            - **Then**: [exact then clause from AC]
+
+            ```mermaid
+            sequenceDiagram
+                participant User as User/External System
+                participant UI as Presentation Layer&lt;br/&gt;[ComponentName]
+                participant UseCase as Application Layer&lt;br/&gt;[UseCaseName]
+                participant Service as Application Service&lt;br/&gt;[ServiceName]
+                participant Domain as Domain Layer&lt;br/&gt;[EntityName]
+                participant Repo as Infrastructure&lt;br/&gt;[RepositoryName]
+                participant DB as Database/External Service
+
+                Note over User: FULL FLOW START
+                Note over User: Given: [Exact given clause from AC]
+
+                %% Entry Point
+                User->>UI: [Initial Trigger: click/submit/event]
+                Note over UI: Entry Point: ComponentName.method()
+
+                %% Presentation Layer Processing
+                UI->>UI: validateInput(formData)
+                UI->>UI: transformToDTO(formData)
+
+                %% Application Layer Orchestration
+                UI->>UseCase: execute(command: CommandDTO)
+                UseCase->>UseCase: validateCommand(command)
+                UseCase->>Service: processBusinessLogic(data)
+
+                %% Domain Layer Business Logic
+                Service->>Domain: applyBusinessRules(data)
+                Domain->>Domain: validateInvariants()
+                Domain->>Domain: calculateDerivedValues()
+
+                %% Infrastructure Layer
+                Service->>Repo: save(entity)
+                Repo->>DB: INSERT/UPDATE
+                DB-->>Repo: result
+
+                %% Return Path Through Layers
+                Repo-->>Service: savedEntity
+                Service-->>UseCase: processedResult
+                UseCase-->>UI: ResponseDTO
+
+                %% Final UI Update
+                UI->>UI: updateState(response)
+                UI->>UI: renderChanges()
+                UI-->>User: [Expected result from Then clause]
+
+                Note over User: FULL FLOW END
+
+                %% Error Handling Paths
+                alt Validation Error
+                    Domain-->>Service: ValidationException
+                    Service-->>UseCase: HandleValidationError
+                    UseCase-->>UI: ErrorResponse(400)
+                    UI-->>User: Display validation message
+                else Infrastructure Error
+                    DB-->>Repo: Exception
+                    Repo-->>Service: RepositoryException
+                    Service-->>UseCase: HandleError
+                    UseCase-->>UI: ErrorResponse(500)
+                    UI-->>User: Display error message
+                end
+            ```
+
+            **Flow Documentation:**
+            - **Entry Point**: [ComponentName.methodName()] at [file:line]
+            - **Data In**: [exact DTO/type passed in]
+            - **Processing Steps**: [numbered list of key processing steps]
+            - **Data Out**: [exact DTO/type returned]
+            - **State Changes**: [what state is modified and where]
+            - **Events Emitted**: [events fired during this flow]
+            - **Error Paths**: [validation errors, infrastructure errors]
+
+            &lt;!-- Repeat for EVERY AC scenario. No scenario may be skipped. --&gt;
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════════════════════ -->
+        <!-- SECTION 10: COMPLETE FILE STRUCTURE                                 -->
+        <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+        <section name="file-structure">
+            ### V.8. Complete File Structure
+
+            &lt;!-- Tree showing ALL files to be created/modified.
+                 Mark new files vs modified files clearly.
+                 Include brief purpose for each file. --&gt;
+
+            #### New Files to Create
+            ```
+            src/
+            ├── domain/
+            │   ├── entities/
+            │   │   └── StoryEntity.ts              # [purpose]
+            │   ├── interfaces/
+            │   │   └── IStoryEntity.ts              # [purpose]
+            │   ├── value-objects/
+            │   │   └── StoryValueObject.ts          # [purpose]
+            │   └── constants/
+            │       └── StoryConstants.ts             # [purpose]
+            ├── application/
+            │   ├── interfaces/
+            │   │   └── IStoryUseCase.ts             # [purpose]
+            │   ├── use-cases/
+            │   │   └── StoryUseCase.ts              # [purpose]
+            │   └── dtos/
+            │       ├── StoryRequestDTO.ts           # [purpose]
+            │       └── StoryResponseDTO.ts          # [purpose]
+            ├── infrastructure/
+            │   └── services/
+            │       └── StoryService.ts              # [purpose]
+            └── presentation/
+                └── components/
+                    └── StoryComponent.ts            # [purpose]
+            ```
+
+            #### Existing Files to Modify
+            ```
+            src/
+            ├── infrastructure/
+            │   └── di/
+            │       └── container.ts                 # [MODIFY] Add new service registrations
+            ├── [layer]/
+            │   └── [file].ts                        # [MODIFY] [reason for modification]
+            ```
+
+            #### Implementation Statistics
+            - **New files**: [N]
+            - **Modified files**: [N]
+            - **Total files touched**: [N]
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════════════════════ -->
+        <!-- SECTION 11: DI CONTAINER CONFIGURATION                              -->
+        <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+        <section name="di-container">
+            ### V.9. DI Container Configuration
+
+            &lt;!-- All new service registrations, interface-to-implementation bindings,
+                 and lifecycle management. --&gt;
+
+            ```typescript
+            // File: infrastructure/di/container.ts (MODIFY — add these registrations)
+
+            // New service registrations for this story
+            container.register&lt;IStoryEntity&gt;('IStoryEntity', StoryEntity, Lifecycle.Transient);
+            container.register&lt;IStoryUseCase&gt;('IStoryUseCase', StoryUseCase, Lifecycle.Singleton);
+            container.register&lt;IStoryService&gt;('IStoryService', StoryService, Lifecycle.Singleton);
+            ```
+
+            #### Registration Details
+            | Interface | Implementation | Lifecycle | Justification |
+            |-----------|---------------|-----------|---------------|
+            | IStoryEntity | StoryEntity | Transient | New instance per use |
+            | IStoryUseCase | StoryUseCase | Singleton | Stateless orchestrator |
+            | IStoryService | StoryService | Singleton | Shared infrastructure |
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════════════════════ -->
+        <!-- SECTION 12: REFACTORING PLAN                                        -->
+        <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+        <section name="refactoring-plan">
+            ### V.10. Refactoring Plan
+
+            &lt;!-- From integration analysis: all refactoring items.
+                 Include refactoring order, dependencies, and impact assessment.
+                 Even if no refactoring needed, document why. --&gt;
+
+            #### Refactoring Items from Integration Analysis
+
+            &lt;!-- For each refactoring item identified: --&gt;
+
+            **Refactoring: [Item Name]**
+            - **File**: `[file:line-range]`
+            - **Current State**: [what it is now]
+            - **Proposed Change**: [what it should become]
+            - **Justification**: [why this is needed — from integration analysis]
+            - **Impact**: [what else is affected]
+            - **Order**: [when to do this relative to other refactorings]
+
+            &lt;!-- Repeat for each refactoring item.
+                 If no refactoring needed, state: "No refactoring required. [justification]." --&gt;
+
+            #### Hardcoded Values to Replace
+
+            &lt;!-- From integration analysis: all hardcoded values and placeholder code
+                 that MUST be replaced as part of this implementation.
+                 Include exact file paths, line numbers, and replacement code. --&gt;
+
+            ```yaml
+            FILE: [exact file path]
+              LINE: [line number(s)]
+              CURRENT CODE: |
+                [actual code snippet]
+              SHOULD BE: |
+                [replacement code using new entities/constants]
+              FIX REQUIRED: [specific action]
+            ```
+
+            &lt;!-- Repeat for each hardcoded value --&gt;
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════════════════════ -->
+        <!-- SECTION 13: TESTING STRATEGY                                        -->
+        <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+        <section name="testing-strategy">
+            ### V.11. Testing Strategy
+
+            &lt;!-- Follow testing-framework.md from wiki. --&gt;
+
+            #### Unit Tests
+            - **What to test**: [components, services, use cases to unit test]
+            - **Mocking strategy**: [what to mock and how]
+            - **Test patterns**: [patterns to follow from testing-framework.md]
+
+            #### Integration Tests
+            - **Scenarios**: [integration scenarios to cover]
+            - **Test utilities**: [existing test utilities available for reuse]
+
+            #### E2E Tests
+            - **Scenarios**: [end-to-end scenarios covering ALL AC scenarios]
+            - **Test framework**: [framework to use from testing-framework.md]
+
+            #### Ensuring Existing Tests Pass
+            - [Steps to verify existing tests still pass]
+            - [Tests that may need adjustment and why]
+
+            #### Test File Structure
+            ```
+            tests/
+            ├── unit/
+            │   ├── domain/
+            │   │   └── StoryEntity.test.ts
+            │   └── application/
+            │       └── StoryUseCase.test.ts
+            ├── integration/
+            │   └── StoryIntegration.test.ts
+            └── e2e/
+                └── StoryE2E.test.ts
+            ```
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════════════════════ -->
+        <!-- SECTION 14: IMPLEMENTATION ORDER                                    -->
+        <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+        <section name="implementation-order">
+            ### V.12. Implementation Order
+
+            &lt;!-- Step-by-step implementation approach following coding standards.
+                 Dependencies between steps clearly marked.
+                 Build verification points after each major step. --&gt;
+
+            1. **[Step 1: Domain Layer]**: [What to implement first and why]
+               - Files to create/modify: [list]
+               - Pattern to follow: [reference to existing pattern from wiki]
+               - **Build verification**: Run build after this step
+
+            2. **[Step 2: Application Layer]**: [What to implement next]
+               - Files to create/modify: [list]
+               - Pattern to follow: [reference]
+               - **Depends on**: Step 1
+
+            3. **[Step 3: Infrastructure Layer]**: [implementation details]
+               - Files to create/modify: [list]
+               - **Depends on**: Steps 1, 2
+
+            4. **[Step 4: Presentation Layer]**: [implementation details]
+               - Files to create/modify: [list]
+               - **Depends on**: Steps 1, 2, 3
+
+            5. **[Step 5: DI Configuration]**: Wire up all new services
+               - Files to modify: [DI container file]
+               - **Depends on**: Steps 1-4
+
+            6. **[Step 6: Refactoring]**: Execute refactoring items from integration analysis
+               - Files to modify: [from refactoring plan]
+               - **Build verification**: Run build + tests after each refactoring
+
+            7. **[Step 7: Testing]**: Write and run all tests
+               - Files to create: [test files]
+               - **Depends on**: Steps 1-6
+
+            &lt;!-- Adjust steps based on actual story requirements --&gt;
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════════════════════ -->
+        <!-- SECTION 15: IMPLEMENTATION CHECKLIST                                -->
+        <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+        <section name="implementation-checklist">
+            ### V.13. Implementation Checklist
+
+            - [ ] Create domain entities
+            - [ ] Define application interfaces
+            - [ ] Implement infrastructure services
+            - [ ] Add presentation components
+            - [ ] Configure dependency injection
+            - [ ] Replace hardcoded values identified in integration analysis
+            - [ ] Execute refactoring items from integration analysis
+            - [ ] Write unit tests
+            - [ ] Integration testing
+            - [ ] E2E testing covering ALL Acceptance Criteria Scenarios
+            - [ ] Documentation
+
+            For complete technical design details, see the sections above.
+        </section>
+
+    </output-format>
+
+    <analysis-process>
+
+        &lt;!-- This section defines the analysis methodology that the technical-application-architect
+             agent must follow. It mirrors the workflow steps but provides detailed
+             instructions for each analysis phase.
+
+             MANDATORY COMPLETION REQUIREMENTS:
+             - Phase 1: ALL 4 items (Initial Discovery) — MANDATORY
+             - Phase 2: ALL 3 items (System Architecture Understanding) — MANDATORY
+             - Phase 3: ALL 2 items (Codebase Analysis) — MANDATORY
+             - Phase 4: Solution Design (generate ALL output sections) — MANDATORY
+             - Total: 9 mandatory analysis items + 13 output sections — SKIP NONE --&gt;
+
+        <phase name="initial-discovery" order="1">
+            &lt;!-- ALL 4 items are MANDATORY --&gt;
+
+            <item name="understand-story" mandatory="true">
+                **[MANDATORY] Understand the Story:**
+                - Read the story thoroughly: User Story, Description, all AC scenarios
+                - These define WHAT functionality needs to be implemented
+                - Extract key behaviors, components, and patterns needed
+                - The story's acceptance criteria define the SCOPE of the solution
+                - Identify ALL AC scenarios — each will need a sequence diagram
+            </item>
+
+            <item name="extract-business-requirements" mandatory="true">
+                **[MANDATORY] Extract Business Requirements:**
+                - Requirements come from the story's User Story, Description, and AC
+                - The story IS the source of truth for business requirements
+                - Extract all constraints, behaviors, and expected outcomes
+                - Map each AC scenario to the technical components needed
+            </item>
+
+            <item name="study-external-analysis" mandatory="false">
+                **[CONDITIONAL] Study External/Industry-Standard Analysis:**
+                - Only if external analysis exists in story directory
+                - Use algorithms and formulas IF they are the MOST EFFICIENT AND PERFORMANT
+                - If you can identify a better approach, use the better approach
+                - The external analysis is a REFERENCE, not a blueprint
+            </item>
+
+            <item name="feature-planning-context" mandatory="true">
+                **[MANDATORY] Feature Planning Context:**
+                - Read the parent feature document for broader context
+                - Understand story dependencies and shared components
+                - Design with the complete feature in mind
+                - Never design in isolation
+            </item>
+        </phase>
+
+        <phase name="system-architecture-understanding" order="2">
+            &lt;!-- ALL 3 items are MANDATORY --&gt;
+
+            <item name="wiki-system-architecture" mandatory="true">
+                **[MANDATORY] System Architecture from Wiki:**
+                - Study system-architecture.md for complete architectural overview
+                - Study system-structure.md for codebase layout
+                - Map where this story's components fit in the overall architecture
+            </item>
+
+            <item name="wiki-subsystem-knowledge" mandatory="true">
+                **[MANDATORY] Subsystem Knowledge from Wiki:**
+                - Study ALL subsystem wiki documents referenced by the story
+                - Extract interfaces to extend, classes to compose, patterns to follow
+                - Identify constants to reuse and conventions to respect
+                - These replace: related-stories-implementations, documented-features, documentation
+            </item>
+
+            <item name="integration-analysis-study" mandatory="true">
+                **[MANDATORY] Deep Study of Integration Analysis:**
+                - THOROUGHLY analyze the integration analysis document
+                - Extract ALL integration points, refactoring needs, patterns to follow
+                - Extract ALL hardcoded values and placeholder code to replace
+                - This tells you EXACTLY how to integrate without breaking the codebase
+                - NEVER SKIP REFACTORING if the integration analysis identifies it's needed
+            </item>
+        </phase>
+
+        <phase name="codebase-analysis" order="3">
+            &lt;!-- ALL 2 items are MANDATORY --&gt;
+
+            <item name="coding-standards" mandatory="true">
+                **[MANDATORY] Coding Standards Review:**
+                - Read coding-standards.md BEFORE generating ANY solution code
+                - Enforce: zero hardcoding, single responsibility, interface-first design
+                - One class/interface/type per file — NO EXCEPTIONS
+                - Every piece of code in the solution MUST comply
+            </item>
+
+            <item name="source-code-exploration" mandatory="true">
+                **[MANDATORY] Source Code Exploration:**
+                - Guided by wiki system-structure.md and integration analysis
+                - Identify existing patterns, reusable components, naming conventions
+                - Focus on files identified by the integration analysis
+            </item>
+        </phase>
+
+        <phase name="solution-design" order="4">
+            &lt;!-- Generate ALL 13 output sections --&gt;
+
+            <item name="generate-all-sections" mandatory="true">
+                **[MANDATORY] Generate Complete Technical Solution:**
+                Using all context from phases 1-3, generate ALL output sections:
+                1. Header with solution context
+                2. Architecture Overview with Clean Architecture compliance
+                3. V.1. Component &amp; Boundary Architecture with Mermaid diagrams
+                4. V.2. Design Patterns &amp; Technical Decisions
+                5. V.3. Complete Class Diagrams &amp; Interfaces (one per file!)
+                6. V.4. Data Models &amp; Structures (one per file!)
+                7. V.5. Algorithms &amp; Business Logic with formulas and examples
+                8. V.6. Event Flow &amp; Entry Points
+                9. V.7. MANDATORY Sequence Diagrams for ALL AC scenarios
+                10. V.8. Complete File Structure tree
+                11. V.9. DI Container Configuration
+                12. V.10. Refactoring Plan (from integration analysis)
+                13. V.11. Testing Strategy (unit, integration, e2e)
+                14. V.12. Implementation Order with dependencies
+                15. V.13. Implementation Checklist
+            </item>
+        </phase>
+
+    </analysis-process>
+
+    <validation-checklist>
+
+        &lt;!-- The workflow uses this checklist to validate completeness.
+             ALL 25 items MUST pass before the solution is considered complete. --&gt;
+
+        **Story File Requirements:**
+        - [ ] Technical solution section exists in the story file
+        - [ ] Section contains all required subsections from template
+
+        **Architecture Requirements:**
+        - [ ] Component &amp; Boundary Architecture with Mermaid diagram
+        - [ ] Layer Architecture Analysis (Domain, Application, Infrastructure, Presentation)
+        - [ ] Clean Architecture compliance verified (dependencies point inward)
+        - [ ] Dependency injection strategy documented
+
+        **Design Requirements:**
+        - [ ] Design patterns documented with purpose and implementation
+        - [ ] Technical decisions documented with rationale and trade-offs
+        - [ ] Class diagrams with complete interface definitions
+        - [ ] EVERY interface/class/type in its OWN SEPARATE FILE (coding standards!)
+        - [ ] Data models and structures defined with TypeScript types
+
+        **Algorithm Requirements:**
+        - [ ] Algorithms documented with mathematical formulas
+        - [ ] Constants and configuration values defined (NO hardcoding!)
+        - [ ] Business rules documented with implementations
+        - [ ] Example calculations provided
+
+        **Sequence Diagram Requirements (CRITICAL!):**
+        - [ ] Sequence diagram for EVERY AC scenario
+        - [ ] Full flow from entry point to exit through ALL layers
+        - [ ] Real method names used (not generic placeholders)
+        - [ ] Error handling paths included (alt blocks)
+        - [ ] Data structures shown at each step
+
+        **Implementation Requirements:**
+        - [ ] Complete file structure tree (new + modified files)
+        - [ ] DI container configuration specified
+        - [ ] Refactoring plan from integration analysis incorporated
+        - [ ] Testing strategy (unit, integration, e2e)
+        - [ ] Implementation order with dependencies
+        - [ ] Implementation checklist
+
+        **Compliance Requirements:**
+        - [ ] Coding standards compliance verified throughout
+        - [ ] Integration analysis findings incorporated
+        - [ ] No hardcoded values in any code snippets
+        - [ ] All code follows Clean Architecture layers
+
+        **Total: 25 mandatory checklist items**
+
+    </validation-checklist>
+
+    <guidelines>
+
+        <guideline name="external-analysis-philosophy">
+            When external analysis IS available:
+            - Use external algorithms and formulas IF they are the MOST EFFICIENT AND PERFORMANT
+            - If you can identify a better approach, use the better approach
+            - The external analysis is a REFERENCE, not a mandatory blueprint
+            - Adapt external patterns to fit Clean Architecture properly
+            - Constants from external systems are starting points, not mandates
+        </guideline>
+
+        <guideline name="integration-analysis-mandatory">
+            The integration analysis (pass 4) is ALWAYS required:
+            - It tells you exactly how to integrate without breaking the codebase
+            - All refactoring items MUST be incorporated into the solution
+            - All hardcoded values MUST be addressed in the refactoring plan
+            - Patterns identified MUST be followed
+            - Do not design in ways that contradict the integration analysis
+        </guideline>
+
+        <guideline name="coding-standards-first">
+            Coding standards are NON-NEGOTIABLE:
+            - Read coding-standards.md BEFORE generating any code
+            - One class/interface/type per file — ALWAYS
+            - Zero hardcoding — ALL values in constants files
+            - Interface-first design — EVERY implementation has an interface
+            - No dead code — clean, complete implementations only
+        </guideline>
+
+        <guideline name="sequence-diagram-completeness">
+            Every AC scenario MUST have a sequence diagram:
+            - Full flow from entry point to exit through ALL architectural layers
+            - Real method names, not generic placeholders
+            - Exact data structures passed at each step
+            - Error handling paths (alt blocks)
+            - No scenario may be skipped
+        </guideline>
+
+        <guideline name="github-compatibility">
+            The technical solution is written into the story file which is also a GitHub issue:
+            - Mermaid diagrams render natively in GitHub
+            - Use markdown tables (not HTML)
+            - No custom CSS or HTML styling
+            - Keep formatting clean for GitHub rendering
+        </guideline>
+
+        <guideline name="solution-size">
+            The technical solution will typically be 1000-2000+ lines:
+            - This is expected and necessary for comprehensive coverage
+            - Do not truncate or summarize — the implementing AI needs every detail
+            - Include ALL diagrams, ALL code snippets, ALL configurations
+            - Completeness is more important than brevity
+        </guideline>
+
+    </guidelines>
+
+</technical-solution>

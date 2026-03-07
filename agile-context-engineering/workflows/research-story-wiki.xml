@@ -1,0 +1,474 @@
+<workflow>
+
+    <purpose>
+        Research and curate the Relevant Wiki section for a story specification.
+        Load the story requirements (User Story, Description, AC), read the parent feature
+        for broader context, scan `.docs/wiki/` system-wide and subsystem documents,
+        and compile a curated list of wiki references that directly inform the technical
+        solution for this story.
+
+        The output is written INTO the story file — populating the `## Relevant Wiki`
+        section placeholder. If the story has a GitHub issue, the issue body is also updated.
+
+        This is pass 2 of the story specification pipeline (see story.xml composition).
+        Input: story file with sections 1-8 complete (from pass 1).
+        Output: `## Relevant Wiki` section appended/replaced in the story file.
+
+        This workflow is executed by the orchestrator directly. It spawns `ace-wiki-mapper`
+        subagents (via `subagent_type="ace-wiki-mapper"`) for parallel subsystem research.
+    </purpose>
+
+    <mandatory-context>
+        Read all files referenced by the invoking command's execution-context before starting.
+        Also read any document or text passed as parameter ($ARGUMENTS) in the invoking command.
+
+        Key context files:
+        - **story-wiki.xml template**: defines the output-format, selection-criteria, and guidelines
+          for the `## Relevant Wiki` section. The compiled output MUST follow this template exactly.
+    </mandatory-context>
+
+    <process>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 1: SETUP                                                     -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="setup" order="1">
+            **MANDATORY FIRST STEP — Execute environment detection and story initialization:**
+
+            ```bash
+            INIT=$(node ~/.claude/agile-context-engineering/src/ace-tools.js init research-story {story_param})
+            ```
+
+            This single call validates the story parameter, extracts metadata/requirements/wiki
+            references, computes all paths and slugs, and checks artifact existence.
+
+            Parse INIT JSON for:
+            - **Environment**: `has_git`, `has_gh_cli`, `github_project`, `mapper_model`
+            - **Story validation**: `story_valid`, `story_error`, `story_source`
+            - **Story metadata**: `story` (id, title, status, size), `feature` (id, title), `epic` (id, title)
+            - **Requirements**: `user_story`, `description`, `acceptance_criteria_count`
+            - **Paths**: `paths.*` (story_dir, story_file, feature_dir, feature_file, etc.)
+            - **Wiki**: `wiki_references` (system_wide, subsystem_docs, total_count), `wiki_docs_exist`
+            - **Artifacts**: `has_external_analysis`, `has_integration_analysis`, `has_feature_file`
+
+            Display stage banner:
+
+            ```
+            ╔══════════════════════════════════════════════════╗
+            ║  ACE > Research Story Wiki                        ║
+            ╚══════════════════════════════════════════════════╝
+            ```
+
+            **If `has_git` is false:** Initialize git:
+            ```bash
+            git init
+            ```
+
+            **If `INIT.story_valid` is false:**
+            Display error using `INIT.story_error` and exit.
+
+            **Verify wiki exists** — check that `.docs/wiki/` directory exists.
+            **If wiki not found:**
+            Display error and exit:
+            ```
+              x  No wiki found at .docs/wiki/
+                 The wiki must exist before researching story wiki references.
+                 Run /ace:init-wiki or /ace:map-system first.
+            ```
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 2: VALIDATE & LOAD STORY                                     -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="validate-story" order="2">
+
+            **Story validation, parsing, and path computation were completed by
+            `init research-story` in step 1.** All metadata, requirements, and
+            paths are available in the INIT JSON.
+
+            Read the story file content for use in wiki research:
+
+            **If `INIT.story_source` is `file`:**
+            Read the file at `INIT.paths.story_file`. Store as STORY_CONTENT.
+
+            **If `INIT.story_source` is `github-url` or `issue-number`:**
+            Fetch the issue body using INIT's GitHub project context:
+            ```bash
+            GH_STORY=$(gh issue view {issue_number} --repo {INIT.github_project.owner}/{INIT.github_project.repo} --json body -q .body)
+            ```
+            Store as STORY_CONTENT.
+
+            Set pre-computed paths from INIT:
+            - `STORY_FILE = INIT.paths.story_file`
+            - `STORY_DIR = INIT.paths.story_dir`
+
+            Display:
+            ```
+              i  Story loaded: {INIT.story.id} — {INIT.story.title}
+                 Feature: {INIT.feature.id} — {INIT.feature.title}
+                 Epic: {INIT.epic.id} — {INIT.epic.title}
+                 Requirements: {INIT.acceptance_criteria_count} acceptance criteria scenarios
+            ```
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 3: LOAD FEATURE CONTEXT                                      -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="load-feature-context" order="3">
+
+            <!-- ── 3a: Read parent feature document ──────────────────────── -->
+
+            **If `INIT.has_feature_file` is true:**
+            Read the feature document at `INIT.paths.feature_file` and extract:
+            - Feature scope and description
+            - Other stories in the feature and their relationships
+            - Subsystems or components mentioned in the feature
+            Store as FEATURE_CONTEXT.
+
+            **If `INIT.has_feature_file` is false:**
+            Proceed without — log a note but do not fail.
+
+            <!-- ── 3b: Check for feature-level relevant-wiki hint ─────────── -->
+
+            Check if a feature-level relevant-wiki file exists at:
+            `{INIT.paths.feature_dir}/relevant-wiki.md`
+
+            **If exists:** Read it. This file provides a HINT for which subsystems and
+            wiki documents are likely relevant. Use it as a starting point for subsystem
+            identification — but still verify each document's relevance to THIS story.
+            Store as FEATURE_WIKI_HINTS.
+
+            **If not exists:** Proceed without. This is optional.
+
+            Display:
+            ```
+              i  Feature context: {loaded | not found}
+                 Feature wiki hints: {loaded | not found}
+            ```
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 4: CURATE SYSTEM-WIDE WIKI DOCS                             -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="include-system-wide" order="4">
+
+            The four system-wide wiki documents are ALWAYS included — no reading or
+            assessment needed. They are mandatory context for every story implementation.
+
+            Set SYSTEM_WIDE_REFS to the fixed list:
+            - `.docs/wiki/system-wide/system-structure.md` — Mandatory system-wide context
+            - `.docs/wiki/system-wide/system-architecture.md` — Mandatory system-wide context
+            - `.docs/wiki/system-wide/coding-standards.md` — Mandatory system-wide context
+            - `.docs/wiki/system-wide/testing-framework.md` — Mandatory system-wide context
+
+            **Do NOT read these files.** The implementing agent (pass 5) will read them.
+            This step only ensures they appear in the output.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 5: IDENTIFY AFFECTED SUBSYSTEMS                              -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="identify-subsystems" order="5">
+
+            Read `.docs/wiki/system-wide/system-architecture.md` to understand subsystem
+            boundaries, responsibilities, and how they interact. This is the ONE system-wide
+            doc worth reading during wiki research — it maps the subsystem landscape.
+
+            Then analyze the story requirements (User Story, Description, AC) and feature context
+            against the architecture doc to determine which subsystems are affected by this story.
+
+            Sources for subsystem identification:
+            1. **System architecture doc**: subsystem boundaries, responsibilities, integration points
+            2. **Story content**: keywords, component names, service names in the AC
+            3. **Feature context**: subsystems mentioned in the parent feature document
+            4. **Feature wiki hints**: subsystems listed in the feature-level relevant-wiki.md
+            5. **Wiki subsystem list**: compare against `wiki_subsystem_names` from INIT
+
+            For each identified subsystem, verify it exists in `.docs/wiki/subsystems/`:
+            ```bash
+            ls .docs/wiki/subsystems/
+            ```
+
+            Store the list of affected subsystem names as AFFECTED_SUBSYSTEMS.
+
+            **If no subsystems identified:**
+            Display:
+            ```
+              i  No specific subsystems identified. Wiki research limited to system-wide docs.
+            ```
+            Skip to step 7.
+
+            **If subsystems identified:**
+            Display:
+            ```
+              i  Affected subsystems: {subsystem1}, {subsystem2}, ...
+                 Spawning wiki research agents...
+            ```
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 6: PARALLEL SUBSYSTEM WIKI RESEARCH                          -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="subsystem-research" order="6">
+
+            For each subsystem in AFFECTED_SUBSYSTEMS, spawn an ace-wiki-mapper agent
+            to read and assess the subsystem's wiki documents for relevance to THIS story.
+
+            **IMPORTANT**: Spawn agents IN PARALLEL when there are multiple subsystems.
+            Each agent reads the subsystem's wiki docs and returns ONLY a list of relevant
+            files with reasons — it does NOT write any files.
+
+            For each subsystem, spawn:
+
+            ```
+            Task(
+                prompt="Focus: wiki-curation-for-story
+
+                You are assessing wiki documents in a single subsystem for relevance to a story.
+                DO NOT write or modify any files. ONLY read and assess.
+
+                Story context:
+                - Story: {Story ID} — {Story Title}
+                - User Story: {user_story_statement}
+                - Description: {description}
+                - Acceptance Criteria: {all_AC_scenarios}
+                - Feature: {Feature ID} — {Feature Title}
+
+                Subsystem to investigate: {subsystem_name}
+                Subsystem wiki path: .docs/wiki/subsystems/{subsystem_name}/
+
+                Instructions:
+                1. List all files in .docs/wiki/subsystems/{subsystem_name}/ recursively
+                2. Read each document (structure.md, architecture.md, and any docs in
+                   systems/, patterns/, cross-cutting/, guides/, decisions/ subdirectories)
+                3. For each document, assess: does it directly inform the technical solution
+                   for THIS story? Apply these criteria:
+                   - INCLUDE if: describes a system this story modifies/extends, documents a
+                     pattern this story must follow, covers a cross-cutting concern this story
+                     must respect, contains a guide for a task this story requires, records an
+                     ADR that constrains design choices
+                   - EXCLUDE if: only tangentially related, describes something the story reads
+                     but doesn't modify, would be nice-to-know but doesn't change implementation
+
+                4. Return your findings in this EXACT format:
+
+                RELEVANT_FILES:
+                - `.docs/wiki/subsystems/{subsystem_name}/{path}` — {one-line reason}
+                - `.docs/wiki/subsystems/{subsystem_name}/{path}` — {one-line reason}
+
+                NOT_RELEVANT:
+                - `.docs/wiki/subsystems/{subsystem_name}/{path}` — {one-line reason for exclusion}
+
+                If NO documents are relevant, return RELEVANT_FILES with no entries.
+                Do NOT write any files. Return text only.",
+                subagent_type="ace-wiki-mapper",
+                model="{MAPPER_MODEL}",
+                run_in_background=true,
+                description="Wiki research: {subsystem_name}"
+            )
+            ```
+
+            Wait for ALL agents to complete. Collect their RELEVANT_FILES lists.
+            Merge into a single list: SUBSYSTEM_REFS.
+
+            Display:
+            ```
+              i  Subsystem research complete.
+                 {N} relevant docs found across {M} subsystems.
+            ```
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 7: COMPILE RELEVANT WIKI SECTION                             -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="compile-output" order="7">
+
+            Compile the final `## Relevant Wiki` section by combining:
+            1. SYSTEM_WIDE_REFS (always present — the four mandatory system-wide docs)
+            2. SUBSYSTEM_REFS (from parallel agent research — may be empty)
+
+            Group subsystem references by wiki document type:
+            - **Systems**: files under `subsystems/*/systems/`
+            - **Patterns**: files under `subsystems/*/patterns/`
+            - **Cross-Cutting Concerns**: files under `subsystems/*/cross-cutting/`
+            - **Guides**: files under `subsystems/*/guides/`
+            - **Decisions**: files under `subsystems/*/decisions/`
+            - **Architecture**: `subsystems/*/architecture.md` files
+            - **Structure**: `subsystems/*/structure.md` files (include under Systems category)
+
+            Omit any category header that has zero entries.
+            The `### System-Wide` header is NEVER omitted.
+
+            Follow the output-format defined in story-wiki.xml template exactly.
+
+            Store the compiled markdown as WIKI_SECTION.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 8: WRITE TO STORY FILE                                       -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="write-output" order="8">
+
+            <!-- ── 8a: Write to local story file ──────────────────────────── -->
+
+            Read the current STORY_FILE content.
+
+            **If the story file contains a `## Relevant Wiki` section placeholder:**
+            Replace the placeholder section (from `## Relevant Wiki` up to the next `## `
+            heading or end of file) with WIKI_SECTION.
+
+            **If the story file does NOT contain a `## Relevant Wiki` section:**
+            Append WIKI_SECTION after the `## Definition of Done` section
+            (before `## Technical Solution` if it exists, otherwise before the metadata section).
+
+            Write the updated content back to STORY_FILE.
+
+            Display:
+            ```
+              +  Relevant Wiki section written to {STORY_FILE}
+            ```
+
+            <!-- ── 8b: Update GitHub issue (if applicable) ───────────────── -->
+
+            **If the story was loaded from GitHub OR the story file header contains a GitHub link:**
+
+            Extract the issue number from the story.
+
+            **If `has_gh_cli` is true AND issue number is available:**
+
+            Read the current GitHub issue body:
+            ```bash
+            GH_BODY=$(gh issue view {issue_number} --repo {REPO} --json body -q .body)
+            ```
+
+            Replace or append the `## Relevant Wiki` section in the issue body
+            (same logic as local file — find and replace existing section, or append).
+
+            Update the issue:
+            ```bash
+            gh issue edit {issue_number} --repo {REPO} --body "{updated_body}"
+            ```
+
+            Display:
+            ```
+              +  GitHub issue #{issue_number} updated with Relevant Wiki section.
+            ```
+
+            **If GitHub CLI not available or no issue number:**
+            Display:
+            ```
+              i  No GitHub issue to update. Local file only.
+            ```
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 9: VALIDATION                                                -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="validation" order="9">
+
+            Re-read STORY_FILE and verify:
+
+            **Content Requirements:**
+            - [ ] `## Relevant Wiki` section exists in the story file
+            - [ ] `### System-Wide` subsection is present with all four docs listed
+            - [ ] Subsystem references (if any) are grouped by wiki document type
+            - [ ] Each subsystem reference has a one-line reason
+            - [ ] No empty category headers (omit categories with zero entries)
+            - [ ] No placeholder text left unfilled
+            - [ ] File paths use backtick formatting
+
+            **Quality Requirements:**
+            - [ ] Subsystem reasons are story-specific, not generic ("related to auth" = FAIL)
+            - [ ] Only directly relevant subsystem docs included (no tangential references)
+            - [ ] Markdown renders cleanly (no broken formatting)
+
+            **Total: 10 mandatory checklist items**
+
+            If any check fails, fix the issue before proceeding.
+
+            Display:
+            ```
+              {check_mark}  Relevant Wiki validated. {passed}/{total} checks passed.
+            ```
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 10: REVIEW                                                   -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="review" order="10">
+
+            Display a summary:
+            ```
+              Wiki Research Summary:
+              ────────
+              System-wide docs: 4
+              Subsystem docs: {N}
+              Subsystems scanned: {M}
+              Total references: {4 + N}
+            ```
+
+            Use AskUserQuestion:
+            - header: "Wiki"
+            - question: "Relevant Wiki section written to `{STORY_FILE}`. Does it look comprehensive?"
+            - options:
+              - "Approve" — Looks good
+              - "Refine" — Some references are missing or incorrect
+
+            **If "Approve":**
+
+            Display completion:
+            ```
+            ╔══════════════════════════════════════════════════╗
+            ║  ACE > Story Wiki Research Complete               ║
+            ║  {Story ID} "{Story Title}"                      ║
+            ╚══════════════════════════════════════════════════╝
+
+              +  {STORY_FILE} updated.
+
+              References:
+              ────────
+              System-wide: 4 | Subsystem: {N} | Total: {4 + N}
+
+              i  Wiki research complete. The Relevant Wiki section is now
+                 part of the story file and will be used by pass 5
+                 (technical solution) to load implementation context.
+
+              Next > Continue with story refinement:
+                     - /ace:research-external-solution — analyze external reference systems
+                     - /ace:plan-story — continue the story pipeline
+            ```
+
+            **If "Refine":**
+            - Ask what references are missing or incorrect
+            - Go back to the relevant step (re-read wiki docs, adjust references)
+            - Re-validate (step 9) and present for review again
+        </step>
+
+    </process>
+
+    <success_criteria>
+        - Story loaded and requirements extracted (User Story, Description, AC)
+        - Parent feature document loaded for broader context (if available)
+        - Feature-level relevant-wiki.md checked for subsystem hints (if exists)
+        - All four system-wide wiki docs included (fixed list, not read)
+        - Affected subsystems identified from story content and feature context
+        - Parallel ace-wiki-mapper agents spawned for each affected subsystem
+        - Agent results collected and merged into categorized references
+        - Relevant Wiki section compiled following story-wiki.xml template
+        - Story file updated with the Relevant Wiki section
+        - GitHub issue updated (if applicable)
+        - All 10 validation checklist items verified
+        - User reviewed and approved the output
+    </success_criteria>
+
+</workflow>

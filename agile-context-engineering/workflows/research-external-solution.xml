@@ -1,0 +1,659 @@
+<workflow>
+
+    <purpose>
+        Perform COMPREHENSIVE, IN-DEPTH, CODE-LEVEL analysis of how a specific story
+        is implemented in an external reference system. Load the story requirements, validate
+        the external codebase, optionally load external documentation, then execute exhaustive
+        code analysis following the template's analysis-process phases. Write the analysis to
+        external-analysis.md in the story's artifact directory.
+
+        Produces `.ace/artifacts/product/<id-epic_name>/<id-feature_name>/<id-story_name>/external-analysis.md`
+        — a comprehensive code-level analysis with algorithms, patterns, formulas, and
+        implementation details extracted verbatim from the external system's code.
+
+        This is pass 3 of the story specification pipeline (see story.xml composition).
+        All output is written ONLY to the analysis file — no GitHub updates, no modifications
+        to the story file.
+
+        This workflow is executed by the `ace-code-discovery-analyst` agent
+        (spawned via `subagent_type="ace-code-discovery-analyst"`).
+    </purpose>
+
+    <mandatory-context>
+        Read all files referenced by the invoking command's execution-context before starting.
+        Also read any document or text passed as parameter ($ARGUMENTS) in the invoking command.
+    </mandatory-context>
+
+    <process>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 1: SETUP                                                     -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="setup" order="1">
+            **MANDATORY FIRST STEP — Execute environment detection and story initialization:**
+
+            ```bash
+            INIT=$(node ~/.claude/agile-context-engineering/src/ace-tools.js init research-story {story_param})
+            ```
+
+            This single call validates the story parameter, extracts metadata/requirements/wiki
+            references, computes all paths and slugs, and checks artifact existence.
+
+            Parse INIT JSON for:
+            - **Environment**: `has_git`, `has_gh_cli`, `github_project`, `analyst_model`
+            - **Story validation**: `story_valid`, `story_error`, `story_source`
+            - **Story metadata**: `story` (id, title, status, size), `feature` (id, title), `epic` (id, title)
+            - **Requirements**: `user_story`, `description`, `acceptance_criteria_count`
+            - **Paths**: `paths.*` (story_dir, story_file, external_analysis_file, feature_dir, feature_file, etc.)
+            - **Artifacts**: `has_external_analysis`, `has_integration_analysis`, `has_feature_file`
+
+            Display stage banner:
+
+            ```
+            ╔══════════════════════════════════════════════════╗
+            ║  ACE > Research External Solution                 ║
+            ╚══════════════════════════════════════════════════╝
+            ```
+
+            **If `has_git` is false:** Initialize git:
+            ```bash
+            git init
+            ```
+
+            **If `INIT.story_valid` is false:**
+            Display error using `INIT.story_error` and exit.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 2: VALIDATE & LOAD STORY                                     -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="validate-story" order="2">
+
+            **Story validation, parsing, and path computation were completed by
+            `init research-story` in step 1.** All metadata, requirements, and
+            paths are available in the INIT JSON.
+
+            Read the story file content for analysis context:
+
+            **If `INIT.story_source` is `file`:**
+            Read the file at `INIT.paths.story_file`. Store as STORY_CONTENT.
+
+            **If `INIT.story_source` is `github-url` or `issue-number`:**
+            Fetch the issue body using INIT's GitHub project context:
+            ```bash
+            GH_STORY=$(gh issue view {issue_number} --repo {INIT.github_project.owner}/{INIT.github_project.repo} --json body -q .body)
+            ```
+            Store as STORY_CONTENT.
+
+            The story's User Story, Description, and Acceptance Criteria define
+            WHAT functionality to analyze in the external codebase. These are the
+            requirements — do NOT seek requirements from other sources.
+            Wiki references from `INIT.wiki_references` may inform exploration.
+
+            <!-- ── 2b: Read parent feature document ───────────────────────── -->
+
+            **If `INIT.has_feature_file` is true:**
+            Read the feature document at `INIT.paths.feature_file` and extract:
+            - Feature description and scope
+            - List of all stories in the feature (IDs, titles, descriptions)
+            - Dependencies between stories
+            - Shared components or services mentioned
+            This informs the "Story Integration Within Feature" section.
+
+            **If `INIT.has_feature_file` is false:**
+            Proceed without — the analysis can still be done without feature context.
+
+            <!-- ── 2c: Display ───────────────────────────────────────────────── -->
+
+            Set pre-computed paths from INIT:
+            - `STORY_FILE = INIT.paths.story_file`
+            - `STORY_DIR = INIT.paths.story_dir`
+
+            Display:
+            ```
+              i  Story loaded: {INIT.story.id} — {INIT.story.title}
+                 Feature: {INIT.feature.id} — {INIT.feature.title}
+                 Epic: {INIT.epic.id} — {INIT.epic.title}
+                 Requirements: {INIT.acceptance_criteria_count} acceptance criteria scenarios
+            ```
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 3: VALIDATE EXTERNAL CODEBASE                                -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="validate-external-codebase" order="3">
+
+            Parse the `external-codebase` parameter from $ARGUMENTS.
+
+            <!-- ── 3a: Local path ────────────────────────────────────────────── -->
+
+            **If local path:**
+
+            Confirm folder exists and contains source code:
+            ```bash
+            ls {external_codebase_path}/
+            ```
+
+            **If not valid:** Display error and exit:
+            ```
+              x  External codebase not found: {external_codebase_path}
+                 Provide a valid local path to a source code directory
+                 or a GitHub repository URL.
+            ```
+
+            Set `EXTERNAL_CODEBASE_PATH = {external_codebase_path}`
+
+            <!-- ── 3b: GitHub URL ────────────────────────────────────────────── -->
+
+            **If GitHub URL:**
+
+            Verify repository accessibility:
+            ```bash
+            gh repo view {repo_identifier} --json name,url 2>/dev/null
+            ```
+
+            **If not accessible:** Display error and exit:
+            ```
+              x  External repository not accessible: {repo_url}
+                 Verify the URL is correct and the repository is public
+                 or you have access.
+            ```
+
+            Set `EXTERNAL_CODEBASE_PATH = {resolved path or URL}`
+
+            <!-- ── 3c: Display ───────────────────────────────────────────────── -->
+
+            Display:
+            ```
+              i  External codebase: {EXTERNAL_CODEBASE_PATH}
+            ```
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 4: LOAD EXTERNAL DOCS (OPTIONAL)                             -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="load-external-docs" order="4">
+
+            Parse the `external-docs` parameter from $ARGUMENTS.
+
+            <!-- ── 4a: Not provided ──────────────────────────────────────────── -->
+
+            **If not provided:**
+
+            Check if context7 MCP server is available (check if `mcp__context7__resolve-library-id`
+            or similar context7 tools are available in the current tool set).
+
+            **If context7 available:**
+            Set `USE_CONTEXT7 = true`
+            Display:
+            ```
+              i  No external docs provided.
+                 context7 MCP server detected — will use it for library documentation.
+            ```
+
+            **If context7 not available:**
+            Set `USE_CONTEXT7 = false`
+            Display:
+            ```
+              i  No external docs provided. Analysis will rely on code exploration.
+                 TIP: Provide external-docs= for richer analysis,
+                      or install context7 MCP server for automatic library docs.
+            ```
+
+            <!-- ── 4b: Provided as weblink ───────────────────────────────────── -->
+
+            **If provided as weblink:**
+
+            Verify URL accessibility (attempt a fetch or HEAD request).
+
+            **If not accessible:** Display warning (non-fatal):
+            ```
+              !  External docs URL not accessible: {url}
+                 Continuing without external docs.
+            ```
+
+            **If accessible:**
+            Store as `EXTERNAL_DOCS_URL = {url}`
+            Display:
+            ```
+              i  External docs: {url}
+            ```
+
+            <!-- ── 4c: Provided as filepath ──────────────────────────────────── -->
+
+            **If provided as filepath:**
+
+            Verify file exists:
+            ```bash
+            DOCS_EXISTS=$(node ~/.claude/agile-context-engineering/src/ace-tools.js verify-path-exists {filepath} --raw)
+            ```
+
+            **If not exists:** Display warning (non-fatal):
+            ```
+              !  External docs file not found: {filepath}
+                 Continuing without external docs.
+            ```
+
+            **If exists:** Read the file. Store as `EXTERNAL_DOCS_CONTENT`.
+            Display:
+            ```
+              i  External docs: {filepath}
+            ```
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 5: RESOLVE OUTPUT PATH                                       -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="resolve-output-path" order="5">
+
+            **Paths were pre-computed by `init research-story` in step 1.**
+
+            Set from INIT JSON:
+            - `STORY_DIR = INIT.paths.story_dir`
+            - `OUTPUT_FILE = INIT.paths.external_analysis_file`
+
+            Ensure directory exists:
+            ```bash
+            mkdir -p {STORY_DIR}
+            ```
+
+            Display:
+            ```
+              i  Output: {OUTPUT_FILE}
+            ```
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 6: CHECK EXISTING ANALYSIS                                   -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="check-existing" order="6">
+
+            **If `INIT.has_external_analysis` is true:**
+
+            Use AskUserQuestion:
+            - header: "Existing"
+            - question: "An external analysis already exists at `{OUTPUT_FILE}`. What would you like to do?"
+            - options:
+              - "Overwrite" — Discard and create a new analysis from scratch
+              - "Skip" — Keep the current analysis as-is
+
+            **If "Overwrite":** Continue to step 7.
+            **If "Skip":** Display message and exit workflow:
+            ```
+              i  Keeping existing analysis. No changes made.
+            ```
+
+            **If not exists:** Continue to step 7.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 7: EXECUTE ANALYSIS                                          -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="execute-analysis" order="7">
+
+            Display:
+            ```
+            ┌──────────────────────────────────────────────────┐
+            │  ACE > Research External Solution > Analysis      │
+            └──────────────────────────────────────────────────┘
+
+              i  Starting deep code-level analysis.
+                 Reading 30+ files and tracing execution paths
+                 5+ levels deep. This may take several minutes.
+            ```
+
+            **Execute the complete analysis following the template's `<analysis-process>` section.**
+            The template (`external-solution.xml`) defines 3 mandatory phases with 16 total items.
+            You ARE the code-discovery-analyst — perform the analysis directly.
+
+            <!-- ── 7a: Phase 1 — Initial Discovery (3 mandatory items) ───────── -->
+
+            **Phase 1: Initial Discovery**
+
+            1. **[MANDATORY] Understand the story requirements:**
+               - Re-read STORY_CONTENT thoroughly — User Story, Description, all AC scenarios
+               - These define WHAT functionality to analyze in the external codebase
+               - Extract the key behaviors, algorithms, and patterns to look for
+               - If parent feature document was loaded (step 2c), understand:
+                 - The broader feature context
+                 - What other stories exist and how they relate
+                 - Dependencies and shared components between stories
+
+            2. **[MANDATORY] Explore available documentation:**
+               - **external-docs** (if EXTERNAL_DOCS_URL or EXTERNAL_DOCS_CONTENT set):
+                 Review for implementation context, API documentation, architecture overview.
+                 If URL: use WebFetch to retrieve content.
+                 Use documentation to guide code exploration.
+               - **context7 MCP server** (if USE_CONTEXT7 is true — PREFERRED):
+                 Use `mcp__context7__resolve-library-id` to find the library,
+                 then `mcp__context7__get-library-docs` to fetch relevant docs.
+                 **ALWAYS prefer context7** when the external system is a known library/framework.
+               - If neither available: rely entirely on code exploration.
+
+            3. **[MANDATORY] Locate the implementation:**
+               - Find where the story's functionality is implemented in `EXTERNAL_CODEBASE_PATH`
+               - Start with likely entry points: exports, public APIs, event handlers
+               - Use Grep/Glob to find relevant files by keywords from the story
+               - Read README files and documentation in the external codebase for structural guidance
+               - Build an initial map of involved files before deep diving
+
+            <!-- ── 7b: Phase 2 — Deep Implementation Analysis (9 mandatory items) ── -->
+
+            **Phase 2: Deep Implementation Analysis — ALL 9 items MANDATORY, skip NONE:**
+
+            1. **[MANDATORY] Complete Entry Points & Triggers Identification (CRITICAL):**
+               Document ALL entry points into the story functionality:
+               - **User Action Triggers**: button clicks, form submissions, keyboard shortcuts
+               - **API Entry Points**: REST endpoints, GraphQL mutations, RPC calls
+               - **Event-Based Triggers**: WebSocket messages, system events, pub/sub messages
+               - **Scheduled/Automated Triggers**: cron jobs, timers, intervals
+               - **External System Triggers**: webhooks, callbacks, integrations
+               For EACH entry point document:
+               ```typescript
+               // Entry Point Type: [User Action/API/Event/etc.]
+               // File: src/path/file.ts:45-60
+               // Trigger: [Exact trigger description]
+               // Parameters: [List all parameters with types]
+               // Example usage: [Show actual usage example]
+               ```
+
+            2. **[MANDATORY] Complete Code Path Mapping:**
+               - Follow EVERY code path from entry to completion
+               - Include ALL branches, conditionals, and edge cases
+               - Document every file, class, method, and function involved
+               - Track all data transformations and state changes
+               - Minimum call depth: 5+ levels
+
+            3. **[MANDATORY] Story-Specific File Tree:**
+               - Document ONLY files involved in this story (NOT entire codebase)
+               - Categorize as: CORE, SUPPORT, CONFIG, TEST
+               - Include line counts and one-line purpose for each file
+               - Include total file count and line count at bottom
+
+            4. **[MANDATORY] Constants & Configuration Extraction:**
+               - Extract ALL constants and configuration values used by the story
+               - Include ACTUAL values from code, NOT placeholders
+               - Group by category: performance limits, business thresholds, magic numbers
+               - Always include source file path and line numbers
+
+            5. **[MANDATORY] Algorithm & Formula Documentation:**
+               For each calculation or algorithm found:
+               - **Purpose**: What it calculates/achieves
+               - **Formula**: Exact mathematical formula or logic
+               - **Implementation**: Code snippet showing implementation
+               - **Example**: Sample input/output with explanation
+               - **Edge Cases**: How they handle special cases
+
+            6. **[MANDATORY] Comprehensive Flow Diagram:**
+               Create a detailed Mermaid sequence diagram showing:
+               - Complete execution flow with ALL branches
+               - Actual method names and parameters (NOT generic names)
+               - Data flow between components
+               - State changes and side effects
+               - Error handling paths
+
+            7. **[MANDATORY] Test Patterns Extraction:**
+               - Extract actual test cases from the external system
+               - Include test code snippets with assertions
+               - Document test scenarios covered
+               - Note edge cases tested
+               - Extract test data patterns
+               - Identify mocking strategies used
+
+            8. **[MANDATORY] Performance Considerations:**
+               - Caching strategies used
+               - Algorithm optimizations
+               - Throttling/debouncing patterns
+               - Memory management techniques
+               - Batch processing approaches
+               Include code references for each optimization.
+
+            9. **[MANDATORY] Validation & Security:**
+               - Input validation rules with actual validation code
+               - Data sanitization methods
+               - Security checks implemented
+               - Error boundaries
+               Include actual code snippets showing validation logic.
+
+            <!-- ── 7c: Phase 3 — Pattern & Architecture Analysis (4 mandatory items) ── -->
+
+            **Phase 3: Pattern & Architecture Analysis — ALL 4 items MANDATORY:**
+
+            1. **[MANDATORY] Design Patterns Identified:**
+               - Document all design patterns used (Strategy, Observer, Factory, etc.)
+               - Explain WHY they chose each pattern
+               - Include code examples of pattern implementation
+               - Note patterns shared with other parts of the system
+               - Identify if patterns enable component integration/communication
+
+            2. **[MANDATORY] Component Lifecycle:**
+               - Initialization sequence
+               - State management approach
+               - Cleanup/disposal mechanisms
+               - Memory management considerations
+
+            3. **[MANDATORY] Performance Optimizations:**
+               - Caching strategies
+               - Algorithm optimizations
+               - Rendering optimizations (if applicable)
+               - Data structure choices for performance
+
+            4. **[MANDATORY] Error Handling & Edge Cases:**
+               - How they handle errors at each architectural level
+               - Validation approaches
+               - Fallback mechanisms
+               - Boundary conditions
+
+            **CRITICAL REQUIREMENTS:**
+            - **NO ASSUMPTIONS**: Only document what you actually find in the code
+            - **STORY SCOPE ONLY**: Focus exclusively on code paths related to the story
+            - **COMPLETE COVERAGE**: Every file and method involved must be documented
+            - **EXACT IMPLEMENTATIONS**: Include actual code snippets, not descriptions
+            - **FORMULAS & CALCULATIONS**: Extract and explain ALL mathematical operations
+            - **METRICS**: Minimum 30+ files read, 50+ code references, 5+ call depth
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 8: WRITE OUTPUT                                              -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="write-output" order="8">
+
+            Write the complete analysis to `{OUTPUT_FILE}` following the template's
+            `<output-format>` section exactly. Include ALL sections:
+
+            1. Header (repository, version, story, date, metrics)
+            2. Implementation Overview
+            3. Entry Points & Triggers (categorized by type)
+            4. Story-Specific File Tree
+            5. Constants & Configuration
+            6. Core Implementation (Algorithms, Data Flow with Mermaid diagram, Key Components)
+            7. Code Examples
+            8. Test Patterns
+            9. Validation & Security
+            10. Performance Optimizations
+            11. Architecture Decisions (Design Patterns, Lifecycle, Error Handling)
+            12. Story Integration Within Feature
+            13. Lessons for Our Implementation
+            14. Complete File Reference
+
+            Use the Write tool to create the file. Include all findings from step 7.
+
+            This is NOT a summary — it is a COMPLETE CODE EXTRACTION. Every section
+            must contain actual code snippets, file paths with line numbers, and
+            concrete implementation details.
+
+            Display:
+            ```
+              +  Analysis written to {OUTPUT_FILE}
+            ```
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 9: VALIDATION                                                -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="validation" order="9">
+
+            Read the output file and verify against the validation checklist
+            defined in the template (external-solution.xml):
+
+            **File Creation Requirements:**
+            - [ ] Analysis file created at {OUTPUT_FILE}
+            - [ ] Story directory exists
+            - [ ] File contains all required sections from template
+
+            **Content Requirements — Core Analysis:**
+            - [ ] CRITICAL: No assumptions — analysis reflects 100% accurate code, no guessing
+            - [ ] Complete Entry Points & Triggers section with ALL trigger types
+            - [ ] Story-Specific File Tree showing ONLY files involved in story
+            - [ ] Constants & Configuration section with actual values
+            - [ ] Mermaid sequence diagram showing complete data flow
+            - [ ] All algorithms and formulas extracted with explanations
+            - [ ] Code examples included from external implementation
+            - [ ] Architecture patterns identified and documented
+
+            **Content Requirements — Enhanced Sections:**
+            - [ ] Test Patterns section with actual test code
+            - [ ] Validation & Security section with validation rules
+            - [ ] Performance Optimizations documented
+            - [ ] Story Integration Within Feature section completed
+            - [ ] Complete File Reference with file roles
+
+            **Analysis Quality Requirements:**
+            - [ ] All entry points categorized (User/API/Event/External)
+            - [ ] Complete code path mapping documented (5+ levels deep)
+            - [ ] Error handling approaches analyzed
+            - [ ] No assumptions made — only documented what was found in code
+            - [ ] Lessons for our implementation clearly stated
+
+            **Metrics Requirements:**
+            - [ ] Minimum 30+ files read for the story
+            - [ ] Minimum 50+ code references documented
+            - [ ] Minimum 5+ call depth traced
+            - [ ] All metrics reported in output header
+
+            **Total: 23 mandatory checklist items**
+
+            If the output is incomplete or missing sections, go back and fill in
+            the missing content before proceeding.
+
+            Display:
+            ```
+              {check_mark}  Analysis validated. {passed}/{total} checks passed.
+            ```
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 10: REVIEW AND APPROVE                                       -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="review" order="10">
+
+            Display a summary of the analysis:
+            ```
+              Analysis Summary:
+              ────────
+              Files analyzed: {N} | Code references: {M} | Call depth: {D}
+              Sections: {count}/14 | Checklist: {passed}/23
+            ```
+
+            Use AskUserQuestion:
+            - header: "Analysis"
+            - question: "External analysis written to `{OUTPUT_FILE}`. Review the file in your editor — does the analysis look comprehensive?"
+            - options:
+              - "Approve" — Looks good, commit it
+              - "Refine" — Some sections need more depth
+              - "Skip commit" — Keep the file but don't commit yet
+
+            **If "Approve":**
+            Continue to step 11.
+
+            **If "Refine":**
+            - Ask what sections need more depth or what's missing
+            - Go back to the relevant analysis phase, read more code, and update OUTPUT_FILE
+            - Re-run validation (step 9)
+            - Present for review again
+
+            **If "Skip commit":**
+            Display completion without commit:
+            ```
+            ╔══════════════════════════════════════════════════╗
+            ║  ACE > External Analysis Complete (uncommitted)   ║
+            ║  {Story ID} "{Story Title}"                      ║
+            ╚══════════════════════════════════════════════════╝
+
+              i  Analysis written to {OUTPUT_FILE}
+                 File not committed — commit manually when ready.
+            ```
+            Exit workflow.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 11: COMMIT                                                   -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="commit" order="11">
+
+            Stage and commit the analysis file:
+
+            ```bash
+            git add {OUTPUT_FILE}
+            ```
+
+            ```bash
+            git commit -m "docs: external analysis for {Story ID} — {Story Title}"
+            ```
+
+            Display completion:
+
+            ```
+            ╔══════════════════════════════════════════════════╗
+            ║  ACE > External Analysis Complete                ║
+            ║  {Story ID} "{Story Title}"                      ║
+            ╚══════════════════════════════════════════════════╝
+
+              +  {OUTPUT_FILE} committed.
+
+              Metrics:
+              ────────
+              Files analyzed: {N} | Code references: {M} | Call depth: {D}
+
+              i  External analysis complete. This artifact will be consumed
+                 by the technical solution (pass 5) when running plan-story.
+
+              Next > Continue with story refinement:
+                     - Integration analysis (pass 4)
+                     - Technical solution (pass 5)
+                   > /ace:research-external-solution story=... external-codebase=...
+                     Analyze another story's external implementation.
+            ```
+        </step>
+
+    </process>
+
+    <success_criteria>
+        - Story loaded and requirements extracted (User Story, Description, Acceptance Criteria)
+        - Parent feature document loaded for broader context (if available)
+        - External codebase validated and accessible (local path or GitHub URL)
+        - External docs loaded if provided, or context7 used if available
+        - Output path resolved from story context
+        - All 3 analysis phases executed directly (16 mandatory items completed)
+        - Analysis file written with ALL template sections populated
+        - NO assumptions made — all findings backed by actual code references
+        - Minimum metrics met: 30+ files read, 50+ code references, 5+ call depth
+        - Mermaid sequence diagram included in the analysis
+        - All 23 validation checklist items verified
+        - User reviewed and approved the analysis
+        - Document committed with appropriate message
+        - No modifications made to the story file or GitHub issues
+    </success_criteria>
+
+</workflow>

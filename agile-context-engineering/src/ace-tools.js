@@ -21,6 +21,8 @@
  *   init coding-standards           Environment detection for coding standards init
  *   init map-system                 Environment detection for map-system workflow
  *   init plan-backlog               Environment detection for plan-backlog workflow
+ *   init plan-story <story>          Environment detection for plan-story workflow (deep questioning)
+ *   init research-story <story>     Validate story, extract metadata/requirements/wiki refs, compute paths
  *   init setup-github               Detect gh CLI, repo, and list GitHub Projects
  *
  *   ensure-settings                  Create .ace/settings.json with defaults if missing
@@ -39,10 +41,12 @@ const path = require('path');
 // ─── Model Profile Table ─────────────────────────────────────────────────────
 
 const MODEL_PROFILES = {
-  'ace-product-owner':        { quality: 'opus',   balanced: 'sonnet', budget: 'sonnet' },
-  'ace-project-researcher':   { quality: 'opus',   balanced: 'sonnet', budget: 'haiku' },
-  'ace-research-synthesizer': { quality: 'sonnet', balanced: 'sonnet', budget: 'haiku' },
-  'ace-wiki-mapper':     { quality: 'sonnet', balanced: 'sonnet', budget: 'haiku' },
+  'ace-product-owner':            { quality: 'opus',   balanced: 'sonnet', budget: 'sonnet' },
+  'ace-project-researcher':       { quality: 'opus',   balanced: 'sonnet', budget: 'haiku' },
+  'ace-research-synthesizer':     { quality: 'sonnet', balanced: 'sonnet', budget: 'haiku' },
+  'ace-wiki-mapper':              { quality: 'sonnet', balanced: 'sonnet', budget: 'haiku' },
+  'ace-code-integration-analyst': { quality: 'opus',   balanced: 'opus',   budget: 'sonnet' },
+  'ace-code-discovery-analyst':   { quality: 'opus',   balanced: 'opus',   budget: 'sonnet' },
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -167,6 +171,209 @@ function detectCodeFiles(cwd, maxDepth) {
 
   walk(cwd, 0);
   return found;
+}
+
+// ─── Story Parsing Helpers ────────────────────────────────────────────────────
+
+/**
+ * Read a file safely, returning null on failure instead of throwing.
+ */
+function safeReadFile(filePath) {
+  try { return fs.readFileSync(filePath, 'utf-8'); }
+  catch { return null; }
+}
+
+/**
+ * Classify a story parameter as file path, GitHub URL, or issue number.
+ * Returns { type, filePath?, repo?, issueNumber?, reason? }
+ */
+function classifyStoryParam(param) {
+  if (!param) return { type: null, reason: 'No story parameter provided' };
+  const trimmed = param.trim();
+  if (/^https?:\/\/github\.com\//.test(trimmed)) {
+    const match = trimmed.match(/github\.com\/([^/]+\/[^/]+)\/issues\/(\d+)/);
+    if (match) return { type: 'github-url', repo: match[1], issueNumber: parseInt(match[2]) };
+    return { type: 'invalid', reason: 'Unrecognized GitHub URL format. Expected: https://github.com/owner/repo/issues/123' };
+  }
+  if (/^\d+$/.test(trimmed)) {
+    return { type: 'issue-number', issueNumber: parseInt(trimmed) };
+  }
+  return { type: 'file', filePath: trimmed };
+}
+
+/**
+ * Extract a markdown section between a heading and the next heading of equal or higher level.
+ * Returns the section content (without the heading itself), or null if not found.
+ * headingLevel: number of '#' chars (2 for ##, 3 for ###)
+ */
+function extractMarkdownSection(content, sectionName, headingLevel) {
+  const prefix = '#'.repeat(headingLevel);
+  const escapedName = sectionName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // Find the heading line
+  const headingPattern = new RegExp(`^${prefix}\\s+${escapedName}\\s*$`, 'm');
+  const headingMatch = headingPattern.exec(content);
+  if (!headingMatch) return null;
+
+  // Get everything after the heading line
+  const startIdx = headingMatch.index + headingMatch[0].length;
+  const rest = content.substring(startIdx);
+
+  // Find the next heading of equal or higher level
+  const nextHeadingPattern = new RegExp(`^#{1,${headingLevel}}\\s`, 'm');
+  const nextMatch = nextHeadingPattern.exec(rest);
+
+  const sectionContent = nextMatch ? rest.substring(0, nextMatch.index) : rest;
+  return sectionContent.trim() || null;
+}
+
+/**
+ * Parse the story markdown header to extract metadata and parent context.
+ *
+ * Expected format:
+ *   # S3: Display OAuth Provider Buttons
+ *   **Feature**: F3 OAuth2 Login Flow | **Epic**: #45 User Authentication
+ *   **Status**: Refined | **Size**: 3 | **Sprint**: Sprint 2 | **Link**: [#95](url)
+ */
+function extractStoryMetadata(content) {
+  const result = {
+    id: null, title: null, status: null, size: null, sprint: null, link: null,
+    feature: { id: null, title: null },
+    epic: { id: null, title: null },
+  };
+  if (!content) return result;
+
+  // Header: # ID: Title
+  const headerMatch = content.match(/^#\s+([^:\n]+?):\s+(.+)$/m);
+  if (headerMatch) {
+    result.id = headerMatch[1].trim();
+    result.title = headerMatch[2].trim();
+  }
+
+  // Feature/Epic line: **Feature**: F3 OAuth2 Login Flow | **Epic**: #45 User Authentication
+  const featureEpicMatch = content.match(/\*\*Feature\*\*:\s*(.+?)\s*\|\s*\*\*Epic\*\*:\s*(.+)$/m);
+  if (featureEpicMatch) {
+    const featureStr = featureEpicMatch[1].trim();
+    const epicStr = featureEpicMatch[2].trim();
+    // Parse "F3 OAuth2 Login Flow" → id="F3", title="OAuth2 Login Flow"
+    const featureParts = featureStr.match(/^(\S+)\s+(.+)$/);
+    if (featureParts) {
+      result.feature.id = featureParts[1];
+      result.feature.title = featureParts[2];
+    } else {
+      result.feature.title = featureStr;
+    }
+    const epicParts = epicStr.match(/^(\S+)\s+(.+)$/);
+    if (epicParts) {
+      result.epic.id = epicParts[1];
+      result.epic.title = epicParts[2];
+    } else {
+      result.epic.title = epicStr;
+    }
+  }
+
+  // Status line: **Status**: Refined | **Size**: 3 | **Sprint**: Sprint 2 | **Link**: [#95](url)
+  const statusMatch = content.match(/\*\*Status\*\*:\s*([^|*]+)/);
+  if (statusMatch) result.status = statusMatch[1].trim();
+
+  const sizeMatch = content.match(/\*\*Size\*\*:\s*([^|*]+)/);
+  if (sizeMatch) result.size = sizeMatch[1].trim();
+
+  const sprintMatch = content.match(/\*\*Sprint\*\*:\s*([^|*]+)/);
+  if (sprintMatch) result.sprint = sprintMatch[1].trim();
+
+  const linkMatch = content.match(/\*\*Link\*\*:\s*([^|*\n]+)/);
+  if (linkMatch) result.link = linkMatch[1].trim();
+
+  return result;
+}
+
+/**
+ * Extract story requirements: user story statement, description, and AC scenario count.
+ */
+function extractStoryRequirements(content) {
+  const result = { user_story: null, description: null, acceptance_criteria_count: 0 };
+  if (!content) return result;
+
+  // User Story: content between "## User Story" and next "## "
+  const userStorySection = extractMarkdownSection(content, 'User Story', 2);
+  if (userStorySection) {
+    // Strip blockquote prefixes (> )
+    result.user_story = userStorySection.replace(/^>\s?/gm, '').trim();
+  }
+
+  // Description: content between "## Description" and next "## "
+  const descSection = extractMarkdownSection(content, 'Description', 2);
+  if (descSection) {
+    result.description = descSection.trim();
+  }
+
+  // Count AC scenarios: occurrences of "### Scenario:"
+  const scenarioMatches = content.match(/^###\s+Scenario:/gm);
+  result.acceptance_criteria_count = scenarioMatches ? scenarioMatches.length : 0;
+
+  return result;
+}
+
+/**
+ * Parse the "## Relevant Wiki" section to extract structured wiki file references.
+ * Returns { system_wide: string[], subsystem_docs: [{path, category, reason}], total_count }
+ */
+function extractWikiReferences(content) {
+  const result = { system_wide: [], subsystem_docs: [], total_count: 0 };
+  if (!content) return result;
+
+  const wikiSection = extractMarkdownSection(content, 'Relevant Wiki', 2);
+  if (!wikiSection) return result;
+
+  // Parse each line that starts with "- `path`" — extract path and reason
+  const linePattern = /^-\s+`([^`]+)`\s*[—–-]\s*(.+)$/gm;
+  let match;
+  while ((match = linePattern.exec(wikiSection)) !== null) {
+    const filePath = match[1].trim();
+    const reason = match[2].trim();
+
+    if (filePath.includes('/system-wide/')) {
+      result.system_wide.push(filePath);
+    } else {
+      // Classify subsystem doc category from path
+      let category = 'other';
+      if (filePath.includes('/systems/')) category = 'systems';
+      else if (filePath.includes('/patterns/')) category = 'patterns';
+      else if (filePath.includes('/cross-cutting/')) category = 'cross-cutting';
+      else if (filePath.includes('/guides/')) category = 'guides';
+      else if (filePath.includes('/decisions/')) category = 'decisions';
+      else if (filePath.includes('/architecture')) category = 'architecture';
+
+      result.subsystem_docs.push({ path: filePath, category, reason });
+    }
+  }
+
+  result.total_count = result.system_wide.length + result.subsystem_docs.length;
+  return result;
+}
+
+/**
+ * Compute all story-related paths and slugs from parent context.
+ */
+function computeStoryPaths(epicId, epicTitle, featureId, featureTitle, storyId, storyTitle) {
+  const epicSlug = generateSlugInternal(`${epicId}-${epicTitle}`) || 'unknown-epic';
+  const featureSlug = generateSlugInternal(`${featureId}-${featureTitle}`) || 'unknown-feature';
+  const storySlug = generateSlugInternal(`${storyId}-${storyTitle}`) || 'unknown-story';
+
+  const storyDir = `.ace/artifacts/product/${epicSlug}/${featureSlug}/${storySlug}`;
+  const featureDir = `.ace/artifacts/product/${epicSlug}/${featureSlug}`;
+
+  return {
+    epic_slug: epicSlug,
+    feature_slug: featureSlug,
+    story_slug: storySlug,
+    story_dir: storyDir,
+    story_file: `${storyDir}/${storySlug}.md`,
+    external_analysis_file: `${storyDir}/external-analysis.md`,
+    integration_analysis_file: `${storyDir}/integration-analysis.md`,
+    feature_dir: featureDir,
+    feature_file: `${featureDir}/${featureSlug}.md`,
+  };
 }
 
 // ─── Commands ─────────────────────────────────────────────────────────────────
@@ -740,6 +947,446 @@ function cmdInitPlanFeature(cwd, raw) {
       const settings = loadSettings(cwd);
       return settings.github_project;
     })(),
+  };
+
+  output(result, raw);
+}
+
+// ─── Init: Plan Story ─────────────────────────────────────────────────────────
+
+/**
+ * init plan-story <story-param>
+ *
+ * Environment detection for the plan-story workflow.
+ * Validates the story source (file path, GitHub URL, or issue number),
+ * loads feature context, detects existing story state, and returns
+ * everything the workflow needs to run deep questioning.
+ *
+ * story-param can be:
+ *   - File path: .ace/artifacts/product/.../story.md or any markdown file
+ *   - GitHub URL: https://github.com/owner/repo/issues/123
+ *   - Issue number: 123
+ */
+function cmdInitPlanStory(cwd, raw, storyParam) {
+  const config = loadConfig(cwd);
+  const brownfield = detectBrownfieldStatus(cwd);
+
+  // ── Environment detection ──
+  const has_git = pathExistsInternal(cwd, '.git');
+  const has_gh_cli = (() => {
+    try {
+      const { execSync } = require('child_process');
+      execSync('gh --version', { stdio: 'pipe' });
+      return true;
+    } catch { return false; }
+  })();
+  const github_project = (() => {
+    const settings = loadSettings(cwd);
+    return settings.github_project;
+  })();
+
+  // Wiki detection
+  const wikiSystemDir = '.docs/wiki/system-wide';
+  const has_wiki_system_wide = pathExistsInternal(cwd, wikiSystemDir);
+  const wikiSubsystemsDir = '.docs/wiki/subsystems';
+  const has_wiki_subsystems = pathExistsInternal(cwd, wikiSubsystemsDir);
+  let wiki_subsystem_names = [];
+  if (has_wiki_subsystems) {
+    try {
+      const entries = fs.readdirSync(path.join(cwd, wikiSubsystemsDir), { withFileTypes: true });
+      wiki_subsystem_names = entries.filter(e => e.isDirectory()).map(e => e.name);
+    } catch {}
+  }
+  const has_wiki = has_wiki_system_wide || has_wiki_subsystems;
+
+  // ── Classify the story parameter ──
+  const classified = classifyStoryParam(storyParam);
+
+  // Early exit if invalid
+  if (classified.type === null || classified.type === 'invalid') {
+    output({
+      product_owner_model: resolveModelInternal(cwd, 'ace-product-owner'),
+      commit_docs: config.commit_docs,
+      has_git, has_gh_cli, github_project,
+      ...brownfield,
+      has_wiki, has_wiki_system_wide, has_wiki_subsystems, wiki_subsystem_names,
+      has_product_vision: pathExistsInternal(cwd, '.docs/product/product-vision.md'),
+      has_product_backlog: pathExistsInternal(cwd, '.ace/artifacts/product/product-backlog.md'),
+      story_source: null,
+      story_valid: false,
+      story_error: classified.reason || 'No story parameter provided',
+      story_content: null,
+      story: { id: null, title: null, status: null, size: null },
+      feature: { id: null, title: null },
+      epic: { id: null, title: null },
+      user_story: null, description: null, acceptance_criteria_count: 0,
+      paths: null,
+      has_external_analysis: false, has_integration_analysis: false,
+      has_feature_file: false, has_story_file: false,
+    }, raw);
+    return;
+  }
+
+  // ── Load story content ──
+  let storyContent = null;
+  let storySource = classified.type === 'file' ? 'file' : 'github';
+  let storyError = null;
+  let storyFilePath = null;
+
+  if (classified.type === 'file') {
+    const resolvedPath = path.isAbsolute(classified.filePath)
+      ? classified.filePath
+      : path.join(cwd, classified.filePath);
+    if (!pathExistsInternal(cwd, classified.filePath)) {
+      storyError = `Story file not found: ${classified.filePath}`;
+    } else {
+      storyContent = safeReadFile(resolvedPath);
+      storyFilePath = classified.filePath;
+      if (!storyContent) storyError = `Could not read story file: ${classified.filePath}`;
+    }
+  } else {
+    // github-url or issue-number
+    if (!has_gh_cli) {
+      storyError = 'GitHub CLI (gh) not installed. Cannot fetch GitHub issues.';
+    } else {
+      const repo = classified.repo || (github_project.repo || null);
+      if (!repo) {
+        storyError = 'No repository configured. Provide a full GitHub URL or configure github_project.repo in settings.';
+      } else {
+        const ghResult = execCommand(
+          `gh issue view ${classified.issueNumber} --repo ${repo} --json title,body,labels,state`,
+          cwd
+        );
+        if (!ghResult) {
+          storyError = `Could not fetch GitHub issue #${classified.issueNumber} from ${repo}.`;
+        } else {
+          try {
+            const issue = JSON.parse(ghResult);
+            storyContent = issue.body || '';
+            if (storyContent && !storyContent.match(/^#\s+/m)) {
+              storyContent = `# ${issue.title}\n\n${storyContent}`;
+            }
+          } catch {
+            storyError = `Failed to parse GitHub issue response for #${classified.issueNumber}.`;
+          }
+        }
+      }
+    }
+  }
+
+  // ── Extract metadata & requirements (may be empty for seed stories) ──
+  const metadata = extractStoryMetadata(storyContent);
+  const requirements = extractStoryRequirements(storyContent);
+
+  // ── Compute paths ──
+  let paths = null;
+  let has_story_file = false;
+
+  if (storyFilePath) {
+    const resolvedPath = path.isAbsolute(storyFilePath)
+      ? storyFilePath
+      : path.join(cwd, storyFilePath);
+    const storyDir = path.dirname(resolvedPath);
+    const relStoryDir = path.relative(cwd, storyDir).replace(/\\/g, '/');
+    const storySlug = path.basename(storyDir);
+    const featureDir = path.dirname(storyDir);
+    const relFeatureDir = path.relative(cwd, featureDir).replace(/\\/g, '/');
+    const featureSlug = path.basename(featureDir);
+
+    paths = {
+      epic_slug: null,
+      feature_slug: featureSlug,
+      story_slug: storySlug,
+      story_dir: relStoryDir,
+      story_file: storyFilePath.replace(/\\/g, '/'),
+      external_analysis_file: `${relStoryDir}/external-analysis.md`,
+      integration_analysis_file: `${relStoryDir}/integration-analysis.md`,
+      feature_dir: relFeatureDir,
+      feature_file: `${relFeatureDir}/${featureSlug}.md`,
+    };
+    has_story_file = true;
+  } else if (metadata.epic.id && metadata.feature.id && metadata.id) {
+    paths = computeStoryPaths(
+      metadata.epic.id, metadata.epic.title || '',
+      metadata.feature.id, metadata.feature.title || '',
+      metadata.id, metadata.title || ''
+    );
+    has_story_file = paths ? pathExistsInternal(cwd, paths.story_file) : false;
+  }
+
+  // ── Check artifact existence ──
+  const has_external_analysis = paths ? pathExistsInternal(cwd, paths.external_analysis_file) : false;
+  const has_integration_analysis = paths ? pathExistsInternal(cwd, paths.integration_analysis_file) : false;
+  const has_feature_file = paths ? pathExistsInternal(cwd, paths.feature_file) : false;
+
+  // ── Build result ──
+  const result = {
+    // Models
+    product_owner_model: resolveModelInternal(cwd, 'ace-product-owner'),
+
+    // Config
+    commit_docs: config.commit_docs,
+
+    // Environment
+    has_git, has_gh_cli, github_project,
+
+    // Brownfield detection
+    ...brownfield,
+
+    // Wiki state
+    has_wiki, has_wiki_system_wide, has_wiki_subsystems, wiki_subsystem_names,
+
+    // Product artifacts
+    has_product_vision: pathExistsInternal(cwd, '.docs/product/product-vision.md'),
+    has_product_backlog: pathExistsInternal(cwd, '.ace/artifacts/product/product-backlog.md'),
+
+    // Story source
+    story_source: storySource,
+    story_valid: storyContent !== null && storyError === null,
+    story_error: storyError,
+
+    // Raw story content (for the workflow to analyze)
+    story_content: storyContent,
+
+    // Story metadata (may be partial for seed stories)
+    story: {
+      id: metadata.id,
+      title: metadata.title,
+      status: metadata.status,
+      size: metadata.size,
+    },
+    feature: metadata.feature,
+    epic: metadata.epic,
+
+    // Requirements (may be empty for seed stories)
+    user_story: requirements.user_story,
+    description: requirements.description,
+    acceptance_criteria_count: requirements.acceptance_criteria_count,
+
+    // Computed paths
+    paths,
+
+    // Artifact existence
+    has_external_analysis,
+    has_integration_analysis,
+    has_feature_file,
+    has_story_file,
+  };
+
+  output(result, raw);
+}
+
+// ─── Init: Research Story ────────────────────────────────────────────────────
+
+/**
+ * init research-story <story-param>
+ *
+ * Single compound command that validates a story source, extracts all metadata,
+ * requirements, wiki references, computes paths, and checks artifact existence.
+ * Replaces 5-7 separate ace-tools calls in story-level workflows.
+ *
+ * story-param can be:
+ *   - File path: .ace/artifacts/product/.../story.md
+ *   - GitHub URL: https://github.com/owner/repo/issues/123
+ *   - Issue number: 123
+ */
+function cmdInitResearchStory(cwd, raw, storyParam) {
+  const config = loadConfig(cwd);
+
+  // ── Environment detection (reused from other init commands) ──
+  const has_git = pathExistsInternal(cwd, '.git');
+  const has_gh_cli = (() => {
+    try {
+      const { execSync } = require('child_process');
+      execSync('gh --version', { stdio: 'pipe' });
+      return true;
+    } catch { return false; }
+  })();
+  const github_project = (() => {
+    const settings = loadSettings(cwd);
+    return settings.github_project;
+  })();
+
+  // ── Classify the story parameter ──
+  const classified = classifyStoryParam(storyParam);
+
+  // Early exit if invalid
+  if (classified.type === null || classified.type === 'invalid') {
+    output({
+      analyst_model: resolveModelInternal(cwd, 'ace-code-integration-analyst'),
+      mapper_model: resolveModelInternal(cwd, 'ace-wiki-mapper'),
+      commit_docs: config.commit_docs,
+      has_git, has_gh_cli, github_project,
+      story_source: null,
+      story_valid: false,
+      story_error: classified.reason || 'No story parameter provided',
+      story: { id: null, title: null, status: null, size: null },
+      feature: { id: null, title: null },
+      epic: { id: null, title: null },
+      user_story: null, description: null, acceptance_criteria_count: 0,
+      paths: null,
+      has_external_analysis: false, has_integration_analysis: false, has_feature_file: false,
+      wiki_references: { system_wide: [], subsystem_docs: [], total_count: 0 },
+      wiki_docs_exist: { existing: [], missing: [] },
+    }, raw);
+    return;
+  }
+
+  // ── Load story content ──
+  let storyContent = null;
+  let storySource = classified.type === 'file' ? 'file' : 'github';
+  let storyError = null;
+  let storyFilePath = null;
+
+  if (classified.type === 'file') {
+    const resolvedPath = path.isAbsolute(classified.filePath)
+      ? classified.filePath
+      : path.join(cwd, classified.filePath);
+    if (!pathExistsInternal(cwd, classified.filePath)) {
+      storyError = `Story file not found: ${classified.filePath}`;
+    } else {
+      storyContent = safeReadFile(resolvedPath);
+      storyFilePath = classified.filePath;
+      if (!storyContent) storyError = `Could not read story file: ${classified.filePath}`;
+    }
+  } else {
+    // github-url or issue-number
+    if (!has_gh_cli) {
+      storyError = 'GitHub CLI (gh) not installed. Cannot fetch GitHub issues.';
+    } else {
+      const repo = classified.repo || (github_project.repo || null);
+      if (!repo) {
+        storyError = 'No repository configured. Provide a full GitHub URL or configure github_project.repo in settings.';
+      } else {
+        const ghResult = execCommand(
+          `gh issue view ${classified.issueNumber} --repo ${repo} --json title,body,labels,state`,
+          cwd
+        );
+        if (!ghResult) {
+          storyError = `Could not fetch GitHub issue #${classified.issueNumber} from ${repo}.`;
+        } else {
+          try {
+            const issue = JSON.parse(ghResult);
+            // Reconstruct story content from issue body (the body IS the story markdown)
+            storyContent = issue.body || '';
+            // If the title isn't in the body, prepend it as a header
+            if (storyContent && !storyContent.match(/^#\s+/m)) {
+              storyContent = `# ${issue.title}\n\n${storyContent}`;
+            }
+          } catch {
+            storyError = `Failed to parse GitHub issue response for #${classified.issueNumber}.`;
+          }
+        }
+      }
+    }
+  }
+
+  // ── Extract metadata & requirements ──
+  const metadata = extractStoryMetadata(storyContent);
+  const requirements = extractStoryRequirements(storyContent);
+  const wikiRefs = extractWikiReferences(storyContent);
+
+  // ── Compute paths ──
+  let paths = null;
+  if (storyFilePath) {
+    // Story loaded from file — derive paths from actual file location
+    const resolvedPath = path.isAbsolute(storyFilePath)
+      ? storyFilePath
+      : path.join(cwd, storyFilePath);
+    const storyDir = path.dirname(resolvedPath);
+    const relStoryDir = path.relative(cwd, storyDir).replace(/\\/g, '/');
+    const storySlug = path.basename(storyDir);
+    const featureDir = path.dirname(storyDir);
+    const relFeatureDir = path.relative(cwd, featureDir).replace(/\\/g, '/');
+    const featureSlug = path.basename(featureDir);
+
+    paths = {
+      epic_slug: null,
+      feature_slug: featureSlug,
+      story_slug: storySlug,
+      story_dir: relStoryDir,
+      story_file: storyFilePath.replace(/\\/g, '/'),
+      external_analysis_file: `${relStoryDir}/external-analysis.md`,
+      integration_analysis_file: `${relStoryDir}/integration-analysis.md`,
+      feature_dir: relFeatureDir,
+      feature_file: `${relFeatureDir}/${featureSlug}.md`,
+    };
+  } else if (metadata.epic.id && metadata.feature.id && metadata.id) {
+    // Story loaded from GitHub — compute paths from metadata
+    paths = computeStoryPaths(
+      metadata.epic.id, metadata.epic.title || '',
+      metadata.feature.id, metadata.feature.title || '',
+      metadata.id, metadata.title || ''
+    );
+  }
+
+  // ── Check artifact existence ──
+  const has_external_analysis = paths ? pathExistsInternal(cwd, paths.external_analysis_file) : false;
+  const has_integration_analysis = paths ? pathExistsInternal(cwd, paths.integration_analysis_file) : false;
+  const has_feature_file = paths ? pathExistsInternal(cwd, paths.feature_file) : false;
+
+  // ── Verify wiki doc existence ──
+  const allWikiPaths = [...wikiRefs.system_wide, ...wikiRefs.subsystem_docs.map(d => d.path)];
+  const wikiExisting = [];
+  const wikiMissing = [];
+  for (const wikiPath of allWikiPaths) {
+    if (pathExistsInternal(cwd, wikiPath)) {
+      wikiExisting.push(wikiPath);
+    } else {
+      wikiMissing.push(wikiPath);
+    }
+  }
+
+  // ── Build result ──
+  const result = {
+    // Models
+    analyst_model: resolveModelInternal(cwd, 'ace-code-integration-analyst'),
+    mapper_model: resolveModelInternal(cwd, 'ace-wiki-mapper'),
+
+    // Config
+    commit_docs: config.commit_docs,
+
+    // Environment
+    has_git,
+    has_gh_cli,
+    github_project,
+
+    // Story source
+    story_source: storySource,
+    story_valid: storyContent !== null && storyError === null,
+    story_error: storyError,
+
+    // Story metadata
+    story: {
+      id: metadata.id,
+      title: metadata.title,
+      status: metadata.status,
+      size: metadata.size,
+    },
+    feature: metadata.feature,
+    epic: metadata.epic,
+
+    // Requirements
+    user_story: requirements.user_story,
+    description: requirements.description,
+    acceptance_criteria_count: requirements.acceptance_criteria_count,
+
+    // Computed paths
+    paths,
+
+    // Artifact existence
+    has_external_analysis,
+    has_integration_analysis,
+    has_feature_file,
+
+    // Wiki references (structured)
+    wiki_references: wikiRefs,
+
+    // Wiki doc verification
+    wiki_docs_exist: {
+      existing: wikiExisting,
+      missing: wikiMissing,
+    },
   };
 
   output(result, raw);
@@ -1393,11 +2040,17 @@ function main() {
         case 'plan-feature':
           cmdInitPlanFeature(cwd, raw);
           break;
+        case 'plan-story':
+          cmdInitPlanStory(cwd, raw, args.slice(2).join(' '));
+          break;
+        case 'research-story':
+          cmdInitResearchStory(cwd, raw, args.slice(2).join(' '));
+          break;
         case 'setup-github':
           cmdSetupGithubProject(cwd, raw);
           break;
         default:
-          error('Unknown init subcommand. Available: new-project, product-vision, coding-standards, map-system, map-subsystem, plan-backlog, plan-feature, setup-github');
+          error('Unknown init subcommand. Available: new-project, product-vision, coding-standards, map-system, map-subsystem, plan-backlog, plan-feature, plan-story, research-story, setup-github');
       }
       break;
     }
