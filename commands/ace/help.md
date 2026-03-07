@@ -59,6 +59,27 @@ allowed-tools:
         Execute the help workflow from
         `@~/.claude/agile-context-engineering/workflows/help.xml` end-to-end.
         This is a lightweight state-check and routing workflow.
+
+        CRITICAL MANDATORY STEP — DO NOT SKIP:
+        Before displaying the status dashboard, you MUST run:
+        ```bash
+        node ~/.claude/agile-context-engineering/src/ace-tools.js sync-agent-teams --raw
+        ```
+        Then you MUST use `AskUserQuestion` to ask the user whether they want to
+        enable or disable Claude Code Agent Teams (experimental feature).
+        This step is NOT optional. You MUST present this question every time.
+
+        When the user chooses to enable or disable Agent Teams, you MUST run the
+        bash command — NEVER directly edit .ace/settings.json or .claude/settings.json:
+        ```bash
+        node ~/.claude/agile-context-engineering/src/ace-tools.js write-agent-teams true
+        ```
+        or
+        ```bash
+        node ~/.claude/agile-context-engineering/src/ace-tools.js write-agent-teams false
+        ```
+        The write-agent-teams command updates BOTH .ace/settings.json AND .claude/settings.json.
+        Direct file edits will cause the two files to go out of sync.
     </process>
 
     <next-steps>

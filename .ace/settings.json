@@ -1,6 +1,7 @@
 {
   "model_profile": "balanced",
   "commit_docs": true,
+  "agent_teams": false,
   "github_project": {
     "enabled": false,
     "gh_installed": false,

@@ -232,13 +232,82 @@
         </step>
 
         <!-- ══════════════════════════════════════════════════════════════════ -->
-        <!-- STEP 4: DISPLAY STATUS DASHBOARD                                  -->
+        <!-- STEP 4: AGENT TEAMS SETUP (optional — experimental feature)       -->
         <!-- ══════════════════════════════════════════════════════════════════ -->
 
-        <step name="status-dashboard" order="4">
+        <step name="agent-teams-setup" order="4">
+            **MANDATORY — MUST execute this step. DO NOT skip. Always ask the user about Agent Teams.**
+
+            This step syncs and configures the Claude Code Agent Teams experimental feature.
+            You MUST run the sync command below and MUST use AskUserQuestion to interact with the user.
+
+            <substep order="4.1" name="sync-agent-teams">
+                **MANDATORY — Run this command before evaluating state:**
+
+                ```bash
+                AGENT_TEAMS=$(node ~/.claude/agile-context-engineering/src/ace-tools.js sync-agent-teams --raw)
+                ```
+
+                Parse the JSON output. The `agent_teams` field is the synced boolean state.
+            </substep>
+
+            <substep order="4.2" name="ask-agent-teams">
+                **MANDATORY — You MUST use AskUserQuestion here. Do NOT skip this interaction.**
+                **IMPORTANT: When writing settings, you MUST use the Bash commands below.
+                NEVER directly edit .ace/settings.json or .claude/settings.json — the
+                write-agent-teams command updates BOTH files atomically.**
+
+                <variant condition="agent_teams is true (from sync output)">
+                    Use `AskUserQuestion`:
+                    - header: "Agent Teams"
+                    - question: "Agent Teams (experimental) is currently ENABLED. This orchestrates multiple Claude Code sessions in parallel but significantly increases token usage. Would you like to keep it enabled?"
+                    - options:
+                      - "Keep enabled" — Continue with Agent Teams enabled
+                      - "Disable" — Turn off Agent Teams to reduce token usage
+
+                    <variant condition="user chose Disable">
+                        ```bash
+                        node ~/.claude/agile-context-engineering/src/ace-tools.js write-agent-teams false
+                        ```
+                        Display:
+                        ```
+                          ✓  Agent Teams disabled.
+                        ```
+                    </variant>
+                </variant>
+
+                <variant condition="agent_teams is false (from sync output)">
+                    Use `AskUserQuestion`:
+                    - header: "Agent Teams"
+                    - question: "Would you like to enable Claude Code Agent Teams? This is an experimental feature that orchestrates multiple Claude Code sessions working in parallel. WARNING: This significantly increases token usage."
+                    - options:
+                      - "Skip for now (Recommended)" — Keep Agent Teams disabled
+                      - "Enable Agent Teams" — Enable experimental multi-session orchestration (higher token cost)
+
+                    <variant condition="user chose Enable Agent Teams">
+                        ```bash
+                        node ~/.claude/agile-context-engineering/src/ace-tools.js write-agent-teams true
+                        ```
+                        Display:
+                        ```
+                          ✓  Agent Teams enabled.
+                             - Set agent_teams: true in .ace/settings.json
+                             - Set CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS in .claude/settings.json
+                             ⚠  This feature is experimental and increases token usage significantly.
+                        ```
+                    </variant>
+                </variant>
+            </substep>
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 5: DISPLAY STATUS DASHBOARD                                  -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="status-dashboard" order="5">
             Build and display the project status dashboard.
 
-            <substep order="4.1" name="render-documents-section">
+            <substep order="5.1" name="render-documents-section">
                 ```
                 ╔══════════════════════════════════════════════════╗
                 ║  ACE > Project Status                            ║
@@ -266,15 +335,16 @@
                 </doc-command-mapping>
             </substep>
 
-            <substep order="4.2" name="render-settings-section">
+            <substep order="5.2" name="render-settings-section">
                 ```
                   Settings            [✓] .ace/settings.json
                   Model profile:      {settings.model_profile}
                   Commit docs:        {settings.commit_docs}
+                  Agent Teams:        {enabled (experimental) | disabled}
                 ```
             </substep>
 
-            <substep order="4.3" name="render-github-section">
+            <substep order="5.3" name="render-github-section">
                 ```
                   GitHub CLI          [{check}] {installed|not found}
                   Owner               {owner or 'not detected'}
@@ -285,12 +355,12 @@
         </step>
 
         <!-- ══════════════════════════════════════════════════════════════════ -->
-        <!-- STEP 5: OFFER CODEBASE MAPPING (brownfield only)                  -->
+        <!-- STEP 6: OFFER CODEBASE MAPPING (brownfield only)                  -->
         <!-- ══════════════════════════════════════════════════════════════════ -->
 
-        <step name="offer-map-system" order="5" condition="is_brownfield is true AND has_system_architecture is false">
+        <step name="offer-map-system" order="6" condition="is_brownfield is true AND has_system_architecture is false">
 
-            <substep order="5.1" name="ask-map-codebase">
+            <substep order="6.1" name="ask-map-codebase">
                 Use `AskUserQuestion`:
                 - header: "Codebase"
                 - question: "I detected existing code but no wiki documentation. Would you like to map your codebase first?"
@@ -299,7 +369,7 @@
                   - "Skip for now" — Continue without mapping
             </substep>
 
-            <substep order="5.2" name="route-map-decision">
+            <substep order="6.2" name="route-map-decision">
                 <variant condition="user chose Map codebase">
                     Display:
                     ```
@@ -311,18 +381,18 @@
                 </variant>
 
                 <variant condition="user chose Skip for now">
-                    Continue to step 6.
+                    Continue to step 7.
                 </variant>
             </substep>
         </step>
 
         <!-- ══════════════════════════════════════════════════════════════════ -->
-        <!-- STEP 6: OFFER PRODUCT VISION                                      -->
+        <!-- STEP 7: OFFER PRODUCT VISION                                      -->
         <!-- ══════════════════════════════════════════════════════════════════ -->
 
-        <step name="offer-product-vision" order="6" condition="has_product_vision is false">
+        <step name="offer-product-vision" order="7" condition="has_product_vision is false">
 
-            <substep order="6.1" name="ask-product-vision">
+            <substep order="7.1" name="ask-product-vision">
                 Use `AskUserQuestion`:
                 - header: "Vision"
                 - question: "No product vision found. Would you like to define one now?"
@@ -331,42 +401,12 @@
                   - "Skip for now" — Continue without a product vision
             </substep>
 
-            <substep order="6.2" name="route-vision-decision">
+            <substep order="7.2" name="route-vision-decision">
                 <variant condition="user chose Create product vision">
                     Display:
                     ```
                       Next > Run /ace:plan-product-vision to define your product vision.
                              This drives all downstream planning.
-                    ```
-                    **Exit workflow.**
-                </variant>
-
-                <variant condition="user chose Skip for now">
-                    Continue to step 7.
-                </variant>
-            </substep>
-        </step>
-
-        <!-- ══════════════════════════════════════════════════════════════════ -->
-        <!-- STEP 7: OFFER CODING STANDARDS                                    -->
-        <!-- ══════════════════════════════════════════════════════════════════ -->
-
-        <step name="offer-coding-standards" order="7" condition="has_coding_standards is false">
-
-            <substep order="7.1" name="ask-coding-standards">
-                Use `AskUserQuestion`:
-                - header: "Standards"
-                - question: "No coding standards found. Would you like to generate them?"
-                - options:
-                  - "Generate coding standards (Recommended)" — Run /ace:init-coding-standards to create tailored standards
-                  - "Skip for now" — Continue without coding standards
-            </substep>
-
-            <substep order="7.2" name="route-standards-decision">
-                <variant condition="user chose Generate coding standards">
-                    Display:
-                    ```
-                      Next > Run /ace:init-coding-standards to generate tailored coding standards.
                     ```
                     **Exit workflow.**
                 </variant>
@@ -378,39 +418,25 @@
         </step>
 
         <!-- ══════════════════════════════════════════════════════════════════ -->
-        <!-- STEP 8: OFFER PRODUCT BACKLOG                                     -->
+        <!-- STEP 8: OFFER CODING STANDARDS                                    -->
         <!-- ══════════════════════════════════════════════════════════════════ -->
 
-        <step name="offer-product-backlog" order="8" condition="has_product_vision is true">
+        <step name="offer-coding-standards" order="8" condition="has_coding_standards is false">
 
-            <substep order="8.1" name="check-backlog-exists">
-                ```bash
-                HAS_BACKLOG=$(node ~/.claude/agile-context-engineering/src/ace-tools.js verify-path-exists .ace/artifacts/product/product-backlog.md --raw)
-                ```
-
-                <variant condition="HAS_BACKLOG is true">
-                    Backlog already exists. Skip to step 9.
-                </variant>
-
-                <variant condition="HAS_BACKLOG is false">
-                    Continue to substep 8.2.
-                </variant>
-            </substep>
-
-            <substep order="8.2" name="ask-plan-backlog">
+            <substep order="8.1" name="ask-coding-standards">
                 Use `AskUserQuestion`:
-                - header: "Backlog"
-                - question: "You have a product vision but no backlog. Would you like to plan your product backlog?"
+                - header: "Standards"
+                - question: "No coding standards found. Would you like to generate them?"
                 - options:
-                  - "Plan backlog (Recommended)" — Run /ace:plan-backlog to break your vision into epics and features
-                  - "Skip for now" — Continue without a backlog
+                  - "Generate coding standards (Recommended)" — Run /ace:init-coding-standards to create tailored standards
+                  - "Skip for now" — Continue without coding standards
             </substep>
 
-            <substep order="8.3" name="route-backlog-decision">
-                <variant condition="user chose Plan backlog">
+            <substep order="8.2" name="route-standards-decision">
+                <variant condition="user chose Generate coding standards">
                     Display:
                     ```
-                      Next > Run /ace:plan-backlog to break your vision into epics and features.
+                      Next > Run /ace:init-coding-standards to generate tailored coding standards.
                     ```
                     **Exit workflow.**
                 </variant>
@@ -422,12 +448,56 @@
         </step>
 
         <!-- ══════════════════════════════════════════════════════════════════ -->
-        <!-- STEP 9: COMPLETION                                                -->
+        <!-- STEP 9: OFFER PRODUCT BACKLOG                                     -->
         <!-- ══════════════════════════════════════════════════════════════════ -->
 
-        <step name="completion" order="9">
+        <step name="offer-product-backlog" order="9" condition="has_product_vision is true">
 
-            <substep order="9.1" name="greenfield-note" condition="is_greenfield is true AND has_system_architecture is false">
+            <substep order="9.1" name="check-backlog-exists">
+                ```bash
+                HAS_BACKLOG=$(node ~/.claude/agile-context-engineering/src/ace-tools.js verify-path-exists .ace/artifacts/product/product-backlog.md --raw)
+                ```
+
+                <variant condition="HAS_BACKLOG is true">
+                    Backlog already exists. Skip to step 10.
+                </variant>
+
+                <variant condition="HAS_BACKLOG is false">
+                    Continue to substep 8.2.
+                </variant>
+            </substep>
+
+            <substep order="9.2" name="ask-plan-backlog">
+                Use `AskUserQuestion`:
+                - header: "Backlog"
+                - question: "You have a product vision but no backlog. Would you like to plan your product backlog?"
+                - options:
+                  - "Plan backlog (Recommended)" — Run /ace:plan-backlog to break your vision into epics and features
+                  - "Skip for now" — Continue without a backlog
+            </substep>
+
+            <substep order="9.3" name="route-backlog-decision">
+                <variant condition="user chose Plan backlog">
+                    Display:
+                    ```
+                      Next > Run /ace:plan-backlog to break your vision into epics and features.
+                    ```
+                    **Exit workflow.**
+                </variant>
+
+                <variant condition="user chose Skip for now">
+                    Continue to step 10.
+                </variant>
+            </substep>
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 10: COMPLETION                                               -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="completion" order="10">
+
+            <substep order="10.1" name="greenfield-note" condition="is_greenfield is true AND has_system_architecture is false">
                 Display:
                 ```
                   i  System architecture, structure, and testing framework docs
@@ -435,7 +505,7 @@
                 ```
             </substep>
 
-            <substep order="9.2" name="fully-initialized">
+            <substep order="10.2" name="fully-initialized">
                 <variant condition="all documents exist (vision + architecture + structure + coding standards + testing framework)">
                     Display:
                     ```
@@ -461,6 +531,7 @@
         <check>Environment detection executed successfully</check>
         <check>Settings.json ensured (created if missing)</check>
         <check>GitHub Project integration offered to the user (not silently skipped)</check>
+        <check>Agent Teams: sync-agent-teams command executed AND AskUserQuestion presented (NEVER skip this)</check>
         <check>Status dashboard displayed showing all document states, settings, and GitHub status</check>
         <check>Missing setup commands offered interactively in priority order</check>
         <check>No document creation performed (delegated to specialized commands)</check>

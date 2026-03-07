@@ -27,6 +27,8 @@
  *
  *   ensure-settings                  Create .ace/settings.json with defaults if missing
  *   write-github-settings            Write GitHub Project settings (key=value args)
+ *   write-agent-teams <true|false>   Enable/disable agent teams in ACE + Claude Code settings
+ *   sync-agent-teams                 Sync agent_teams from .claude/settings.json (source of truth) to .ace/settings.json
  *
  * GitHub Commands:
  *   github resolve-fields             Resolve native issue type IDs and project field IDs
@@ -473,6 +475,7 @@ function detectBrownfieldStatus(cwd) {
 const SETTINGS_DEFAULTS = {
   model_profile: 'balanced',
   commit_docs: true,
+  agent_teams: false,
   github_project: {
     enabled: false,
     gh_installed: false,
@@ -490,6 +493,7 @@ function loadSettings(cwd) {
     return {
       model_profile: parsed.model_profile ?? SETTINGS_DEFAULTS.model_profile,
       commit_docs: parsed.commit_docs ?? SETTINGS_DEFAULTS.commit_docs,
+      agent_teams: parsed.agent_teams ?? SETTINGS_DEFAULTS.agent_teams,
       github_project: {
         enabled: parsed.github_project?.enabled ?? SETTINGS_DEFAULTS.github_project.enabled,
         gh_installed: parsed.github_project?.gh_installed ?? SETTINGS_DEFAULTS.github_project.gh_installed,
@@ -608,6 +612,70 @@ function cmdWriteGithubSettings(cwd, raw, extraArgs) {
 
   writeSettings(cwd, settings);
   output({ written: true, settings }, raw);
+}
+
+function cmdSyncAgentTeams(cwd, raw) {
+  // Source of truth: .claude/settings.json env var
+  const claudeSettingsPath = path.join(cwd, '.claude', 'settings.json');
+  let claudeEnabled = false;
+  try {
+    const claudeRaw = fs.readFileSync(claudeSettingsPath, 'utf-8');
+    const claudeSettings = JSON.parse(claudeRaw);
+    const val = claudeSettings?.env?.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS;
+    claudeEnabled = val === '1' || val === 'true';
+  } catch {
+    // File doesn't exist or is invalid — treat as disabled
+  }
+
+  // Sync ACE settings to match Claude's source of truth
+  const settings = loadSettings(cwd);
+  const wasDifferent = settings.agent_teams !== claudeEnabled;
+  if (wasDifferent) {
+    settings.agent_teams = claudeEnabled;
+    writeSettings(cwd, settings);
+  }
+
+  output({ agent_teams: claudeEnabled, synced: wasDifferent }, raw);
+}
+
+function cmdWriteAgentTeamsSetting(cwd, raw, extraArgs) {
+  const enabled = extraArgs[0] === 'true';
+  const settings = loadSettings(cwd);
+  settings.agent_teams = enabled;
+  writeSettings(cwd, settings);
+
+  // Also update the project's .claude/settings.json
+  const claudeDir = path.join(cwd, '.claude');
+  const claudeSettingsPath = path.join(claudeDir, 'settings.json');
+
+  let claudeSettings = {};
+  try {
+    const existing = fs.readFileSync(claudeSettingsPath, 'utf-8');
+    claudeSettings = JSON.parse(existing);
+  } catch {
+    // File doesn't exist or is invalid — start fresh
+  }
+
+  if (!claudeSettings.env) {
+    claudeSettings.env = {};
+  }
+
+  if (enabled) {
+    claudeSettings.env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS = '1';
+  } else {
+    delete claudeSettings.env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS;
+    // Clean up empty env object
+    if (Object.keys(claudeSettings.env).length === 0) {
+      delete claudeSettings.env;
+    }
+  }
+
+  if (!fs.existsSync(claudeDir)) {
+    fs.mkdirSync(claudeDir, { recursive: true });
+  }
+  fs.writeFileSync(claudeSettingsPath, JSON.stringify(claudeSettings, null, 2) + '\n', 'utf-8');
+
+  output({ written: true, agent_teams: enabled, settings, claude_settings: claudeSettings }, raw);
 }
 
 // ─── Compound Commands ────────────────────────────────────────────────────────
@@ -1977,7 +2045,7 @@ function main() {
   const cwd = process.cwd();
 
   if (!command) {
-    error('Usage: ace-tools <command> [args] [--raw]\nCommands: load-config, resolve-model, verify-path-exists, generate-slug, current-timestamp, ensure-settings, write-github-settings, init');
+    error('Usage: ace-tools <command> [args] [--raw]\nCommands: load-config, resolve-model, verify-path-exists, generate-slug, current-timestamp, ensure-settings, write-github-settings, write-agent-teams, sync-agent-teams, init');
   }
 
   switch (command) {
@@ -2013,6 +2081,16 @@ function main() {
 
     case 'write-github-settings': {
       cmdWriteGithubSettings(cwd, raw, args.slice(1));
+      break;
+    }
+
+    case 'write-agent-teams': {
+      cmdWriteAgentTeamsSetting(cwd, raw, args.slice(1));
+      break;
+    }
+
+    case 'sync-agent-teams': {
+      cmdSyncAgentTeams(cwd, raw);
       break;
     }
 
@@ -2078,7 +2156,7 @@ function main() {
     }
 
     default:
-      error(`Unknown command: ${command}\nAvailable: load-config, resolve-model, verify-path-exists, generate-slug, current-timestamp, ensure-settings, write-github-settings, init, github`);
+      error(`Unknown command: ${command}\nAvailable: load-config, resolve-model, verify-path-exists, generate-slug, current-timestamp, ensure-settings, write-github-settings, write-agent-teams, sync-agent-teams, init, github`);
   }
 }
 
