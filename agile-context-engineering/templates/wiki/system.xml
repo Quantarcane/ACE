@@ -227,6 +227,27 @@
             - Constructor timing: factory methods called from `super()` BEFORE subclass fields initialize
             - Button IDs have NO hyphens, registry types DO have hyphens
         </gotchas>
+
+        <tech-debt>
+            ## Tech Debt
+
+            Known quality issues in this system discovered during story code reviews.
+            Items are added by the wiki mapper and removed when fixed by a future story.
+            Include ONLY if this system has known tech debt items. Omit section entirely if clean.
+
+            ### [Short descriptive title of the issue]
+            - **Severity:** high | medium | low
+            - **File:** `[file-path:SymbolName]`
+            - **Description:** What the issue is, why it matters, and what could go wrong
+              if left unfixed. Reference specific code constructs where applicable.
+            - **Discovered during:** [story-id] — [story title]
+
+            ### [Another issue]
+            - **Severity:** ...
+            - **File:** ...
+            - **Description:** ...
+            - **Discovered during:** ...
+        </tech-debt>
     </template>
 
     <guidelines>
@@ -299,6 +320,15 @@
         - Cross-reference with markdown links to other docs.
         - Agent should read these before modifying this system.
 
+        **Tech Debt:**
+        - One `###` subsection per known issue — NOT a table. Each issue needs enough context
+          for an agent to understand the problem without reading the code.
+        - Severity: `high` (security, data loss, production instability), `medium` (quality,
+          maintainability), `low` (cosmetic, minor inefficiency).
+        - Always link to the discovering story for traceability.
+        - REMOVE items when fixed by a future story.
+        - Omit the entire section if no tech debt exists in this system.
+
         **Section Inclusion:**
         - Include ALL sections that are relevant to the system.
         - OMIT sections that genuinely don't apply (e.g., no Database for pure frontend).
@@ -332,6 +362,7 @@
         - State management approach changed
         - New constants or enums added
         - File tree changed (new files, removed files, moved files)
+        - Tech debt discovered or resolved in this system's files
 
         **NOT an update trigger:**
         - Bug fixes that don't change system behavior

@@ -63,6 +63,16 @@
             Input: ALL prior passes (story file + external artifacts).
             Produces the technical-solution section appended to the story file.
         </pass>
+
+        &lt;!-- Execution passes (written by /ace:execute-story, not /ace:plan-story) --&gt;
+        <pass order="E1" populated-by="execute-story" output="story-file" required="false">
+            Summary &amp; State — execution results, commit log, deviations, code review.
+            Written after implementation is complete and user approves.
+        </pass>
+        <pass order="E2" populated-by="execute-story" output="story-file" required="false">
+            Wiki Updates — table of wiki documents updated/created during implementation.
+            Written after wiki mapper completes post-implementation.
+        </pass>
     </composition>
 
     <output-format>
@@ -201,6 +211,23 @@
                  - external-analysis.md (if it exists in story directory)
                  - integration-analysis.md (from story directory)
                  See story-technical-solution.xml for full section structure. --&gt;
+        </section>
+
+        <section name="summary-and-state" populated-by="execute-story">
+            ## Summary &amp; State
+
+            &lt;!-- Populated by /ace:execute-story after implementation.
+                 Contains: status, execution date, duration, commit log,
+                 implementation summary, deviations, and code review results.
+                 Do NOT edit manually — this section is written by the execution workflow. --&gt;
+        </section>
+
+        <section name="wiki-updates" populated-by="execute-story">
+            ## Wiki Updates
+
+            &lt;!-- Populated by /ace:execute-story after wiki mapping.
+                 Contains: table of wiki documents updated/created during implementation.
+                 Do NOT edit manually — this section is written by the execution workflow. --&gt;
         </section>
 
         <section name="metadata">
@@ -396,13 +423,28 @@
         and their artifacts should be re-evaluated.
         Updates metadata refinement count and "Last refined" date.
 
-        **During implementation:**
-        Story status moves from Refined to In Progress in the parent feature's story index.
-        The story spec itself does not change during implementation.
+        **During implementation (/ace:execute-story):**
+        Story status moves from Refined to In Progress.
+        Claude Code Plan Mode creates an execution plan from the Technical Solution.
+        Implementation proceeds (solo or agent teams mode).
+        Code review runs (ace-code-reviewer agent).
+        NO intermediary commits — changes accumulate until user approval.
+
+        **Execution Pass E1 — Summary &amp; State (execute-story → story file):**
+        After user approves implementation, the Summary &amp; State section is written
+        with: status, execution date, duration, commit log, implementation summary,
+        deviations from plan, and code review results.
+
+        **Execution Pass E2 — Wiki Updates (execute-story → story file):**
+        After wiki mapper completes, the Wiki Updates section is written with a table
+        of wiki documents updated/created during implementation. Tech debt discovered
+        during code review is integrated into wiki subsystem docs.
 
         **Completion:**
         All AC scenarios verified. DoD checklist complete. Story status moves to Done.
-        Parent feature's story index updated. If GitHub-linked, the issue is closed.
+        Parent feature's story index updated. Product backlog updated.
+        If GitHub-linked, the issue body is updated with full story content.
+        If all stories in the feature are Done, the feature status also moves to Done.
 
     </evolution>
 

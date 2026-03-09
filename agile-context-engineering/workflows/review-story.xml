@@ -1,0 +1,281 @@
+<workflow>
+
+    <purpose>
+        Standalone code review for a story's implementation. The session executing this workflow
+        IS the code reviewer — it follows the instructions from ace-code-reviewer.md directly.
+
+        Loads story context (AC, Technical Solution, coding standards), identifies changed/created
+        files, performs 3-level artifact verification, anti-pattern detection, coding standards
+        enforcement, and tech debt discovery.
+
+        This is a read-only workflow — it does NOT modify code, only reports issues.
+    </purpose>
+
+    <agent>
+        This workflow uses the `ace-code-reviewer` agent.
+        The session executing this workflow IS the code reviewer — it follows the agent's
+        review process, checklist, stub detection patterns, dead code detection rules,
+        and report format directly. It does NOT spawn a separate agent.
+    </agent>
+
+    <mandatory-context>
+        Read all files referenced by the invoking command's execution-context before starting.
+        Also read any document or text passed as parameter ($ARGUMENTS) in the invoking command.
+    </mandatory-context>
+
+    <process>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 1: INIT & VALIDATE                                           -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="init-and-validate" order="1">
+
+            <substep order="1.1" name="parse-arguments">
+                Parse `$ARGUMENTS` to extract:
+                - `story` (REQUIRED): file path or GitHub URL/issue number
+            </substep>
+
+            <substep order="1.2" name="run-init">
+                Execute environment detection:
+
+                ```bash
+                INIT=$(node ~/.claude/agile-context-engineering/src/ace-tools.js init execute-story {story_param})
+                ```
+
+                Parse INIT JSON for:
+                - `has_git`, `has_gh_cli`, `github_project`
+                - `story_source`, `story_valid`, `story_error`, `story_content`
+                - `story` (id, title, status, size), `feature` (id, title), `epic` (id, title)
+                - `has_acceptance_criteria`, `acceptance_criteria_count`
+                - `has_technical_solution`, `has_wiki_refs`, `has_coding_standards`
+                - `paths.*`
+            </substep>
+
+            <substep order="1.3" name="display-banner">
+                ```
+                ╔══════════════════════════════════════════════════╗
+                ║  ACE > Review Story                               ║
+                ╚══════════════════════════════════════════════════╝
+                ```
+            </substep>
+
+            <substep order="1.4" name="validate-story">
+                <validation-gate condition="INIT.story_valid is false">
+                    Display `INIT.story_error` and STOP:
+                    ```
+                      x  {INIT.story_error}
+                         Provide a valid story file path or GitHub issue.
+                    ```
+                </validation-gate>
+
+                <validation-gate condition="INIT.has_acceptance_criteria is false">
+                    STOP:
+                    ```
+                      x  Story has no acceptance criteria.
+                         Run /ace:plan-story first to define AC scenarios.
+                    ```
+                </validation-gate>
+
+                <validation-gate condition="INIT.has_technical_solution is false">
+                    STOP:
+                    ```
+                      x  Story has no technical solution.
+                         Run /ace:plan-story first to generate the technical solution.
+                    ```
+                </validation-gate>
+            </substep>
+
+            <substep order="1.5" name="display-context">
+                ```
+                  i  Story: {INIT.story.id} — {INIT.story.title}
+                     Feature: {INIT.feature.id} — {INIT.feature.title}
+                     Status: {INIT.story.status} | Size: {INIT.story.size}
+                     AC scenarios: {INIT.acceptance_criteria_count}
+                     Coding standards: {INIT.has_coding_standards ? "available" : "not found"}
+                ```
+            </substep>
+
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 2: LOAD REVIEW CONTEXT                                       -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="load-context" order="2">
+
+            <substep order="2.1" name="read-story-sections">
+                Read `INIT.paths.story_file` and extract:
+                - **Acceptance Criteria** — Gherkin scenarios (what MUST be implemented)
+                - **Technical Solution** — component breakdown (what files SHOULD exist and what they do)
+                - **Out of Scope** — what should NOT have been built
+            </substep>
+
+            <substep order="2.2" name="read-coding-standards">
+                <variant condition="INIT.has_coding_standards is true">
+                    Read `INIT.paths.coding_standards` — key rules for compliance checking.
+                </variant>
+            </substep>
+
+            <substep order="2.3" name="identify-changed-files">
+                Determine which files to review:
+
+                <variant condition="uncommitted changes exist">
+                    ```bash
+                    git diff --name-only HEAD
+                    git diff --cached --name-only
+                    git status --short
+                    ```
+                    Use changed files as the review scope.
+                </variant>
+
+                <variant condition="no uncommitted changes">
+                    Use the Technical Solution's artifact list to identify expected files
+                    and check their current state in the codebase.
+                </variant>
+
+                Display:
+                ```
+                  i  Review scope: {count} files identified
+                ```
+            </substep>
+
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 3: EXECUTE REVIEW                                            -->
+        <!--                                                                    -->
+        <!-- The session IS the reviewer. Follow the review process from        -->
+        <!-- ace-code-reviewer.md (the ace-code-reviewer agent).               -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="execute-review" order="3">
+
+            <substep order="3.1" name="display-banner">
+                ```
+                ┌──────────────────────────────────────────────────┐
+                │  ACE > Review Story > Reviewing                    │
+                └──────────────────────────────────────────────────┘
+                ```
+            </substep>
+
+            <substep order="3.2" name="3-level-artifact-verification">
+                For EACH artifact mentioned in the Technical Solution, perform the 3-level
+                verification as defined in ace-code-reviewer.md:
+
+                <level name="1-exists">
+                    Verify the file exists at the expected path.
+                    ```bash
+                    [ -f "path/to/file" ] &amp;&amp; echo "FOUND" || echo "MISSING"
+                    ```
+                </level>
+
+                <level name="2-substantive">
+                    Read each file. Check for stub patterns defined in ace-code-reviewer.md's
+                    stub detection section. A substantive file has real logic, real data access,
+                    real rendering — not placeholders, empty handlers, or static returns.
+                </level>
+
+                <level name="3-wired">
+                    Verify each artifact is imported/referenced AND used by consuming code.
+                    Adapt search patterns to the project's language (as documented in
+                    ace-code-reviewer.md's Level 3 patterns).
+                </level>
+
+                Build the artifact status matrix (VERIFIED / ORPHANED / STUB / MISSING).
+            </substep>
+
+            <substep order="3.3" name="run-review-checklist">
+                Execute the full review checklist from ace-code-reviewer.md:
+
+                <blockers>
+                    <check order="1">Dead code — unused imports, unreferenced functions, orphaned files</check>
+                    <check order="2">Backwards-compatible shims — re-exports, deprecated wrappers, underscore renames</check>
+                    <check order="3">Stub implementations — empty returns, placeholder content, no-op handlers</check>
+                    <check order="4">TODO/FIXME/HACK/PLACEHOLDER/XXX comments in new/modified code</check>
+                    <check order="5">Hardcoded values — magic numbers, hardcoded URLs, embedded credentials</check>
+                    <check order="6">Missing error handling — uncaught exceptions, unchecked responses</check>
+                    <check order="7">AC coverage gaps — verify EACH Gherkin scenario is implemented</check>
+                    <check order="8">Coding standards violations — mandatory check if standards available</check>
+                </blockers>
+
+                <warnings>
+                    <check order="9">Console/debug logging left behind</check>
+                    <check order="10">Missing tests for new functionality</check>
+                    <check order="11">Out of scope work — code NOT in the AC</check>
+                </warnings>
+
+                Use grep, file reads, and code analysis as described in ace-code-reviewer.md's
+                dead code detection and stub detection sections.
+            </substep>
+
+            <substep order="3.4" name="discover-tech-debt">
+                While reviewing, note pre-existing tech debt in files TOUCHED by this story.
+                Follow the tech debt discovery rules from ace-code-reviewer.md:
+
+                <rules>
+                    <rule>Only flag debt in EXISTING code, not new code (new code issues are blockers)</rule>
+                    <rule>Record: file, subsystem, description, severity, discovering story</rule>
+                    <rule>Severity: high (security/data loss), medium (quality/maintainability), low (cosmetic)</rule>
+                </rules>
+
+                Output tech debt in YAML format as defined in ace-code-reviewer.md.
+            </substep>
+
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 4: PRESENT RESULTS                                           -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="present-results" order="4">
+            Display the structured review report following ace-code-reviewer.md's report format:
+
+            ```
+            ╔══════════════════════════════════════════════════╗
+            ║  ACE > Story Reviewed                             ║
+            ║  {INIT.story.id} "{INIT.story.title}"            ║
+            ╚══════════════════════════════════════════════════╝
+
+                {✓ or x}  Review complete.
+
+                Status: {passed | issues_found}
+                Blockers: {count}
+                Warnings: {count}
+                Files reviewed: {count}
+                Artifacts verified: {passed}/{total} (3-level)
+                AC coverage: {covered}/{total} scenarios
+                Tech debt discovered: {count} items
+            ```
+
+            Then display the full report sections:
+            - Blockers list (if any) — file:line, description, severity, suggested fix
+            - Warnings list (if any) — file:line, description, severity, suggested fix
+            - Artifact verification matrix
+            - AC coverage matrix
+            - Tech debt YAML (if any)
+        </step>
+
+    </process>
+
+    <success_criteria>
+        <criterion>Init function executed (environment detected, story validated)</criterion>
+        <criterion>Acceptance criteria present — STOPPED if missing</criterion>
+        <criterion>Technical solution present — STOPPED if missing</criterion>
+        <criterion>Story sections extracted (AC, Technical Solution, Out of Scope)</criterion>
+        <criterion>Coding standards loaded if available</criterion>
+        <criterion>Review scope identified (changed files or technical solution artifacts)</criterion>
+        <criterion>3-level artifact verification completed for EVERY artifact in Technical Solution</criterion>
+        <criterion>Full review checklist executed (8 blocker checks, 3 warning checks)</criterion>
+        <criterion>Dead code detection run on all changed files</criterion>
+        <criterion>Stub detection run on all changed files</criterion>
+        <criterion>Coding standards compliance checked if standards available</criterion>
+        <criterion>AC coverage verified — every Gherkin scenario checked</criterion>
+        <criterion>Tech debt in existing code discovered and reported in YAML format</criterion>
+        <criterion>Structured report displayed following ace-code-reviewer report format</criterion>
+        <criterion>Completion banner with summary stats displayed</criterion>
+        <criterion>Next steps displayed</criterion>
+        <criterion>No code modifications made (read-only review)</criterion>
+    </success_criteria>
+
+</workflow>

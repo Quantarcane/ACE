@@ -1,0 +1,125 @@
+<tech-debt-index>
+    <purpose>
+        Template for `.docs/wiki/system-wide/tech-debt-index.md` — a cross-cutting index of all
+        known tech debt across the entire codebase. Answers "What quality issues exist, where,
+        and how severe are they?"
+
+        This is a roll-up document maintained by the wiki mapper after each story execution.
+        The ace-code-reviewer discovers tech debt during review; the wiki mapper records it here
+        AND in the relevant subsystem/system wiki docs.
+
+        Complements:
+        - Subsystem wiki docs (each has its own ## Tech Debt section with local items)
+        - coding-standards.md (defines what IS a violation; this doc tracks EXISTING violations)
+    </purpose>
+
+    <template>
+        <header>
+            # Tech Debt Index
+
+            **Last updated**: [YYYY-MM-DD]
+            **Total items**: [N] ([high] high, [medium] medium, [low] low)
+        </header>
+
+        <summary-table>
+            ## Summary by Subsystem
+
+            | Subsystem | High | Medium | Low | Total | Wiki Doc |
+            |-----------|------|--------|-----|-------|----------|
+            | [name]    | [n]  | [n]    | [n] | [n]   | [link to wiki doc] |
+            | **Total** | [n]  | [n]    | [n] | [n]   | |
+        </summary-table>
+
+        <by-subsystem>
+            ## By Subsystem
+
+            ### [subsystem-name] ([N] items)
+            **Wiki doc**: `.docs/wiki/subsystems/[name]/[relevant-doc].md`
+
+            | # | Severity | Description | File | Discovered |
+            |---|----------|-------------|------|------------|
+            | 1 | high     | [description] | `[file-path]` | [story-id] |
+            | 2 | medium   | [description] | `[file-path]` | [story-id] |
+
+            ### [subsystem-name] ([N] items)
+            ...
+        </by-subsystem>
+
+        <by-severity>
+            ## By Severity
+
+            ### High ([N] items)
+            Items that pose security risk, data loss risk, or production instability.
+
+            | # | Subsystem | Description | File | Discovered |
+            |---|-----------|-------------|------|------------|
+            | 1 | [name]    | [description] | `[file-path]` | [story-id] |
+
+            ### Medium ([N] items)
+            Quality issues, maintainability concerns, missing safeguards.
+
+            | # | Subsystem | Description | File | Discovered |
+            |---|-----------|-------------|------|------------|
+            | 1 | [name]    | [description] | `[file-path]` | [story-id] |
+
+            ### Low ([N] items)
+            Cosmetic issues, minor inefficiencies, style inconsistencies.
+
+            | # | Subsystem | Description | File | Discovered |
+            |---|-----------|-------------|------|------------|
+            | 1 | [name]    | [description] | `[file-path]` | [story-id] |
+        </by-severity>
+    </template>
+
+    <guidelines>
+
+        **Header:**
+        - Last updated date changes on every update
+        - Summary counts must be accurate — recalculate on every update
+
+        **Summary Table:**
+        - One row per subsystem that has tech debt
+        - Wiki doc link points to the subsystem wiki doc containing the local ## Tech Debt section
+        - Totals row at the bottom
+
+        **By Subsystem:**
+        - Grouped by subsystem, sorted alphabetically
+        - Within each subsystem, sorted by severity (high → medium → low)
+        - Each item has: severity, short description, file path, discovering story ID
+        - File paths are relative to project root
+
+        **By Severity:**
+        - Same items as By Subsystem, but grouped by severity level
+        - Provides a quick view of highest-priority debt across the codebase
+
+        **Severity Definitions:**
+        - `high` — security risk, data loss risk, production instability
+        - `medium` — quality issue, maintainability concern, missing safeguards
+        - `low` — cosmetic, minor inefficiency, style inconsistency
+
+        **What does NOT belong here:**
+        - Tech debt that has been fixed (remove it when fixed by a future story)
+        - Planned work or feature requests (those are stories/features in the backlog)
+        - Code that violates standards but was just written (that's a blocker, not tech debt)
+
+    </guidelines>
+
+    <evolution>
+
+        This is a LIVING document — updated by the wiki mapper after each story execution.
+
+        **Update triggers:**
+        - ace-code-reviewer discovers new tech debt during story review
+        - A story implementation fixes existing tech debt (remove the item)
+
+        **Update rules:**
+        - ADD new items discovered during code review
+        - REMOVE items that were fixed by a story
+        - RECALCULATE summary counts on every update
+        - PRESERVE item ordering: by subsystem alphabetically, then by severity
+        - Each item always linked to the discovering story for traceability
+        - When a subsystem has zero remaining items, remove its section
+
+    </evolution>
+
+</tech-debt-index>

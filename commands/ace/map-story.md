@@ -65,6 +65,13 @@ allowed-tools:
                         As commit SHAs: analyze specific commits (e.g., commits='abc123,def456').
                         When not provided: analyze staged + unstaged changes (git diff + git diff --cached).
                     </param>
+                    <param name="tech-debt" type="text | path">
+                        Tech debt items discovered during code review.
+                        Can be plain text, YAML, or a path to a file containing the items.
+                        When provided, the wiki mapper integrates these items into the
+                        relevant subsystem wiki docs (## Tech Debt sections) AND updates
+                        the system-wide tech-debt-index.md.
+                    </param>
                 </optional>
             </story-mode>
 
@@ -104,6 +111,7 @@ allowed-tools:
         <pattern>@~/.claude/agile-context-engineering/templates/wiki/pattern.xml</pattern>
         <guide>@~/.claude/agile-context-engineering/templates/wiki/guide.xml</guide>
         <decizions>@~/.claude/agile-context-engineering/templates/wiki/decizions.xml</decizions>
+        <tech-debt-index>@~/.claude/agile-context-engineering/templates/wiki/tech-debt-index.xml</tech-debt-index>
 
         <questioning>@~/.claude/agile-context-engineering/utils/questioning.xml</questioning>
         <ui-formatting>@~/.claude/agile-context-engineering/utils/ui-formatting.md</ui-formatting>

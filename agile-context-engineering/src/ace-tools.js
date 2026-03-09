@@ -23,12 +23,16 @@
  *   init plan-backlog               Environment detection for plan-backlog workflow
  *   init plan-story <story>          Environment detection for plan-story workflow (deep questioning)
  *   init research-story <story>     Validate story, extract metadata/requirements/wiki refs, compute paths
+ *   init execute-story <story>      Environment detection for execute-story workflow (execution context)
  *   init setup-github               Detect gh CLI, repo, and list GitHub Projects
  *
  *   ensure-settings                  Create .ace/settings.json with defaults if missing
  *   write-github-settings            Write GitHub Project settings (key=value args)
  *   write-agent-teams <true|false>   Enable/disable agent teams in ACE + Claude Code settings
  *   sync-agent-teams                 Sync agent_teams from .claude/settings.json (source of truth) to .ace/settings.json
+ *
+ * Story Commands:
+ *   story update-state               Update story status across story file, feature file, and product backlog
  *
  * GitHub Commands:
  *   github resolve-fields             Resolve native issue type IDs and project field IDs
@@ -49,6 +53,8 @@ const MODEL_PROFILES = {
   'ace-wiki-mapper':              { quality: 'sonnet', balanced: 'sonnet', budget: 'haiku' },
   'ace-code-integration-analyst': { quality: 'opus',   balanced: 'opus',   budget: 'sonnet' },
   'ace-code-discovery-analyst':   { quality: 'opus',   balanced: 'opus',   budget: 'sonnet' },
+  'ace-executor':                 { quality: 'opus',   balanced: 'sonnet', budget: 'sonnet' },
+  'ace-code-reviewer':            { quality: 'sonnet', balanced: 'sonnet', budget: 'haiku' },
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -287,6 +293,31 @@ function extractStoryMetadata(content) {
   if (linkMatch) result.link = linkMatch[1].trim();
 
   return result;
+}
+
+/**
+ * Extract GitHub issue number from a Link field value.
+ * Handles formats: "[#187](url)", "#187", "187"
+ * Returns the issue number as an integer, or null if not parseable.
+ */
+function extractIssueNumber(linkStr) {
+  if (!linkStr) return null;
+  const match = linkStr.match(/#(\d+)/);
+  return match ? parseInt(match[1], 10) : null;
+}
+
+/**
+ * Extract GitHub issue number from a file's **Link** header field.
+ * Reads the file, finds **Link**: [#N](url), returns the issue number or null.
+ */
+function extractIssueNumberFromFile(cwd, filePath) {
+  if (!filePath) return null;
+  const resolved = path.isAbsolute(filePath) ? filePath : path.join(cwd, filePath);
+  const content = safeReadFile(resolved);
+  if (!content) return null;
+  const linkMatch = content.match(/\*\*Link\*\*:\s*([^|*\n]+)/);
+  if (!linkMatch) return null;
+  return extractIssueNumber(linkMatch[1].trim());
 }
 
 /**
@@ -1222,8 +1253,12 @@ function cmdInitPlanStory(cwd, raw, storyParam) {
       title: metadata.title,
       status: metadata.status,
       size: metadata.size,
+      issue_number: extractIssueNumber(metadata.link),
     },
-    feature: metadata.feature,
+    feature: {
+      ...metadata.feature,
+      issue_number: paths ? extractIssueNumberFromFile(cwd, paths.feature_file) : null,
+    },
     epic: metadata.epic,
 
     // Requirements (may be empty for seed stories)
@@ -1238,6 +1273,237 @@ function cmdInitPlanStory(cwd, raw, storyParam) {
     has_external_analysis,
     has_integration_analysis,
     has_feature_file,
+    has_story_file,
+  };
+
+  output(result, raw);
+}
+
+// ─── Init: Execute Story ─────────────────────────────────────────────────────
+
+/**
+ * init execute-story <story-param>
+ *
+ * Environment detection for the execute-story workflow.
+ * Similar to init plan-story but with additional fields for execution:
+ * - agent_teams status (synced from Claude Code settings)
+ * - has_technical_solution, has_acceptance_criteria checks
+ * - has_coding_standards, has_wiki_refs checks
+ * - executor_model, reviewer_model (resolved from profiles)
+ * - product_backlog path
+ *
+ * story-param can be:
+ *   - File path: .ace/artifacts/product/.../story.md
+ *   - GitHub URL: https://github.com/owner/repo/issues/123
+ *   - Issue number: 123
+ */
+function cmdInitExecuteStory(cwd, raw, storyParam) {
+  const config = loadConfig(cwd);
+
+  // ── Environment detection ──
+  const has_git = pathExistsInternal(cwd, '.git');
+  const has_gh_cli = (() => {
+    try {
+      const { execSync } = require('child_process');
+      execSync('gh --version', { stdio: 'pipe' });
+      return true;
+    } catch { return false; }
+  })();
+  const settings = loadSettings(cwd);
+  const github_project = settings.github_project;
+
+  // ── Agent teams detection (sync from Claude Code settings) ──
+  const claudeSettingsPath = path.join(cwd, '.claude', 'settings.json');
+  let agent_teams = settings.agent_teams || false;
+  try {
+    const claudeRaw = fs.readFileSync(claudeSettingsPath, 'utf-8');
+    const claudeSettings = JSON.parse(claudeRaw);
+    const val = claudeSettings?.env?.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS;
+    agent_teams = val === '1' || val === 'true';
+  } catch {}
+
+  // ── Classify the story parameter ──
+  const classified = classifyStoryParam(storyParam);
+
+  // Early exit if invalid
+  if (classified.type === null || classified.type === 'invalid') {
+    output({
+      executor_model: resolveModelInternal(cwd, 'ace-executor'),
+      reviewer_model: resolveModelInternal(cwd, 'ace-code-reviewer'),
+      commit_docs: config.commit_docs,
+      has_git, has_gh_cli, github_project, agent_teams,
+      story_source: null,
+      story_valid: false,
+      story_error: classified.reason || 'No story parameter provided',
+      story_content: null,
+      story: { id: null, title: null, status: null, size: null },
+      feature: { id: null, title: null },
+      epic: { id: null, title: null },
+      has_acceptance_criteria: false,
+      acceptance_criteria_count: 0,
+      has_technical_solution: false,
+      has_wiki_refs: false,
+      has_coding_standards: false,
+      paths: null,
+    }, raw);
+    return;
+  }
+
+  // ── Load story content ──
+  let storyContent = null;
+  let storySource = classified.type === 'file' ? 'file' : 'github';
+  let storyError = null;
+  let storyFilePath = null;
+
+  if (classified.type === 'file') {
+    const resolvedPath = path.isAbsolute(classified.filePath)
+      ? classified.filePath
+      : path.join(cwd, classified.filePath);
+    if (!pathExistsInternal(cwd, classified.filePath)) {
+      storyError = `Story file not found: ${classified.filePath}`;
+    } else {
+      storyContent = safeReadFile(resolvedPath);
+      storyFilePath = classified.filePath;
+      if (!storyContent) storyError = `Could not read story file: ${classified.filePath}`;
+    }
+  } else {
+    // github-url or issue-number
+    if (!has_gh_cli) {
+      storyError = 'GitHub CLI (gh) not installed. Cannot fetch GitHub issues.';
+    } else {
+      const repo = classified.repo || (github_project.repo || null);
+      if (!repo) {
+        storyError = 'No repository configured. Provide a full GitHub URL or configure github_project.repo in settings.';
+      } else {
+        const ghResult = execCommand(
+          `gh issue view ${classified.issueNumber} --repo ${repo} --json title,body,labels,state`,
+          cwd
+        );
+        if (!ghResult) {
+          storyError = `Could not fetch GitHub issue #${classified.issueNumber} from ${repo}.`;
+        } else {
+          try {
+            const issue = JSON.parse(ghResult);
+            storyContent = issue.body || '';
+            if (storyContent && !storyContent.match(/^#\s+/m)) {
+              storyContent = `# ${issue.title}\n\n${storyContent}`;
+            }
+          } catch {
+            storyError = `Failed to parse GitHub issue response for #${classified.issueNumber}.`;
+          }
+        }
+      }
+    }
+  }
+
+  // ── Extract metadata & requirements ──
+  const metadata = extractStoryMetadata(storyContent);
+  const requirements = extractStoryRequirements(storyContent);
+
+  // ── Detect key sections ──
+  const has_acceptance_criteria = requirements.acceptance_criteria_count > 0;
+  const has_technical_solution = storyContent
+    ? !!extractMarkdownSection(storyContent, 'Technical Solution', 2)
+    : false;
+  const has_wiki_refs = storyContent
+    ? !!extractMarkdownSection(storyContent, 'Relevant Wiki', 2)
+    : false;
+  const has_coding_standards = pathExistsInternal(cwd, '.docs/wiki/system-wide/coding-standards.md');
+
+  // ── Compute paths ──
+  let paths = null;
+  let has_story_file = false;
+
+  if (storyFilePath) {
+    const resolvedPath = path.isAbsolute(storyFilePath)
+      ? storyFilePath
+      : path.join(cwd, storyFilePath);
+    const storyDir = path.dirname(resolvedPath);
+    const relStoryDir = path.relative(cwd, storyDir).replace(/\\/g, '/');
+    const storySlug = path.basename(storyDir);
+    const featureDir = path.dirname(storyDir);
+    const relFeatureDir = path.relative(cwd, featureDir).replace(/\\/g, '/');
+    const featureSlug = path.basename(featureDir);
+
+    paths = {
+      epic_slug: null,
+      feature_slug: featureSlug,
+      story_slug: storySlug,
+      story_dir: relStoryDir,
+      story_file: storyFilePath.replace(/\\/g, '/'),
+      external_analysis_file: `${relStoryDir}/external-analysis.md`,
+      integration_analysis_file: `${relStoryDir}/integration-analysis.md`,
+      feature_dir: relFeatureDir,
+      feature_file: `${relFeatureDir}/${featureSlug}.md`,
+      product_backlog: '.ace/artifacts/product/product-backlog.md',
+      coding_standards: '.docs/wiki/system-wide/coding-standards.md',
+    };
+    has_story_file = true;
+  } else if (metadata.epic.id && metadata.feature.id && metadata.id) {
+    const computed = computeStoryPaths(
+      metadata.epic.id, metadata.epic.title || '',
+      metadata.feature.id, metadata.feature.title || '',
+      metadata.id, metadata.title || ''
+    );
+    if (computed) {
+      paths = {
+        ...computed,
+        product_backlog: '.ace/artifacts/product/product-backlog.md',
+        coding_standards: '.docs/wiki/system-wide/coding-standards.md',
+      };
+      has_story_file = pathExistsInternal(cwd, paths.story_file);
+    }
+  }
+
+  // ── Extract GitHub issue numbers ──
+  const storyIssueNumber = extractIssueNumber(metadata.link);
+  const featureIssueNumber = paths ? extractIssueNumberFromFile(cwd, paths.feature_file) : null;
+
+  // ── Build result ──
+  const result = {
+    // Models
+    executor_model: resolveModelInternal(cwd, 'ace-executor'),
+    reviewer_model: resolveModelInternal(cwd, 'ace-code-reviewer'),
+
+    // Config
+    commit_docs: config.commit_docs,
+
+    // Environment
+    has_git, has_gh_cli, github_project, agent_teams,
+
+    // Story source
+    story_source: storySource,
+    story_valid: storyContent !== null && storyError === null,
+    story_error: storyError,
+
+    // Raw story content
+    story_content: storyContent,
+
+    // Story metadata
+    story: {
+      id: metadata.id,
+      title: metadata.title,
+      status: metadata.status,
+      size: metadata.size,
+      issue_number: storyIssueNumber,
+    },
+    feature: {
+      ...metadata.feature,
+      issue_number: featureIssueNumber,
+    },
+    epic: metadata.epic,
+
+    // Section detection
+    has_acceptance_criteria,
+    acceptance_criteria_count: requirements.acceptance_criteria_count,
+    has_technical_solution,
+    has_wiki_refs,
+    has_coding_standards,
+
+    // Computed paths
+    paths,
+
+    // Artifact existence
     has_story_file,
   };
 
@@ -1460,6 +1726,183 @@ function cmdInitResearchStory(cwd, raw, storyParam) {
   output(result, raw);
 }
 
+// ─── Story State Commands ────────────────────────────────────────────────────
+
+/**
+ * story update-state <story-param> --status <Done|DevReady|InProgress>
+ *
+ * Updates the story status across all ACE artifacts:
+ * 1. Story file header (Status field)
+ * 2. Feature file story index table
+ * 3. Product backlog story entry
+ *
+ * Also checks if all stories in the feature are Done — if so, updates
+ * the feature status to Done in both the feature file and product backlog.
+ *
+ * Returns: { story_updated, feature_updated, backlog_updated, feature_status_changed }
+ */
+function cmdStoryUpdateState(cwd, raw, extraArgs) {
+  const params = parseKeyValueArgs(extraArgs);
+  const storyParam = params.story;
+  const newStatus = params.status;
+
+  if (!storyParam) {
+    error('story update-state requires: story=<path|github-url>');
+  }
+  if (!newStatus || !['Done', 'DevReady', 'Refined', 'InProgress', 'In Progress'].includes(newStatus)) {
+    error('story update-state requires: status=Done|DevReady|Refined|InProgress');
+  }
+
+  // Normalize "InProgress" to "In Progress" for display
+  const displayStatus = newStatus === 'InProgress' ? 'In Progress' : newStatus;
+
+  const result = {
+    story_updated: false,
+    feature_updated: false,
+    backlog_updated: false,
+    feature_status_changed: false,
+    new_status: displayStatus,
+    errors: [],
+  };
+
+  // ── Resolve story file path ──
+  const classified = classifyStoryParam(storyParam);
+  if (classified.type !== 'file' || !classified.filePath) {
+    result.errors.push('story update-state currently only supports file paths');
+    output(result, raw);
+    return;
+  }
+
+  const storyFilePath = path.isAbsolute(classified.filePath)
+    ? classified.filePath
+    : path.join(cwd, classified.filePath);
+
+  // ── 1. Update story file header ──
+  const storyContent = safeReadFile(storyFilePath);
+  if (!storyContent) {
+    result.errors.push(`Could not read story file: ${classified.filePath}`);
+    output(result, raw);
+    return;
+  }
+
+  const updatedStory = storyContent.replace(
+    /(\*\*Status\*\*:\s*)([^|*\n]+)/,
+    `$1${displayStatus}`
+  );
+  if (updatedStory !== storyContent) {
+    try {
+      fs.writeFileSync(storyFilePath, updatedStory, 'utf-8');
+      result.story_updated = true;
+    } catch (e) {
+      result.errors.push(`Failed to write story file: ${e.message}`);
+    }
+  }
+
+  // Extract story metadata for lookups
+  const metadata = extractStoryMetadata(storyContent);
+  const storyId = metadata.id;
+  const storyTitle = metadata.title;
+
+  // ── 2. Update feature file story index ──
+  const storyDir = path.dirname(storyFilePath);
+  const featureDir = path.dirname(storyDir);
+  const featureSlug = path.basename(featureDir);
+  const featureFilePath = path.join(featureDir, `${featureSlug}.md`);
+
+  const featureContent = safeReadFile(featureFilePath);
+  if (featureContent && storyId) {
+    // Find the story in the feature's story index table and update its status
+    // Table format: | ID | Title | Size | Status | Sprint | Link |
+    const storyIdEscaped = storyId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const tableRowPattern = new RegExp(
+      `(\\|\\s*${storyIdEscaped}\\s*\\|[^|]*\\|[^|]*\\|\\s*)([^|]*)(\\s*\\|)`,
+      'm'
+    );
+    const updatedFeature = featureContent.replace(tableRowPattern, `$1${displayStatus}$3`);
+
+    if (updatedFeature !== featureContent) {
+      try {
+        fs.writeFileSync(featureFilePath, updatedFeature, 'utf-8');
+        result.feature_updated = true;
+      } catch (e) {
+        result.errors.push(`Failed to write feature file: ${e.message}`);
+      }
+    }
+
+    // ── Check if all stories in the feature are Done ──
+    if (displayStatus === 'Done') {
+      const updatedFeatureContent = safeReadFile(featureFilePath) || updatedFeature;
+      // Find all status cells in the story index table
+      // Match rows like: | S1 | ... | ... | Status | ... | ... |
+      const statusPattern = /\|\s*(?:S\d+|#\d+)\s*\|[^|]*\|[^|]*\|\s*([^|]*)\s*\|/gm;
+      let allDone = true;
+      let match;
+      let storyCount = 0;
+      while ((match = statusPattern.exec(updatedFeatureContent)) !== null) {
+        storyCount++;
+        const status = match[1].trim();
+        if (status !== 'Done') {
+          allDone = false;
+        }
+      }
+
+      if (allDone && storyCount > 0) {
+        // Update feature status to Done in the feature file header
+        const featureWithDoneStatus = updatedFeatureContent.replace(
+          /(\*\*Status\*\*:\s*)([^|*\n]+)/,
+          '$1Done'
+        );
+        if (featureWithDoneStatus !== updatedFeatureContent) {
+          try {
+            fs.writeFileSync(featureFilePath, featureWithDoneStatus, 'utf-8');
+            result.feature_status_changed = true;
+          } catch (e) {
+            result.errors.push(`Failed to update feature status: ${e.message}`);
+          }
+        }
+      }
+    }
+  }
+
+  // ── 3. Update product backlog ──
+  const backlogPath = path.join(cwd, '.ace', 'artifacts', 'product', 'product-backlog.md');
+  const backlogContent = safeReadFile(backlogPath);
+  if (backlogContent && storyId) {
+    let updatedBacklog = backlogContent;
+
+    // Update story status in backlog
+    // Table format varies but story ID should be in a table row
+    const storyIdEscaped = storyId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const backlogStoryPattern = new RegExp(
+      `(\\|\\s*${storyIdEscaped}\\s*\\|[^|]*\\|[^|]*\\|\\s*)([^|]*)(\\s*\\|)`,
+      'm'
+    );
+    updatedBacklog = updatedBacklog.replace(backlogStoryPattern, `$1${displayStatus}$3`);
+
+    // If feature status changed to Done, also update feature in backlog
+    if (result.feature_status_changed && metadata.feature.id) {
+      const featureIdEscaped = metadata.feature.id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const backlogFeaturePattern = new RegExp(
+        `(\\|\\s*${featureIdEscaped}\\s*\\|[^|]*\\|[^|]*\\|\\s*)([^|]*)(\\s*\\|)`,
+        'm'
+      );
+      updatedBacklog = updatedBacklog.replace(backlogFeaturePattern, `$1Done$3`);
+    }
+
+    if (updatedBacklog !== backlogContent) {
+      try {
+        fs.writeFileSync(backlogPath, updatedBacklog, 'utf-8');
+        result.backlog_updated = true;
+      } catch (e) {
+        result.errors.push(`Failed to write product backlog: ${e.message}`);
+      }
+    }
+  }
+
+  if (result.errors.length === 0) delete result.errors;
+  output(result, raw);
+}
+
 // ─── GitHub Integration Commands ──────────────────────────────────────────────
 
 /**
@@ -1637,13 +2080,31 @@ function cmdGithubCreateIssue(cwd, raw, extraArgs) {
   };
 
   // 1. Create the issue (auto-prefix title with [Type])
+  // Use --body-file to avoid shell escaping issues with backticks, $, code blocks, etc.
   const fullTitle = `[${type}] ${title}`;
   const safeTitle = fullTitle.replace(/"/g, '\\"');
-  const safeBody = body.replace(/"/g, '\\"');
+
+  let createBodyFile = null;
+  if (params.body_file) {
+    createBodyFile = path.isAbsolute(params.body_file)
+      ? params.body_file
+      : path.join(cwd, params.body_file);
+  } else {
+    const os = require('os');
+    createBodyFile = path.join(os.tmpdir(), `ace-gh-body-${Date.now()}.md`);
+    fs.writeFileSync(createBodyFile, body, 'utf8');
+  }
+
+  const safeBodyPath = createBodyFile.replace(/\\/g, '/');
   const issueUrl = execCommand(
-    `gh issue create --repo ${repo} --title "${safeTitle}" --body "${safeBody}"`,
+    `gh issue create --repo ${repo} --title "${safeTitle}" --body-file "${safeBodyPath}"`,
     cwd
   );
+
+  // Clean up temp file if we created one
+  if (!params.body_file && createBodyFile && fs.existsSync(createBodyFile)) {
+    try { fs.unlinkSync(createBodyFile); } catch {}
+  }
 
   if (!issueUrl) {
     result.errors.push('Failed to create issue');
@@ -1799,32 +2260,57 @@ function cmdGithubUpdateIssue(cwd, raw, extraArgs) {
     result.updated_title = true;
   }
 
-  // Body can come from body= param or body_file= param (for large bodies)
-  let body = params.body || null;
-  if (!body && params.body_file) {
-    const bodyPath = path.isAbsolute(params.body_file)
+  // Body can come from body_file= param (preferred — avoids shell escaping)
+  // or body= param (for short text).
+  // Uses gh's --body-file flag to avoid shell escaping issues with
+  // backticks, $, newlines, code blocks, mermaid diagrams, etc.
+  let bodyFilePath = null;
+  let tempBodyFile = null;
+
+  if (params.body_file) {
+    bodyFilePath = path.isAbsolute(params.body_file)
       ? params.body_file
       : path.join(cwd, params.body_file);
-    if (fs.existsSync(bodyPath)) {
-      body = fs.readFileSync(bodyPath, 'utf8');
-    } else {
+    if (!fs.existsSync(bodyFilePath)) {
       result.errors.push(`body_file not found: ${params.body_file}`);
+      bodyFilePath = null;
     }
+  } else if (params.body) {
+    // Write body text to a temp file to use --body-file
+    const os = require('os');
+    tempBodyFile = path.join(os.tmpdir(), `ace-gh-body-${Date.now()}.md`);
+    fs.writeFileSync(tempBodyFile, params.body, 'utf8');
+    bodyFilePath = tempBodyFile;
   }
 
-  if (body) {
-    const safeBody = body.replace(/"/g, '\\"');
-    editParts.push(`--body "${safeBody}"`);
+  if (bodyFilePath) {
+    const safeBodyPath = bodyFilePath.replace(/\\/g, '/');
+    editParts.push(`--body-file "${safeBodyPath}"`);
     result.updated_body = true;
   }
 
   if (result.updated_title || result.updated_body) {
-    const editOk = execCommand(editParts.join(' '), cwd);
-    if (!editOk && editOk !== '') {
-      result.errors.push('Failed to update issue');
+    const fullCmd = editParts.join(' ');
+    const { execSync } = require('child_process');
+    try {
+      const editResult = execSync(fullCmd, {
+        cwd,
+        shell: 'bash',
+        stdio: ['pipe', 'pipe', 'pipe'],
+        encoding: 'utf-8',
+        timeout: 30000,
+      }).trim();
+      // success — editResult is the URL
+    } catch (e) {
+      result.errors.push('Failed to update issue: ' + (e.stderr || e.message || 'unknown error'));
       result.updated_title = false;
       result.updated_body = false;
     }
+  }
+
+  // Clean up temp file if created
+  if (tempBodyFile && fs.existsSync(tempBodyFile)) {
+    try { fs.unlinkSync(tempBodyFile); } catch {}
   }
 
   // 2. Update project fields (optional — requires project context)
@@ -1892,6 +2378,88 @@ function cmdGithubUpdateIssue(cwd, raw, extraArgs) {
  *   - features: [{ number, title, status, priority, estimate, sprint, milestone, parent_number, parent_title, url, state }]
  *   - counts: { total, epics, features, skipped }
  */
+
+/**
+ * github sync-story — Update a story's GitHub issue AND its parent feature's GitHub issue
+ * in a single call. Prints human-readable status lines to stderr so the console always
+ * shows what happened, regardless of whether the calling workflow displays it.
+ *
+ * Required args: repo=owner/name  story_file=path
+ * Optional args: feature_file=path
+ *
+ * Reads each file's **Link** header to extract the issue number.
+ * Uses --body-file to push the full file content to GitHub.
+ *
+ * Returns JSON with: { story: { number, updated, error }, feature: { number, updated, error } }
+ */
+function cmdGithubSyncStory(cwd, raw, extraArgs) {
+  const params = parseKeyValueArgs(extraArgs);
+  const repo = params.repo;
+  const storyFile = params.story_file;
+
+  if (!repo || !storyFile) {
+    error('github sync-story requires: repo=owner/name story_file=path');
+  }
+
+  const result = {
+    story: { number: null, updated: false, error: null },
+    feature: { number: null, updated: false, error: null },
+  };
+
+  const { execSync } = require('child_process');
+
+  // --- Sync story issue ---
+  const storyPath = path.isAbsolute(storyFile) ? storyFile : path.join(cwd, storyFile);
+  const storyIssue = extractIssueNumberFromFile(cwd, storyFile);
+
+  if (!storyIssue) {
+    result.story.error = 'No GitHub issue linked';
+    process.stderr.write('  —  Story has no GitHub issue linked. Skipping.\n');
+  } else {
+    result.story.number = storyIssue;
+    const safePath = storyPath.replace(/\\/g, '/');
+    try {
+      execSync(`gh issue edit ${storyIssue} --repo ${repo} --body-file "${safePath}"`, {
+        cwd, shell: 'bash', stdio: ['pipe', 'pipe', 'pipe'], encoding: 'utf-8', timeout: 30000,
+      });
+      result.story.updated = true;
+      process.stderr.write(`  +  Updated GitHub story issue #${storyIssue}.\n`);
+    } catch (e) {
+      result.story.error = (e.stderr || e.message || 'unknown error').trim();
+      process.stderr.write(`  x  FAILED to update GitHub story issue #${storyIssue}.\n`);
+      process.stderr.write(`     Error: ${result.story.error}\n`);
+    }
+  }
+
+  // --- Sync feature issue ---
+  const featureFile = params.feature_file;
+  if (featureFile) {
+    const featurePath = path.isAbsolute(featureFile) ? featureFile : path.join(cwd, featureFile);
+    const featureIssue = extractIssueNumberFromFile(cwd, featureFile);
+
+    if (!featureIssue) {
+      result.feature.error = 'No GitHub issue linked';
+      process.stderr.write('  —  Feature has no GitHub issue linked. Skipping.\n');
+    } else {
+      result.feature.number = featureIssue;
+      const safePath = featurePath.replace(/\\/g, '/');
+      try {
+        execSync(`gh issue edit ${featureIssue} --repo ${repo} --body-file "${safePath}"`, {
+          cwd, shell: 'bash', stdio: ['pipe', 'pipe', 'pipe'], encoding: 'utf-8', timeout: 30000,
+        });
+        result.feature.updated = true;
+        process.stderr.write(`  +  Updated GitHub feature issue #${featureIssue}.\n`);
+      } catch (e) {
+        result.feature.error = (e.stderr || e.message || 'unknown error').trim();
+        process.stderr.write(`  x  FAILED to update GitHub feature issue #${featureIssue}.\n`);
+        process.stderr.write(`     Error: ${result.feature.error}\n`);
+      }
+    }
+  }
+
+  output(result, raw);
+}
+
 function cmdGithubFetchIssues(cwd, raw, extraArgs) {
   const params = parseKeyValueArgs(extraArgs);
   const repo = params.repo;
@@ -2124,11 +2692,27 @@ function main() {
         case 'research-story':
           cmdInitResearchStory(cwd, raw, args.slice(2).join(' '));
           break;
+        case 'execute-story':
+          cmdInitExecuteStory(cwd, raw, args.slice(2).join(' '));
+          break;
         case 'setup-github':
           cmdSetupGithubProject(cwd, raw);
           break;
         default:
-          error('Unknown init subcommand. Available: new-project, product-vision, coding-standards, map-system, map-subsystem, plan-backlog, plan-feature, plan-story, research-story, setup-github');
+          error('Unknown init subcommand. Available: new-project, product-vision, coding-standards, map-system, map-subsystem, plan-backlog, plan-feature, plan-story, research-story, execute-story, setup-github');
+      }
+      break;
+    }
+
+    case 'story': {
+      const storySubcommand = args[1];
+      const storyArgs = args.slice(2);
+      switch (storySubcommand) {
+        case 'update-state':
+          cmdStoryUpdateState(cwd, raw, storyArgs);
+          break;
+        default:
+          error('Unknown story subcommand. Available: update-state');
       }
       break;
     }
@@ -2146,17 +2730,20 @@ function main() {
         case 'update-issue':
           cmdGithubUpdateIssue(cwd, raw, githubArgs);
           break;
+        case 'sync-story':
+          cmdGithubSyncStory(cwd, raw, githubArgs);
+          break;
         case 'fetch-issues':
           cmdGithubFetchIssues(cwd, raw, githubArgs);
           break;
         default:
-          error('Unknown github subcommand. Available: resolve-fields, create-issue, update-issue, fetch-issues');
+          error('Unknown github subcommand. Available: resolve-fields, create-issue, update-issue, sync-story, fetch-issues');
       }
       break;
     }
 
     default:
-      error(`Unknown command: ${command}\nAvailable: load-config, resolve-model, verify-path-exists, generate-slug, current-timestamp, ensure-settings, write-github-settings, write-agent-teams, sync-agent-teams, init, github`);
+      error(`Unknown command: ${command}\nAvailable: load-config, resolve-model, verify-path-exists, generate-slug, current-timestamp, ensure-settings, write-github-settings, write-agent-teams, sync-agent-teams, init, story, github`);
   }
 }
 

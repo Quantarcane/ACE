@@ -85,6 +85,27 @@
             - [Common mistake 1]
             - [Common mistake 2]
         </gotchas>
+
+        <tech-debt>
+            ## Tech Debt
+
+            Known quality issues in this cross-cutting concern discovered during story code reviews.
+            Items are added by the wiki mapper and removed when fixed by a future story.
+            Include ONLY if this concern has known tech debt items. Omit section entirely if clean.
+
+            ### [Short descriptive title of the issue]
+            - **Severity:** high | medium | low
+            - **File:** `[file-path:SymbolName]`
+            - **Description:** What the issue is, why it matters, and what could go wrong
+              if left unfixed. For cross-cutting concerns, note which dependent systems are affected.
+            - **Discovered during:** [story-id] — [story title]
+
+            ### [Another issue]
+            - **Severity:** ...
+            - **File:** ...
+            - **Description:** ...
+            - **Discovered during:** ...
+        </tech-debt>
     </template>
 
     <guidelines>
@@ -129,6 +150,16 @@
         - Registration order dependencies, naming conventions, initialization timing.
         - Anything that silently fails if done wrong.
 
+        **Tech Debt:**
+        - One `###` subsection per known issue — NOT a table. Each issue needs enough context
+          for an agent to understand the problem without reading the code.
+        - For cross-cutting concerns, always note which dependent systems are affected.
+        - Severity: `high` (security, data loss, production instability), `medium` (quality,
+          maintainability), `low` (cosmetic, minor inefficiency).
+        - Always link to the discovering story for traceability.
+        - REMOVE items when fixed by a future story.
+        - Omit the entire section if no tech debt exists in this concern.
+
         **What does NOT belong here:**
         - Domain-specific logic (that's in systems/ docs)
         - Reusable structural patterns (that's in patterns/ docs)
@@ -148,6 +179,7 @@
         - New integration point discovered
         - New gotcha discovered
         - Setup/initialization process changed
+        - Tech debt discovered or resolved in this concern's files
 
         **NOT an update trigger:**
         - New feature that registers with existing mechanism without changing it

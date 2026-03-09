@@ -771,57 +771,76 @@
         </step>
 
         <!-- ══════════════════════════════════════════════════════════════════ -->
-        <!-- STEP 8: GITHUB SYNC                                               -->
+        <!-- STEP 8: STATE UPDATES                                             -->
         <!-- ══════════════════════════════════════════════════════════════════ -->
 
-        <step name="github-sync" order="8">
+        <step name="state-updates" order="8">
 
-            **If `github_project.enabled` is false OR `has_gh_cli` is false:**
-            Skip to step 9.
+            <substep order="8.1" name="update-state-via-tools">
+                ```bash
+                node ~/.claude/agile-context-engineering/src/ace-tools.js story update-state \
+                  story={INIT.paths.story_file} \
+                  status=Refined
+                ```
 
-            **If `github_project.enabled` is true AND `has_gh_cli` is true:**
+                Parse result for: `story_updated`, `feature_updated`, `backlog_updated`.
 
-            Extract settings: REPO = `github_project.repo`, PROJECT_NUMBER = `github_project.project_number`,
-            OWNER = `github_project.owner`.
-
-            <!-- ── 8a: Check if story has a GitHub issue ─────────────────── -->
-
-            Check if the story has a GitHub link in its header (Link field with #N).
-
-            **If story already has a GitHub issue:**
-            - Update the issue body with the full story file content:
-              ```bash
-              node ~/.claude/agile-context-engineering/src/ace-tools.js github update-issue \
-                number={issue_number} \
-                repo={REPO} \
-                body_file={INIT.paths.story_file}
-              ```
-            - Display:
-              ```
-                ~  Updated GitHub issue #{issue_number} with full story specification.
-              ```
-
-            **If story has no GitHub issue:**
-            - Display:
-              ```
-                i  Story has no GitHub issue linked. Local file only.
-                   To create a GitHub issue, run /ace:plan-feature to sync.
-              ```
+                ```
+                  +  Story status updated to Refined
+                  {+  Feature file updated (if feature_updated)}
+                  {+  Product backlog updated (if backlog_updated)}
+                ```
+            </substep>
 
             Continue to step 9.
         </step>
 
         <!-- ══════════════════════════════════════════════════════════════════ -->
-        <!-- STEP 9: COMMIT                                                    -->
+        <!-- STEP 9: GITHUB SYNC                                               -->
         <!-- ══════════════════════════════════════════════════════════════════ -->
 
-        <step name="commit" order="9">
+        <step name="github-sync" order="9">
+
+            <variant condition="INIT.github_project.enabled is false OR INIT.has_gh_cli is false">
+                ```
+                  —  GitHub sync skipped (not configured or gh CLI unavailable).
+                ```
+                Continue to step 10.
+            </variant>
+
+            <variant condition="INIT.github_project.enabled is true AND INIT.has_gh_cli is true">
+                Sync story and feature GitHub issues in a single call.
+                This command prints status lines directly to the console (stderr)
+                so the user ALWAYS sees whether each issue was updated or not.
+
+                ```bash
+                node ~/.claude/agile-context-engineering/src/ace-tools.js github sync-story \
+                  repo={INIT.github_project.repo} \
+                  story_file={INIT.paths.story_file} \
+                  feature_file={INIT.paths.feature_file}
+                ```
+
+                The command handles all cases:
+                - Story/feature has no GitHub issue linked → prints skip message
+                - Update succeeds → prints success message with issue number
+                - Update fails → prints error message with details
+
+                Continue to step 10.
+            </variant>
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 10: COMMIT                                                   -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="commit" order="10">
 
             **If `commit_docs` is false:** Skip commit.
 
             Stage all changed/created files:
             ```bash
             git add {INIT.paths.story_dir}/
+            git add {INIT.paths.feature_file} .ace/artifacts/product/product-backlog.md
             ```
 
             Commit with descriptive message:
@@ -880,8 +899,9 @@
         - Pass 5 (technical solution) dispatched AFTER pass 4 complete
         - NO TaskOutput called on ANY background agent — context window stays clean
         - Each background agent wrote output directly to disk (story file or separate artifact)
+        - Story status updated to Refined via ace-tools (story file, feature file, product backlog)
         - GitHub issue updated (if applicable)
-        - All artifacts committed with descriptive message
+        - All artifacts committed with descriptive message (story dir + feature file + backlog)
     </success_criteria>
 
 </workflow>

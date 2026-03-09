@@ -51,6 +51,7 @@
                 <parameters mode="story">
                     <param name="story-context" required="false" type="path">Path to story artifacts folder</param>
                     <param name="commits" required="false" type="string">Number of recent commits OR comma-separated SHAs</param>
+                    <param name="tech-debt" required="false" type="text|path">Tech debt from code review. Plain text, YAML, or file path.</param>
                 </parameters>
 
                 <parameters mode="file">
@@ -91,6 +92,7 @@
                         "files": [list of source file paths],
                         "file_statuses": { "path": "A|M|D" },   // story mode only
                         "story_summary": "...",                   // story mode only
+                        "tech_debt_items": [...]                  // story mode only, if tech-debt provided
                         "module_name": "...",                     // file mode only
                         "existing_docs": [...]                    // file mode only, if provided
                     }
@@ -174,6 +176,27 @@
                       - [subsystem]  ([N] files changed)
                       - [subsystem]  ([M] files changed)
                     ```
+                </substep>
+
+                <substep order="2d" name="distribute-tech-debt">
+                    <variant condition="tech-debt parameter was provided">
+                        Parse the tech debt input (plain text, YAML, or read from file path).
+                        Each tech debt item has a `file` field — use the same subsystem mapping
+                        rules from step 2b to assign each item to its subsystem.
+                        Attach the filtered items to each subsystem entry as `tech_debt_items`.
+
+                        Store the full parsed tech debt list as `ALL_TECH_DEBT` for step 4
+                        (tech-debt-index update).
+
+                        Display:
+                        ```
+                          i  Tech debt: {total_count} items distributed across {subsystem_count} subsystem(s)
+                        ```
+                    </variant>
+
+                    <variant condition="no tech-debt parameter">
+                        Skip — no tech debt to integrate.
+                    </variant>
                 </substep>
 
             </mode>
@@ -340,6 +363,11 @@
                             <variant condition="file mode">
                                 **Module name:** [module_name]
                                 **Pre-existing documentation:** [existing_docs paths, or 'none']
+                            </variant>
+
+                            <variant condition="tech_debt_items is not empty">
+                                **Tech debt items to integrate:**
+                                [tech_debt_items YAML for this subsystem]
                             </variant>
                         </instruction>
 
@@ -536,6 +564,37 @@
                             </verification-checklist>
                         </instruction>
 
+                        <instruction order="E2" name="integrate-tech-debt">
+                            TECH DEBT INTEGRATION (only if tech_debt_items were provided)
+
+                            For each tech debt item assigned to this subsystem:
+
+                            <substep order="E2.1" name="find-target-doc">
+                                Determine which wiki doc the item belongs to based on the file path
+                                and the item's subsystem/description. It will be a systems/ or
+                                cross-cutting/ doc (tech debt lives in concrete code areas).
+                            </substep>
+
+                            <substep order="E2.2" name="add-tech-debt-section">
+                                If the target doc exists: add or update the `## Tech Debt` section.
+                                If the target doc was just created: include the `## Tech Debt` section.
+
+                                Use the verbose format from the wiki templates (NOT tables):
+                                ```
+                                ### [Short descriptive title]
+                                - **Severity:** high | medium | low
+                                - **File:** `[file-path:SymbolName]`
+                                - **Description:** What the issue is, why it matters
+                                - **Discovered during:** [story-id] — [story title]
+                                ```
+
+                                Do NOT duplicate items already in the doc's Tech Debt section.
+                                Remove items that have been fixed (file no longer has the issue).
+                            </substep>
+
+                            Include tech debt integration in your report.
+                        </instruction>
+
                         <instruction order="F" name="report">
                             YOUR REPORT (return this)
 
@@ -595,10 +654,48 @@
         </step>
 
         <!-- ══════════════════════════════════════════════════════════════════ -->
-        <!-- STEP 5: SECURITY SCAN AND REPORT                                  -->
+        <!-- STEP 5: UPDATE TECH DEBT INDEX (story mode only, if tech debt)   -->
         <!-- ══════════════════════════════════════════════════════════════════ -->
 
-        <step name="report" order="5">
+        <step name="update-tech-debt-index" order="5">
+
+            <variant condition="story mode AND ALL_TECH_DEBT is not empty">
+                Update `.docs/wiki/system-wide/tech-debt-index.md` using the
+                tech-debt-index template (from execution-context).
+
+                <substep order="5.1" name="read-existing-index">
+                    Read `.docs/wiki/system-wide/tech-debt-index.md` if it exists.
+                    If it doesn't exist, create it from the template.
+                </substep>
+
+                <substep order="5.2" name="merge-items">
+                    For each item in ALL_TECH_DEBT:
+                    - Add to the By Subsystem table under the correct subsystem
+                    - Add to the By Severity table under the correct severity
+                    - Do NOT duplicate items already in the index
+                    - Remove items that have been fixed
+                </substep>
+
+                <substep order="5.3" name="recalculate-counts">
+                    Recalculate all summary counts:
+                    - Total items, high/medium/low breakdown
+                    - Per-subsystem counts
+                    - Update the "Last updated" date
+                </substep>
+            </variant>
+
+            <variant condition="file mode OR no tech debt">
+                Skip — no tech debt index update needed.
+            </variant>
+
+            Continue to step 6.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 6: SECURITY SCAN AND REPORT                                  -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="report" order="6">
 
             <substep order="5.1" name="security-scan">
                 Security scan across all affected subsystems — use the Grep tool (NOT bash grep):
@@ -641,6 +738,11 @@
 
                     Documents updated:
                     - [path] — [what changed]
+
+                    [If tech debt was integrated:]
+                    ### Tech Debt Integrated
+                    - [N] items added across [M] subsystem wiki docs
+                    - Tech debt index updated: .docs/wiki/system-wide/tech-debt-index.md
 
                     [If any agent failures:]
                     ### Failures
@@ -686,6 +788,8 @@
         <criterion>Every systems/*.md doc has at least one mermaid sequenceDiagram (E2E flow is mandatory)</criterion>
         <criterion>Inline code only for interface/type contracts</criterion>
         <criterion>Related systems cross-referenced with markdown links</criterion>
+        <criterion>Tech debt items integrated into relevant subsystem wiki docs (if provided)</criterion>
+        <criterion>Tech debt index updated with new items and recalculated counts (if provided)</criterion>
         <criterion>Security scan passed (no secrets in generated docs)</criterion>
         <criterion>Clear structured report from each agent, merged into final report</criterion>
     </success_criteria>
