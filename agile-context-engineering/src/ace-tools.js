@@ -38,6 +38,7 @@
  *   github resolve-fields             Resolve native issue type IDs and project field IDs
  *   github create-issue               Create issue, set type, add to project, set fields
  *   github update-issue               Update an existing issue's title, body, and optionally project fields
+ *   github sync-story                 Sync story/feature body and project status to GitHub
  *   github fetch-issues               Fetch all Epics/Features from GitHub Project with full fields
  */
 
@@ -1939,6 +1940,53 @@ function execCommand(cmd, cwd) {
 }
 
 /**
+ * Resolve project ID and field definitions for a GitHub Project.
+ * Returns { project_id, fields } where fields maps field names to { id, type, options? }.
+ * Returns { project_id: null, fields: {} } on failure.
+ */
+function resolveProjectContext(owner, project, cwd) {
+  const projectListRaw = execCommand(
+    `gh project list --owner ${owner} --format json --limit 20`,
+    cwd
+  );
+
+  let project_id = null;
+  if (projectListRaw) {
+    try {
+      const parsed = JSON.parse(projectListRaw);
+      const projects = parsed.projects || parsed || [];
+      const match = projects.find(p => String(p.number) === String(project));
+      if (match) project_id = match.id;
+    } catch {}
+  }
+
+  const fieldsRaw = execCommand(
+    `gh project field-list ${project} --owner ${owner} --format json`,
+    cwd
+  );
+
+  const fields = {};
+  if (fieldsRaw) {
+    try {
+      const parsed = JSON.parse(fieldsRaw);
+      const fieldList = parsed.fields || parsed || [];
+      for (const field of fieldList) {
+        const entry = { id: field.id, type: field.type };
+        if (field.options) {
+          entry.options = {};
+          for (const opt of field.options) {
+            entry.options[opt.name] = opt.id;
+          }
+        }
+        fields[field.name] = entry;
+      }
+    } catch {}
+  }
+
+  return { project_id, fields };
+}
+
+/**
  * github resolve-fields — Resolve all GitHub field/type IDs needed for issue creation.
  *
  * Required args: repo=owner/name  owner=org  project=number
@@ -1977,49 +2025,12 @@ function cmdGithubResolveFields(cwd, raw, extraArgs) {
     } catch {}
   }
 
-  // 2. Resolve project ID
-  const projectListRaw = execCommand(
-    `gh project list --owner ${owner} --format json --limit 20`,
-    cwd
-  );
-
-  let projectId = null;
-  if (projectListRaw) {
-    try {
-      const parsed = JSON.parse(projectListRaw);
-      const projects = parsed.projects || parsed || [];
-      const match = projects.find(p => String(p.number) === String(project));
-      if (match) projectId = match.id;
-    } catch {}
-  }
-
-  // 3. Resolve project fields
-  const fieldsRaw = execCommand(
-    `gh project field-list ${project} --owner ${owner} --format json`,
-    cwd
-  );
-
-  const fields = {};
-  if (fieldsRaw) {
-    try {
-      const parsed = JSON.parse(fieldsRaw);
-      const fieldList = parsed.fields || parsed || [];
-      for (const field of fieldList) {
-        const entry = { id: field.id, type: field.type };
-        if (field.options) {
-          entry.options = {};
-          for (const opt of field.options) {
-            entry.options[opt.name] = opt.id;
-          }
-        }
-        fields[field.name] = entry;
-      }
-    } catch {}
-  }
+  // 2 & 3. Resolve project ID and fields
+  const { project_id, fields } = resolveProjectContext(owner, project, cwd);
 
   output({
     issue_types: issueTypes,
-    project_id: projectId,
+    project_id,
     fields,
   }, raw);
 }
@@ -2317,11 +2328,24 @@ function cmdGithubUpdateIssue(cwd, raw, extraArgs) {
   if (params.owner && params.project && params.project_id) {
     const owner = params.owner;
 
-    // Find the project item ID for this issue
-    const itemId = execCommand(
-      `gh project item-list ${params.project} --owner ${owner} --format json --jq ".items[] | select(.content.number == ${number}) | .id"`,
+    // Find the project item ID via GraphQL (direct query — no pagination issues)
+    const repoParts = repo.split('/');
+    const repoOwner = repoParts[0];
+    const repoName = repoParts[1] || repoParts[0];
+    const itemQuery = `query { repository(owner: \\"${repoOwner}\\", name: \\"${repoName}\\") { issue(number: ${number}) { projectItems(first: 10) { nodes { id project { id } } } } } }`;
+    const itemResult = execCommand(
+      `gh api graphql -f query="${itemQuery}"`,
       cwd
     );
+    let itemId = null;
+    if (itemResult) {
+      try {
+        const parsed = JSON.parse(itemResult);
+        const nodes = parsed.data?.repository?.issue?.projectItems?.nodes || [];
+        const match = nodes.find(n => n.project?.id === params.project_id);
+        itemId = match?.id || null;
+      } catch {}
+    }
 
     if (itemId) {
       // Set Status
@@ -2381,16 +2405,22 @@ function cmdGithubUpdateIssue(cwd, raw, extraArgs) {
 
 /**
  * github sync-story — Update a story's GitHub issue AND its parent feature's GitHub issue
- * in a single call. Prints human-readable status lines to stderr so the console always
+ * in a single call. Pushes file content as body AND updates the GitHub Project Status field
+ * to match each file's local **Status** value.
+ *
+ * Prints human-readable status lines to stderr so the console always
  * shows what happened, regardless of whether the calling workflow displays it.
  *
  * Required args: repo=owner/name  story_file=path
- * Optional args: feature_file=path
+ * Optional args: feature_file=path  owner=org  project=number
+ *
+ * When owner and project are provided, resolves the GitHub Project's Status field
+ * and updates each issue's project status to match the local file status.
  *
  * Reads each file's **Link** header to extract the issue number.
  * Uses --body-file to push the full file content to GitHub.
  *
- * Returns JSON with: { story: { number, updated, error }, feature: { number, updated, error } }
+ * Returns JSON with: { story: { number, updated, status_synced, error }, feature: { number, updated, status_synced, error } }
  */
 function cmdGithubSyncStory(cwd, raw, extraArgs) {
   const params = parseKeyValueArgs(extraArgs);
@@ -2402,11 +2432,84 @@ function cmdGithubSyncStory(cwd, raw, extraArgs) {
   }
 
   const result = {
-    story: { number: null, updated: false, error: null },
-    feature: { number: null, updated: false, error: null },
+    story: { number: null, updated: false, status_synced: false, error: null },
+    feature: { number: null, updated: false, status_synced: false, error: null },
   };
 
   const { execSync } = require('child_process');
+
+  // --- Resolve project context for status updates (optional) ---
+  const owner = params.owner;
+  const project = params.project;
+  let projectCtx = null;
+
+  if (owner && project) {
+    projectCtx = resolveProjectContext(owner, project, cwd);
+    if (!projectCtx.project_id) {
+      process.stderr.write(`  !  Could not resolve GitHub Project #${project}. Status updates skipped.\n`);
+      projectCtx = null;
+    } else if (!projectCtx.fields.Status) {
+      process.stderr.write('  !  GitHub Project has no Status field. Status updates skipped.\n');
+      projectCtx = null;
+    }
+  }
+
+  // --- Helper: update project status for a single issue ---
+  function syncProjectStatus(issueNumber, filePath, label) {
+    if (!projectCtx) return false;
+
+    const content = safeReadFile(filePath);
+    if (!content) return false;
+
+    const metadata = extractStoryMetadata(content);
+    const localStatus = metadata.status;
+    if (!localStatus) {
+      process.stderr.write(`  —  ${label} has no Status field. Skipping project status update.\n`);
+      return false;
+    }
+
+    const statusField = projectCtx.fields.Status;
+    const statusOptionId = statusField.options?.[localStatus];
+    if (!statusOptionId) {
+      process.stderr.write(`  !  GitHub Project has no status option "${localStatus}". Skipping status update for ${label}.\n`);
+      return false;
+    }
+
+    // Look up project item ID via GraphQL (direct query — no pagination issues)
+    const repoParts = repo.split('/');
+    const repoOwner = repoParts[0];
+    const repoName = repoParts[1] || repoParts[0];
+    const itemQuery = `query { repository(owner: \\"${repoOwner}\\", name: \\"${repoName}\\") { issue(number: ${issueNumber}) { projectItems(first: 10) { nodes { id project { id } } } } } }`;
+    const itemResult = execCommand(
+      `gh api graphql -f query="${itemQuery}"`,
+      cwd
+    );
+    let itemId = null;
+    if (itemResult) {
+      try {
+        const parsed = JSON.parse(itemResult);
+        const nodes = parsed.data?.repository?.issue?.projectItems?.nodes || [];
+        const match = nodes.find(n => n.project?.id === projectCtx.project_id);
+        itemId = match?.id || null;
+      } catch {}
+    }
+    if (!itemId) {
+      process.stderr.write(`  !  ${label} #${issueNumber} not found in GitHub Project. Skipping status update.\n`);
+      return false;
+    }
+
+    const statusOk = execCommand(
+      `gh project item-edit --project-id ${projectCtx.project_id} --id ${itemId} --field-id ${statusField.id} --single-select-option-id ${statusOptionId}`,
+      cwd
+    );
+    if (statusOk !== null) {
+      process.stderr.write(`  +  Updated ${label} #${issueNumber} project status → "${localStatus}".\n`);
+      return true;
+    } else {
+      process.stderr.write(`  x  FAILED to update ${label} #${issueNumber} project status.\n`);
+      return false;
+    }
+  }
 
   // --- Sync story issue ---
   const storyPath = path.isAbsolute(storyFile) ? storyFile : path.join(cwd, storyFile);
@@ -2428,6 +2531,10 @@ function cmdGithubSyncStory(cwd, raw, extraArgs) {
       result.story.error = (e.stderr || e.message || 'unknown error').trim();
       process.stderr.write(`  x  FAILED to update GitHub story issue #${storyIssue}.\n`);
       process.stderr.write(`     Error: ${result.story.error}\n`);
+    }
+
+    if (result.story.updated) {
+      result.story.status_synced = syncProjectStatus(storyIssue, storyPath, 'Story');
     }
   }
 
@@ -2453,6 +2560,10 @@ function cmdGithubSyncStory(cwd, raw, extraArgs) {
         result.feature.error = (e.stderr || e.message || 'unknown error').trim();
         process.stderr.write(`  x  FAILED to update GitHub feature issue #${featureIssue}.\n`);
         process.stderr.write(`     Error: ${result.feature.error}\n`);
+      }
+
+      if (result.feature.updated) {
+        result.feature.status_synced = syncProjectStatus(featureIssue, featurePath, 'Feature');
       }
     }
   }

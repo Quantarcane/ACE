@@ -84,8 +84,16 @@ allowed-tools:
     </output>
 
     <process>
+        **STRICT WORKFLOW EXECUTION — Follow the execute-story workflow STEP BY STEP.
+        Do NOT skip steps. Do NOT improvise. Do NOT start reading code or planning
+        until step 1 (init &amp; validate) is fully complete with the init command output parsed.**
+
         Execute the execute-story workflow from
         `@~/.claude/agile-context-engineering/workflows/execute-story.xml` end-to-end.
+
+        **MANDATORY FIRST ACTION: Run the init command (step 1.2) BEFORE doing anything else.
+        Do NOT read the story file manually. Do NOT explore the codebase. Do NOT start planning.
+        The init command validates the story and provides all paths and context needed.**
 
         **CRITICAL REQUIREMENTS:**
         - Story MUST have Acceptance Criteria — STOP if missing

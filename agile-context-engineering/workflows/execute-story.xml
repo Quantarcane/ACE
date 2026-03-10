@@ -23,11 +23,21 @@
 
     <process>
 
+        **STRICT STEP-BY-STEP EXECUTION. This workflow is NOT a reference document — it is a
+        script you MUST follow in order. Complete each step and ALL its substeps before moving
+        to the next step. Do NOT read ahead and freestyle. Do NOT explore the codebase or read
+        the story file before running the init command. Do NOT create your own plan or ask
+        "Shall I proceed?" — follow the workflow steps exactly as written.**
+
         <!-- ══════════════════════════════════════════════════════════════════ -->
         <!-- STEP 1: INIT & VALIDATE                                           -->
         <!-- ══════════════════════════════════════════════════════════════════ -->
 
         <step name="init-and-validate" order="1">
+
+            **MANDATORY FIRST STEP — Run the init command (substep 1.2) BEFORE any other action.
+            Do NOT read the story file. Do NOT explore code. Do NOT start planning.
+            Run init FIRST, parse the output, THEN proceed through substeps 1.3-1.7 in order.**
 
             <substep order="1.1" name="parse-arguments">
                 Parse `$ARGUMENTS` to extract:
@@ -93,6 +103,21 @@
                     ```
                       x  Story is already marked as Done. Nothing to execute.
                     ```
+                </validation-gate>
+
+                <validation-gate condition="INIT.story.status is 'DevReady'">
+                    Story was previously implemented and approved as DevReady (pending manual testing).
+                    Resuming from verification to allow promoting to Done.
+
+                    ```
+                      i  Story status: DevReady — previously implemented, pending verification.
+                         Resuming from verification (step 5.2).
+                         Skipping planning, execution, and code review.
+                    ```
+
+                    Set `RESUME_FROM_DEVREADY = true`.
+                    After displaying context (substep 1.7), jump DIRECTLY to step 5.2.
+                    Skip substeps 1.5, 1.6 and steps 2, 3, 4, 5.1 entirely.
                 </validation-gate>
             </substep>
 
@@ -190,6 +215,8 @@
             </substep>
 
         </step>
+
+        <!-- ═══ CHECKPOINT: Step 1 MUST be complete. Init MUST have run. Banner MUST be displayed. Context MUST be shown. ═══ -->
 
         <!-- ══════════════════════════════════════════════════════════════════ -->
         <!-- STEP 2: LOAD CONTEXT & CHOOSE EXECUTION MODE                     -->
@@ -381,6 +408,8 @@
 
         </step>
 
+        <!-- ═══ CHECKPOINT: Step 2 MUST be complete. Execution mode MUST be chosen via AskUserQuestion. Plan MUST be approved (solo) or team MUST be approved (teams). ═══ -->
+
         <!-- ══════════════════════════════════════════════════════════════════ -->
         <!-- STEP 3a: AGENT TEAMS EXECUTION                                    -->
         <!-- ══════════════════════════════════════════════════════════════════ -->
@@ -461,6 +490,8 @@
             </substep>
 
         </step>
+
+        <!-- ═══ CHECKPOINT: Step 3a runs ONLY if agent-teams mode was chosen. Otherwise skip to 3b. ═══ -->
 
         <!-- ══════════════════════════════════════════════════════════════════ -->
         <!-- STEP 3b: SOLO EXECUTION                                           -->
@@ -585,6 +616,8 @@
 
         </step>
 
+        <!-- ═══ CHECKPOINT: Implementation MUST be complete (step 3a or 3b). Executor report MUST be parsed. ═══ -->
+
         <!-- ══════════════════════════════════════════════════════════════════ -->
         <!-- STEP 4: CODE REVIEW                                               -->
         <!-- ══════════════════════════════════════════════════════════════════ -->
@@ -663,6 +696,8 @@
 
         </step>
 
+        <!-- ═══ CHECKPOINT: Code review MUST be complete with zero blockers before proceeding. ═══ -->
+
         <!-- ══════════════════════════════════════════════════════════════════ -->
         <!-- STEP 5: USER VERIFICATION & COMMIT                                -->
         <!-- ══════════════════════════════════════════════════════════════════ -->
@@ -670,76 +705,113 @@
         <step name="user-verification" order="5">
 
             <substep order="5.1" name="display-verification">
-                ```
-                ╔══════════════════════════════════════════════════╗
-                ║  ACE > Execute Story > Verification               ║
-                ╚══════════════════════════════════════════════════╝
+                <variant condition="RESUME_FROM_DEVREADY is true">
+                    ```
+                    ╔══════════════════════════════════════════════════╗
+                    ║  ACE > Execute Story > Verification               ║
+                    ╚══════════════════════════════════════════════════╝
 
-                Story: {INIT.story.id} — {INIT.story.title}
+                    Story: {INIT.story.id} — {INIT.story.title}
 
-                Implementation complete. Please verify:
+                    Previously implemented and marked DevReady.
+                    Ready to promote to Done after manual verification.
+                    ```
+                </variant>
 
-                  Acceptance Criteria Walkthrough:
-                  ────────────────────────────────
-                  1. ✓ {scenario name} — [auto-verified: tests pass]
-                  2. ? {scenario name} — [needs manual check: {instructions}]
-                  ...
+                <variant condition="RESUME_FROM_DEVREADY is false (normal execution)">
+                    ```
+                    ╔══════════════════════════════════════════════════╗
+                    ║  ACE > Execute Story > Verification               ║
+                    ╚══════════════════════════════════════════════════╝
 
-                  Code Review Results:
-                  ────────────────────
-                  ✓ No blockers found
-                  {⚠ N warning(s): {brief descriptions}}
+                    Story: {INIT.story.id} — {INIT.story.title}
 
-                  Deviations:
-                  ────────────
-                  {deviation list or "None — plan executed as written"}
-                ```
+                    Implementation complete. Please verify:
+
+                      Acceptance Criteria Walkthrough:
+                      ────────────────────────────────
+                      1. ✓ {scenario name} — [auto-verified: tests pass]
+                      2. ? {scenario name} — [needs manual check: {instructions}]
+                      ...
+
+                      Code Review Results:
+                      ────────────────────
+                      ✓ No blockers found
+                      {⚠ N warning(s): {brief descriptions}}
+
+                      Deviations:
+                      ────────────
+                      {deviation list or "None — plan executed as written"}
+                    ```
+                </variant>
             </substep>
 
             <substep order="5.2" name="ask-user">
-                Use AskUserQuestion:
-                - header: "Verify"
-                - question: "Implementation and code review complete. Does everything look correct?"
-                - options:
-                  - "Approve (Done)" — All AC verified, mark story as Done
-                  - "Approve (DevReady)" — Implementation done but I need to test manually first
-                  - "Fix issues" — Something needs to be changed
+                <variant condition="RESUME_FROM_DEVREADY is true">
+                    Use AskUserQuestion:
+                    - header: "Verify"
+                    - question: "Story was previously implemented as DevReady. Has manual testing passed?"
+                    - options:
+                      - "Approve (Done)" — Manual testing passed, promote to Done
+                      - "Fix issues" — Something still needs to be changed
 
-                <option value="Fix issues">
-                    Ask what needs fixing → apply fixes (deviation rules apply) →
-                    re-run code review (focused) → return to verification prompt.
-                </option>
+                    <option value="Fix issues">
+                        Ask what needs fixing → apply fixes (deviation rules apply) →
+                        return to this verification prompt.
+                    </option>
 
-                <option value="Approve (Done)">
-                    Set `FINAL_STATUS = Done`.
-                    Proceed to step 6 (state updates) → step 7 (wiki + commit).
-                </option>
+                    <option value="Approve (Done)">
+                        Set `FINAL_STATUS = Done`.
+                        Proceed to step 6 (state updates) → step 7 (wiki + commit).
+                    </option>
+                </variant>
 
-                <option value="Approve (DevReady)">
-                    Set `FINAL_STATUS = DevReady`.
+                <variant condition="RESUME_FROM_DEVREADY is false (normal execution)">
+                    Use AskUserQuestion:
+                    - header: "Verify"
+                    - question: "Implementation and code review complete. Does everything look correct?"
+                    - options:
+                      - "Approve (Done)" — All AC verified, mark story as Done
+                      - "Approve (DevReady)" — Implementation done but I need to test manually first
+                      - "Fix issues" — Something needs to be changed
 
-                    Present manual testing instructions:
-                    ```
-                      !  Manual testing required before wiki mapping.
-                         The following scenarios need manual verification:
+                    <option value="Fix issues">
+                        Ask what needs fixing → apply fixes (deviation rules apply) →
+                        re-run code review (focused) → return to verification prompt.
+                    </option>
 
-                      {For each AC scenario that was NOT auto-verified by tests:}
-                         ? {scenario name}
-                           How to test: {step-by-step manual test instructions}
+                    <option value="Approve (Done)">
+                        Set `FINAL_STATUS = Done`.
+                        Proceed to step 6 (state updates) → step 7 (wiki + commit).
+                    </option>
 
-                      After testing, run /ace:execute-story again with this story.
-                      The detect-existing-implementation step (1.5) will detect
-                      that all files exist and offer to skip to code review.
-                    ```
+                    <option value="Approve (DevReady)">
+                        Set `FINAL_STATUS = DevReady`.
 
-                    **DevReady path: skip wiki, commit code + state only.**
-                    Proceed to step 6 (state updates) → step 7.6 (commit) directly.
-                    Do NOT run step 7.1-7.5 (wiki mapping) — the code may still change
-                    after manual testing. Wiki mapping happens when the story reaches Done.
-                </option>
+                        Present manual testing instructions:
+                        ```
+                          !  Manual testing required before wiki mapping.
+                             The following scenarios need manual verification:
+
+                          {For each AC scenario that was NOT auto-verified by tests:}
+                             ? {scenario name}
+                               How to test: {step-by-step manual test instructions}
+
+                          After testing, run /ace:execute-story again with this story.
+                          It will detect DevReady status and skip directly to verification.
+                        ```
+
+                        **DevReady path: skip wiki, commit code + state only.**
+                        Proceed to step 6 (state updates) → step 7.6 (commit) directly.
+                        Do NOT run step 7.1-7.5 (wiki mapping) — the code may still change
+                        after manual testing. Wiki mapping happens when the story reaches Done.
+                    </option>
+                </variant>
             </substep>
 
         </step>
+
+        <!-- ═══ CHECKPOINT: User MUST have approved via AskUserQuestion (Done or DevReady). ═══ -->
 
         <!-- ══════════════════════════════════════════════════════════════════ -->
         <!-- STEP 6: STATE UPDATES                                             -->
@@ -820,7 +892,9 @@
                     node ~/.claude/agile-context-engineering/src/ace-tools.js github sync-story \
                       repo={INIT.github_project.repo} \
                       story_file={INIT.paths.story_file} \
-                      feature_file={INIT.paths.feature_file}
+                      feature_file={INIT.paths.feature_file} \
+                      owner={INIT.github_project.owner} \
+                      project={INIT.github_project.project_number}
                     ```
 
                     The command handles all cases:
@@ -831,6 +905,8 @@
             </substep>
 
         </step>
+
+        <!-- ═══ CHECKPOINT: State updates MUST be complete (story, feature, backlog, GitHub). ═══ -->
 
         <!-- ══════════════════════════════════════════════════════════════════ -->
         <!-- STEP 7: WIKI UPDATE                                               -->
@@ -849,7 +925,7 @@
                 │  ACE > Execute Story > Wiki Update                 │
                 └──────────────────────────────────────────────────┘
 
-                  i  Dispatching wiki mapper (background)...
+                  i  Wiki mapper running (background agent)...
                 ```
             </substep>
 
@@ -860,7 +936,7 @@
 
                 **CRITICAL — Context Window Protection:**
                 The agent writes directly to wiki files and returns ONLY a confirmation.
-                Do NOT call TaskOutput on the background agent.
+                Do NOT call TaskOutput on the background agent — it pollutes the main context.
 
                 ```
                 Agent(
@@ -883,13 +959,26 @@
                 Store the agent task ID as `WIKI_TASK`.
             </substep>
 
-            <substep order="7.3" name="wait-and-verify" condition="FINAL_STATUS is Done">
-                After background notification arrives — IGNORE the output.
-                Do NOT call TaskOutput. Just verify wiki files were updated:
+            <substep order="7.3" name="wait-for-wiki-completion" condition="FINAL_STATUS is Done">
+                **BLOCKING WAIT — Do NOT proceed to substep 7.4 until the wiki mapper has finished.**
 
+                Poll using TaskGet until the background agent completes:
+                ```
+                Loop (max 60 iterations, 10 second intervals):
+                    TaskGet(id=WIKI_TASK)
+                    If status is "completed" → break, proceed to 7.4
+                    If status is "failed" → log warning, proceed to 7.4 (commit without wiki)
+                    Otherwise → continue polling
+                ```
+
+                Once complete, verify wiki files exist:
                 ```bash
                 git status --short .docs/wiki/
                 ```
+
+                **IMPORTANT: Do NOT call TaskOutput on WIKI_TASK. The output pollutes the main
+                context window. The wiki mapper writes directly to files — git status is sufficient
+                to enumerate what changed.**
             </substep>
 
             <substep order="7.4" name="write-wiki-updates-section" condition="FINAL_STATUS is Done">
@@ -916,7 +1005,9 @@
                     node ~/.claude/agile-context-engineering/src/ace-tools.js github sync-story \
                       repo={INIT.github_project.repo} \
                       story_file={INIT.paths.story_file} \
-                      feature_file={INIT.paths.feature_file}
+                      feature_file={INIT.paths.feature_file} \
+                      owner={INIT.github_project.owner} \
+                      project={INIT.github_project.project_number}
                     ```
                 </variant>
             </substep>
@@ -1001,8 +1092,8 @@
 
                       After manual testing:
                       > /ace:execute-story story={INIT.paths.story_file}
-                        Re-run to promote to Done (will detect existing implementation
-                        and skip to code review → approve as Done → wiki mapping).
+                        Re-run to promote to Done (will detect DevReady status
+                        and skip directly to verification → approve as Done → wiki mapping).
                     ```
                 </variant>
             </substep>

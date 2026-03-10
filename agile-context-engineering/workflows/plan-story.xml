@@ -817,7 +817,9 @@
                 node ~/.claude/agile-context-engineering/src/ace-tools.js github sync-story \
                   repo={INIT.github_project.repo} \
                   story_file={INIT.paths.story_file} \
-                  feature_file={INIT.paths.feature_file}
+                  feature_file={INIT.paths.feature_file} \
+                  owner={INIT.github_project.owner} \
+                  project={INIT.github_project.project_number}
                 ```
 
                 The command handles all cases:
