@@ -716,16 +716,52 @@
             Display:
             ```
               i  Feature scope is taking shape. Let's break it into stories.
-                 Each story should be a vertical slice delivering testable value.
-                 The number of stories emerges from the requirements — no predefined range.
+                 Each story must be a VERTICAL SLICE delivering real user-facing value.
             ```
+
+            **VERTICAL SLICE RULE — This is non-negotiable:**
+
+            Every story MUST cut through the architectural layers needed to deliver a
+            complete, user-facing capability. In most cases this means both backend AND
+            frontend work in the same story. A user should be able to USE the functionality
+            when the story is done — not just see a database schema, or just see a UI
+            with no backend, or just an API with no way to reach it.
+
+            **Anti-patterns — NEVER do these:**
+            - "Set up the database schema" — horizontal, not a story
+            - "Create the API endpoints" — horizontal, not a story
+            - "Build the UI components" — horizontal, not a story
+            - "Add validation" — cross-cutting concern, fold into the story that needs it
+            - "Add error handling" — fold into the story where errors occur
+            - "Write tests" — testing is part of every story's Definition of Done, not a separate story
+            - Splitting backend and frontend of the SAME functionality into separate stories
+
+            **Good vertical slices:**
+            - "User can log in with Google" — touches auth config, backend OAuth flow, UI login button, session handling
+            - "User can export their data as CSV" — touches export logic, file generation, download UI
+            - "Admin can disable a user account" — touches admin UI, API, domain logic, notifications
+
+            **Story sizing guidance:**
+
+            AIM for 8sp and 5sp stories. These are the sweet spot — large enough to deliver
+            meaningful vertical slices, small enough to complete in a sprint.
+
+            - **8sp** — The default target. A solid vertical slice with real depth.
+            - **5sp** — Good for slightly smaller slices that still deliver end-to-end value.
+            - **3sp** — Acceptable occasionally for genuinely small but still vertical slices.
+            - **2sp** — Rare. Only when the slice is truly thin but still cuts through layers.
+            - **1sp** — Almost never. Only for trivial configuration or copy changes.
+
+            If most stories in your breakdown are 2-3sp, you have OVER-DECOMPOSED.
+            Merge related small stories into fewer, meatier vertical slices.
 
             **Approach for eliciting good stories:**
 
             1. Start from the user journey: "Walk me through the happy path.
                What's the first thing the user does? What happens next?"
 
-            2. Identify natural cut points: each story should deliver independently testable value.
+            2. Identify natural cut points where a user gets a COMPLETE new capability.
+               Each story = one thing the user can DO that they couldn't before.
 
             3. If brownfield, use RELEVANT_CODE to inform decomposition:
                "The code analysis shows {component} already handles {partial capability}.
@@ -735,15 +771,20 @@
                ```
                Here's how I'd break this down:
 
-               S1: [Title] — [1-sentence scope]
-               S2: [Title] — [1-sentence scope]
-               S3: [Title] — [1-sentence scope]
+               S1: [Title] — [1-sentence scope] (8sp)
+               S2: [Title] — [1-sentence scope] (5sp)
+               S3: [Title] — [1-sentence scope] (8sp)
                ...
 
-               That's {N} stories. Each is independently testable.
+               Each story is a vertical slice — the user gets a complete capability when it's done.
                ```
 
-            5. Use AskUserQuestion:
+            5. **Sanity check before presenting:** Review your story list:
+               - Are most stories 5sp or 8sp? If not, merge the small ones.
+               - Does every story deliver something user-facing? If not, fold it into one that does.
+               - Could a non-technical stakeholder understand what each story delivers? If not, reframe.
+
+            6. Use AskUserQuestion:
                - header: "Stories"
                - question: "Here's the story breakdown. What would you like to adjust?"
                - options:
@@ -752,16 +793,16 @@
                  - "Merge stories" — Some of these should be combined
                  - "Add a story" — Something is missing
 
-            6. For each story, confirm or discuss:
+            7. For each story, confirm or discuss:
                - Title (short descriptive name)
                - Scope description (rich, multi-paragraph plain text — NOT a formal user story.
                  The `plan-story` command handles formal specification later.)
                - Key behaviors and edge cases to consider
                - Relationship to other stories in the feature
-               - **Rough Fibonacci estimate** (1, 2, 3, 5, 8) — planning-level size to help
-                 with sprint planning. `plan-story` can refine later after detailed specification.
+               - **Rough Fibonacci estimate** (1, 2, 3, 5, 8) — aim for 8sp and 5sp.
+                 `plan-story` can refine later after detailed specification.
 
-            7. Validate coverage: "Do these {N} stories cover 100% of the feature scope?
+            8. Validate coverage: "Do these {N} stories cover 100% of the feature scope?
                The includes list is: [list scope items]. Every item should map to at least one story."
 
             <!-- ── 8d: Decision gate ────────────────────────────────────────── -->

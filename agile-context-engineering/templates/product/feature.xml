@@ -227,11 +227,17 @@
     <guidelines>
 
         <guideline name="vertical-slicing">
+            Features AND stories MUST be vertical slices delivering end-to-end user-facing value.
+
             Features MAY cut through multiple modules.
             Features MAY cut through ALL/MOST architectural layers — domain, application,
             infrastructure, and presentation of a module. A feature that only touches one layer
             (e.g., "set up the database schema") is NOT a feature; it's a technical story.
-            Every feature delivers end-to-end user-facing value.
+
+            Stories follow the same principle: each story MUST cut through the layers needed
+            to deliver a complete, user-facing capability. In most cases this means both
+            backend AND frontend in the same story. A story like "Create API endpoints" or
+            "Build UI components" is a horizontal slice — not acceptable in most cases.
         </guideline>
 
         <guideline name="feature-scope">
@@ -266,8 +272,8 @@
         <guideline name="story-breakdown">
             Stories are plain-text descriptions of intent and scope — NOT formal user stories.
             The `plan-story` command handles formal specification later.
-            Aim for 3-8 stories per feature. Fewer than 3 suggests the feature is really a story.
-            More than 8 suggests the feature should be split.
+            The number of stories emerges naturally from the feature's scope — do not
+            target a specific count. Let the requirements drive decomposition.
         </guideline>
 
         <guideline name="brownfield-context">
