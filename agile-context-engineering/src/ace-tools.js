@@ -29,7 +29,7 @@
  *   ensure-settings                  Create .ace/settings.json with defaults if missing
  *   write-github-settings            Write GitHub Project settings (key=value args)
  *   write-agent-teams <true|false>   Enable/disable agent teams in ACE + Claude Code settings
- *   sync-agent-teams                 Sync agent_teams from .claude/settings.json (source of truth) to .ace/settings.json
+ *   sync-agent-teams                 Sync agent_teams from runtime settings.json (source of truth) to .ace/settings.json
  *
  * Story Commands:
  *   story update-state               Update story status across story file, feature file, and product backlog
@@ -44,6 +44,26 @@
 
 const fs = require('fs');
 const path = require('path');
+
+// ─── Runtime Detection ───────────────────────────────────────────────────────
+
+/**
+ * Detect the runtime config directory name from where this script is installed.
+ * Script location: <base>/<config-dir>/agile-context-engineering/src/ace-tools.js
+ * Returns '.claude' or '.opencode' depending on which runtime installed ACE.
+ */
+function getRuntimeConfigDirName() {
+  const aceDir = path.dirname(__dirname); // <base>/<config-dir>/agile-context-engineering
+  const configDir = path.dirname(aceDir); // <base>/<config-dir>
+  const dirName = path.basename(configDir); // '.claude' or '.opencode'
+  if (dirName === '.opencode' || dirName === '.claude') {
+    return dirName;
+  }
+  // Fallback for development/testing (running from repo source)
+  return '.claude';
+}
+
+const RUNTIME_CONFIG_DIR = getRuntimeConfigDirName();
 
 // ─── Model Profile Table ─────────────────────────────────────────────────────
 
@@ -647,8 +667,8 @@ function cmdWriteGithubSettings(cwd, raw, extraArgs) {
 }
 
 function cmdSyncAgentTeams(cwd, raw) {
-  // Source of truth: .claude/settings.json env var
-  const claudeSettingsPath = path.join(cwd, '.claude', 'settings.json');
+  // Source of truth: runtime settings.json env var (e.g. .claude/settings.json or .opencode/settings.json)
+  const claudeSettingsPath = path.join(cwd, RUNTIME_CONFIG_DIR, 'settings.json');
   let claudeEnabled = false;
   try {
     const claudeRaw = fs.readFileSync(claudeSettingsPath, 'utf-8');
@@ -676,8 +696,8 @@ function cmdWriteAgentTeamsSetting(cwd, raw, extraArgs) {
   settings.agent_teams = enabled;
   writeSettings(cwd, settings);
 
-  // Also update the project's .claude/settings.json
-  const claudeDir = path.join(cwd, '.claude');
+  // Also update the project's runtime settings.json (e.g. .claude/ or .opencode/)
+  const claudeDir = path.join(cwd, RUNTIME_CONFIG_DIR);
   const claudeSettingsPath = path.join(claudeDir, 'settings.json');
 
   let claudeSettings = {};
@@ -1313,8 +1333,8 @@ function cmdInitExecuteStory(cwd, raw, storyParam) {
   const settings = loadSettings(cwd);
   const github_project = settings.github_project;
 
-  // ── Agent teams detection (sync from Claude Code settings) ──
-  const claudeSettingsPath = path.join(cwd, '.claude', 'settings.json');
+  // ── Agent teams detection (sync from runtime settings) ──
+  const claudeSettingsPath = path.join(cwd, RUNTIME_CONFIG_DIR, 'settings.json');
   let agent_teams = settings.agent_teams || false;
   try {
     const claudeRaw = fs.readFileSync(claudeSettingsPath, 'utf-8');

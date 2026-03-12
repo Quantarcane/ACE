@@ -163,8 +163,19 @@ function getBasePath(runtime, scope) {
     : path.join(cwd, config.globalDir);
 }
 
-// Copy directory recursively
-function copyDir(src, dest) {
+// File extensions that contain path references needing runtime transformation
+const TRANSFORMABLE_EXTENSIONS = new Set(['.md', '.xml']);
+
+// Transform file content for a target runtime (replaces .claude/ paths with target runtime paths)
+function transformForRuntime(content, runtime) {
+  if (runtime === 'claude') return content; // Source files already use .claude paths
+  const targetDir = RUNTIMES[runtime].globalDir; // e.g. '.opencode'
+  // Replace path references: ~/.claude/ → ~/.opencode/, .claude/settings → .opencode/settings, etc.
+  return content.replace(/\.claude\//g, `${targetDir}/`);
+}
+
+// Copy directory recursively, optionally transforming text file content for the target runtime
+function copyDir(src, dest, runtime) {
   if (!fs.existsSync(dest)) {
     fs.mkdirSync(dest, { recursive: true });
   }
@@ -176,9 +187,16 @@ function copyDir(src, dest) {
     const destPath = path.join(dest, entry.name);
 
     if (entry.isDirectory()) {
-      copyDir(srcPath, destPath);
+      copyDir(srcPath, destPath, runtime);
     } else {
-      fs.copyFileSync(srcPath, destPath);
+      const ext = path.extname(entry.name).toLowerCase();
+      if (runtime !== 'claude' && TRANSFORMABLE_EXTENSIONS.has(ext)) {
+        // Transform path references for non-Claude runtimes
+        const content = fs.readFileSync(srcPath, 'utf-8');
+        fs.writeFileSync(destPath, transformForRuntime(content, runtime), 'utf-8');
+      } else {
+        fs.copyFileSync(srcPath, destPath);
+      }
     }
   }
 }
@@ -202,44 +220,61 @@ function installForRuntime(runtime, scope, packageDir) {
   log(`\nInstalling ACE for ${config.name}...`, colors.cyan);
   log(`  Target: ${basePath}`, colors.dim);
 
+  // Clean previous ACE installation to remove stale files from renamed/deleted commands
+  const aceCommandsPath = path.join(commandsPath, 'ace');
+  if (fs.existsSync(aceCommandsPath)) {
+    fs.rmSync(aceCommandsPath, { recursive: true });
+  }
+  if (fs.existsSync(agentsPath)) {
+    // Only remove ace-* agent files, preserve non-ACE agents
+    for (const f of fs.readdirSync(agentsPath)) {
+      if (f.startsWith('ace-')) {
+        fs.rmSync(path.join(agentsPath, f), { recursive: true });
+      }
+    }
+  }
+  if (fs.existsSync(acePath)) {
+    fs.rmSync(acePath, { recursive: true });
+  }
+
   // Create directories
   fs.mkdirSync(commandsPath, { recursive: true });
   fs.mkdirSync(agentsPath, { recursive: true });
   fs.mkdirSync(acePath, { recursive: true });
 
-  // Copy commands
+  // Copy commands (transform paths for target runtime)
   if (fs.existsSync(srcCommands)) {
-    copyDir(srcCommands, commandsPath);
+    copyDir(srcCommands, commandsPath, runtime);
     log(`  ✓ Commands installed`, colors.green);
   }
 
-  // Copy agents
+  // Copy agents (transform paths for target runtime)
   if (fs.existsSync(srcAgents)) {
-    copyDir(srcAgents, agentsPath);
+    copyDir(srcAgents, agentsPath, runtime);
     log(`  ✓ Agents installed`, colors.green);
   }
 
   // Copy templates into agile-context-engineering/
   if (fs.existsSync(srcTemplates)) {
-    copyDir(srcTemplates, path.join(acePath, 'templates'));
+    copyDir(srcTemplates, path.join(acePath, 'templates'), runtime);
     log(`  ✓ Templates installed`, colors.green);
   }
 
   // Copy utils into agile-context-engineering/
   if (fs.existsSync(srcUtils)) {
-    copyDir(srcUtils, path.join(acePath, 'utils'));
+    copyDir(srcUtils, path.join(acePath, 'utils'), runtime);
     log(`  ✓ Utils installed`, colors.green);
   }
 
   // Copy workflows into agile-context-engineering/
   if (fs.existsSync(srcWorkflows)) {
-    copyDir(srcWorkflows, path.join(acePath, 'workflows'));
+    copyDir(srcWorkflows, path.join(acePath, 'workflows'), runtime);
     log(`  ✓ Workflows installed`, colors.green);
   }
 
   // Copy src (ace-tools) into agile-context-engineering/
   if (fs.existsSync(srcTools)) {
-    copyDir(srcTools, path.join(acePath, 'src'));
+    copyDir(srcTools, path.join(acePath, 'src'), runtime);
     log(`  ✓ Tools installed`, colors.green);
   }
 
