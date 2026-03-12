@@ -317,6 +317,23 @@
             <!-- ─────────────────────────────────────────────────── -->
 
             <substep order="2.5" name="solo-plan-mode" condition="EXECUTION_MODE is solo">
+                **BEFORE entering Plan Mode, display this highlighted warning to the user:**
+
+                ```
+                ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+                ┃  ⚠️  IMPORTANT — READ BEFORE EXITING PLAN MODE               ┃
+                ┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
+                ┃                                                              ┃
+                ┃  When Claude Code wants to exit plan mode, do NOT choose     ┃
+                ┃  the option with "clear context" no matter how filled        ┃
+                ┃  the context is! This will interrupt our command!             ┃
+                ┃                                                              ┃
+                ┃  The implementation in solo mode is done by a different       ┃
+                ┃  subagent with a fresh context window — no need to clear it.  ┃
+                ┃                                                              ┃
+                ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+                ```
+
                 Enter Plan Mode using the EnterPlanMode tool.
 
                 Feed into Plan Mode context:
