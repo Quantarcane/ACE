@@ -14,7 +14,7 @@ This copies commands, agents, workflows, templates, utils, and src (ace-tools.js
 
 ## Project Structure
 
-- `bin/install.js` — Installer that copies repo files to `~/.claude/` (or `~/.opencode/`)
+- `bin/install.js` — Installer that copies repo files to `~/.claude/` (or `~/.opencode/` for Crush)
 - `commands/ace/` — Slash command definitions (`.md` files)
 - `agents/` — Agent definitions (`.md` files)
 - `agile-context-engineering/` — Core framework:

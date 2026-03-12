@@ -20,9 +20,9 @@ node bin/install.js --help
 | Scope | Runtime | Location |
 |-------|---------|----------|
 | Global | Claude Code | `~/.claude/` |
-| Global | OpenCode | `~/.opencode/` |
+| Global | Crush (formerly OpenCode) | `~/.opencode/` |
 | Local | Claude Code | `./.claude/` |
-| Local | OpenCode | `./.opencode/` |
+| Local | Crush (formerly OpenCode) | `./.opencode/` |
 
 Each location gets the following structure:
 

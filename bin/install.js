@@ -30,8 +30,8 @@ const RUNTIMES = {
     supportsLocal: true,
   },
   opencode: {
-    name: 'OpenCode',
-    description: 'OpenCode AI coding assistant',
+    name: 'Crush',
+    description: 'Crush AI coding assistant (formerly OpenCode)',
     globalDir: '.opencode',
     commandsDir: 'commands',
     agentsDir: 'agents',
@@ -79,7 +79,7 @@ Usage: npx agile-context-engineering [options]
 
 Options:
   --claude      Install for Claude Code only
-  --opencode    Install for OpenCode only
+  --opencode    Install for Crush (formerly OpenCode)
   --all         Install for all supported runtimes
   --global      Install globally (~/.claude, ~/.opencode)
   --local       Install locally (.claude, .opencode)
@@ -89,7 +89,7 @@ Options:
 Examples:
   npx agile-context-engineering                    # Interactive installation
   npx agile-context-engineering --claude --local   # Claude Code, local install
-  npx agile-context-engineering --opencode --global # OpenCode, global install
+  npx agile-context-engineering --opencode --global # Crush (formerly OpenCode), global install
   npx agile-context-engineering --all --global     # All runtimes, global install
 `);
 }
@@ -183,7 +183,7 @@ function copyDir(src, dest) {
   }
 }
 
-// Install ACE for a runtime (Claude Code or OpenCode)
+// Install ACE for a runtime (Claude Code or Crush)
 function installForRuntime(runtime, scope, packageDir) {
   const config = RUNTIMES[runtime];
   const basePath = getBasePath(runtime, scope);
@@ -280,7 +280,7 @@ async function main() {
     // Ask for runtime selection (multiple choice)
     runtimes = await askMultiple(rl, '\nWhich runtime(s) do you want to install ACE for?', [
       { label: 'Claude Code', value: 'claude', description: "Anthropic's Claude Code CLI" },
-      { label: 'OpenCode', value: 'opencode', description: 'OpenCode AI coding assistant' },
+      { label: 'Crush', value: 'opencode', description: 'Crush AI coding assistant (formerly OpenCode)' },
     ]);
 
     // Ask for scope
@@ -300,7 +300,7 @@ async function main() {
     }
 
     if (runtimes.length === 0) {
-      log('Error: No runtime specified. Use --claude, --opencode, or --all', colors.red);
+      log('Error: No runtime specified. Use --claude, --opencode (Crush), or --all', colors.red);
       process.exit(1);
     }
 

@@ -28,17 +28,17 @@ Your job: Create a unified research summary that informs backlog and roadmap cre
 </role>
 
 <downstream_consumer>
-Your SUMMARY.md is consumed by the ace-roadmapper agent which uses it to:
+Your SUMMARY.md is consumed by downstream planning workflows which use it to:
 
-| Section | How Roadmapper Uses It |
-|---------|------------------------|
+| Section | How It's Used |
+|---------|--------------|
 | Executive Summary | Quick understanding of domain |
 | Key Findings | Technology and feature decisions |
 | Implications for Backlog | Epic/feature structure suggestions |
-| Research Flags | Which epics need deeper research |
+| Research Flags | Which areas need deeper research |
 | Gaps to Address | What to flag for validation |
 
-**Be opinionated.** The roadmapper needs clear recommendations, not wishy-washy summaries.
+**Be opinionated.** Downstream consumers need clear recommendations, not wishy-washy summaries.
 </downstream_consumer>
 
 <execution_flow>
@@ -222,7 +222,7 @@ Quality indicators:
 
 - **Synthesized, not concatenated:** Findings are integrated, not just copied
 - **Opinionated:** Clear recommendations emerge from combined research
-- **Actionable:** Roadmapper can structure epics/features based on implications
+- **Actionable:** Downstream planning can structure epics/features based on implications
 - **Honest:** Confidence levels reflect actual source quality
 
 </success_criteria>
