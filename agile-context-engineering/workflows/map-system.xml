@@ -175,6 +175,24 @@
             mkdir -p .docs/wiki/system-wide
             ```
 
+            **Generate wiki-readme.md if it does not already exist:**
+
+            Check if `.docs/wiki/wiki-readme.md` exists. If it does NOT exist, generate it
+            from the wiki-readme template (`~/.claude/agile-context-engineering/templates/wiki/wiki-readme.xml`).
+
+            Read the template's `<template>` section and write the markdown content to
+            `.docs/wiki/wiki-readme.md`. This is a mostly-static meta-document — fill it
+            directly without spawning an agent:
+            - Directory Structure section: use as-is from template (canonical layout)
+            - Document Types tables: use as-is from template
+            - How to Use sections: use as-is from template
+            - Creating New Documents section: use as-is from template
+            - Keeping Current section: use as-is from template
+            - Subsystems table: leave with placeholder rows — will be populated when
+              `/ace:map-subsystem` runs
+
+            If `.docs/wiki/wiki-readme.md` already exists, skip — do not overwrite.
+
             Continue to step 4.
         </step>
 
@@ -581,6 +599,11 @@
             git add .docs/wiki/system-wide/
             ```
 
+            If wiki-readme.md was created in step 3:
+            ```bash
+            git add .docs/wiki/wiki-readme.md
+            ```
+
             If CLAUDE.md was created or updated:
             ```bash
             git add CLAUDE.md
@@ -608,6 +631,7 @@
               Documents:
               ──────────
               [For each document, show action taken and line count]
+              +  wiki-readme.md           ([N] lines) — [created | already exists]
               +  system-structure.md      ([N] lines) — [created/updated/recreated/scaffolded]
               +  testing-framework.md     ([N] lines) — [created/updated/recreated/scaffolded]
               +  system-architecture.md   ([N] lines) — [created/updated/recreated/scaffolded]
@@ -633,6 +657,7 @@
 
     <success_criteria>
         - Init function executed (brownfield/greenfield detected, document existence checked)
+        - wiki-readme.md created at .docs/wiki/wiki-readme.md if it did not already exist
         - Each document triaged independently (create/update/recreate/scaffold/skip)
         - Greenfield: structure and testing scaffolded, architecture created via interview
         - Brownfield: all documents created/updated by ace-wiki-mapper agents
@@ -640,7 +665,7 @@
         - CLAUDE.md updated with wiki maintenance instructions
         - All created documents verified for content (non-empty, non-placeholder for brownfield)
         - Security scan passed (no secrets in generated docs)
-        - Documents committed to .docs/wiki/system-wide/
+        - Documents committed to .docs/wiki/system-wide/ (and .docs/wiki/wiki-readme.md)
         - User sees clear completion summary and next steps
     </success_criteria>
 

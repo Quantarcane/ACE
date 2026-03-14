@@ -5,7 +5,7 @@ const path = require('path');
 const readline = require('readline');
 const os = require('os');
 
-const VERSION = '0.1.0';
+const VERSION = require('../package.json').version;
 
 // ANSI color codes
 const colors = {
@@ -67,10 +67,29 @@ function parseArgs() {
     all: args.includes('--all'),
     global: args.includes('--global'),
     local: args.includes('--local'),
+    forceStatusline: args.includes('--force-statusline'),
     help: args.includes('--help') || args.includes('-h'),
     version: args.includes('--version') || args.includes('-v'),
   };
   return flags;
+}
+
+// Read or create settings.json
+function readSettings(settingsPath) {
+  if (fs.existsSync(settingsPath)) {
+    try {
+      return JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+    } catch (e) {
+      return {};
+    }
+  }
+  return {};
+}
+
+// Build hook command with proper quoting for the target directory
+function buildHookCommand(targetDir, hookFile) {
+  const hookPath = path.join(targetDir, 'hooks', hookFile);
+  return `node "${hookPath.replace(/\\/g, '/')}"`;
 }
 
 function showHelp() {
@@ -82,9 +101,10 @@ Options:
   --opencode    Install for Crush (formerly OpenCode)
   --all         Install for all supported runtimes
   --global      Install globally (~/.claude, ~/.opencode)
-  --local       Install locally (.claude, .opencode)
-  -h, --help    Show this help message
-  -v, --version Show version number
+  --local             Install locally (.claude, .opencode)
+  --force-statusline  Replace existing statusline configuration
+  -h, --help          Show this help message
+  -v, --version       Show version number
 
 Examples:
   npx agile-context-engineering                    # Interactive installation
@@ -278,6 +298,26 @@ function installForRuntime(runtime, scope, packageDir) {
     log(`  ✓ Tools installed`, colors.green);
   }
 
+  // Copy hooks
+  const srcHooks = path.join(packageDir, 'hooks');
+  const hooksPath = path.join(basePath, 'hooks');
+  if (fs.existsSync(srcHooks)) {
+    // Only copy ace-* hook files, preserve non-ACE hooks (e.g. GSD)
+    if (!fs.existsSync(hooksPath)) {
+      fs.mkdirSync(hooksPath, { recursive: true });
+    }
+    for (const f of fs.readdirSync(srcHooks)) {
+      if (f.startsWith('ace-')) {
+        fs.copyFileSync(path.join(srcHooks, f), path.join(hooksPath, f));
+      }
+    }
+    log(`  ✓ Hooks installed`, colors.green);
+  }
+
+  // Write VERSION file for update checking
+  const versionFile = path.join(acePath, 'VERSION');
+  fs.writeFileSync(versionFile, VERSION, 'utf-8');
+
   return basePath;
 }
 
@@ -355,21 +395,92 @@ async function main() {
     installedPaths.push({ runtime, name: RUNTIMES[runtime].name, path: installedPath });
   }
 
+  // Configure hooks and statusline in settings.json (Claude Code only, not Crush)
+  for (const { runtime, path: basePath } of installedPaths) {
+    if (runtime !== 'claude') continue;
+
+    const settingsPath = path.join(basePath, 'settings.json');
+    const settings = readSettings(settingsPath);
+
+    const statuslineCommand = buildHookCommand(basePath, 'ace-statusline.js');
+    const updateCheckCommand = buildHookCommand(basePath, 'ace-check-update.js');
+
+    // Register SessionStart hook for background update checking
+    if (!settings.hooks) settings.hooks = {};
+    if (!settings.hooks.SessionStart) settings.hooks.SessionStart = [];
+
+    const hasAceUpdateHook = settings.hooks.SessionStart.some(entry =>
+      entry.hooks && entry.hooks.some(h => h.command && h.command.includes('ace-check-update'))
+    );
+    if (!hasAceUpdateHook) {
+      settings.hooks.SessionStart.push({
+        hooks: [{ type: 'command', command: updateCheckCommand }]
+      });
+      log(`  ✓ Configured update check hook`, colors.green);
+    }
+
+    // Handle statusline configuration
+    const hasExisting = settings.statusLine != null;
+    const isAceStatusline = hasExisting && settings.statusLine.command &&
+      settings.statusLine.command.includes('ace-statusline');
+
+    if (!hasExisting || flags.forceStatusline) {
+      // No existing statusline or force flag — install ACE statusline
+      settings.statusLine = { type: 'command', command: statuslineCommand };
+      log(`  ✓ Configured statusline`, colors.green);
+    } else if (isAceStatusline) {
+      // Already ACE statusline — update path
+      settings.statusLine = { type: 'command', command: statuslineCommand };
+      log(`  ✓ Updated statusline`, colors.green);
+    } else if (isInteractive) {
+      // Existing non-ACE statusline in interactive mode — ask user
+      const existingCmd = settings.statusLine.command || settings.statusLine.url || '(custom)';
+      log(`\n  ⚠ Existing statusline detected`, colors.yellow);
+      log(`  Current: ${existingCmd}`, colors.dim);
+      log(`\n  ACE statusline shows:`, colors.cyan);
+      log(`    • Model name`, colors.dim);
+      log(`    • Current task (from todo list)`, colors.dim);
+      log(`    • Context window usage (color-coded)`, colors.dim);
+      log(`    • Update notifications`, colors.dim);
+
+      const rl = createPrompt();
+      const choice = await ask(rl, '\n  What would you like to do?', [
+        { label: 'Keep existing statusline', value: 'keep' },
+        { label: 'Replace with ACE statusline', value: 'replace' },
+      ]);
+      rl.close();
+
+      if (choice === 'replace') {
+        settings.statusLine = { type: 'command', command: statuslineCommand };
+        log(`  ✓ Configured statusline`, colors.green);
+      } else {
+        log(`  ⚠ Skipping statusline (kept existing)`, colors.yellow);
+      }
+    } else {
+      // Non-interactive with existing statusline — skip
+      log(`  ⚠ Skipping statusline (already configured, use --force-statusline to replace)`, colors.yellow);
+    }
+
+    // Write settings
+    fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n', 'utf-8');
+  }
+
   // Show success message
   log(`\n${'═'.repeat(50)}`, colors.green);
   log(`  ACE installed successfully!`, colors.green + colors.bright);
   log(`${'═'.repeat(50)}`, colors.green);
 
   log(`\nInstalled locations:`, colors.cyan);
-  for (const { name, path: p } of installedPaths) {
-    log(`  ${name}: ${p}`, colors.dim);
+  for (const { name: runtimeName, path: p } of installedPaths) {
+    log(`  ${runtimeName}: ${p}`, colors.dim);
   }
 
   log(`\nInstalled structure:`, colors.cyan);
-  for (const { name, path: p } of installedPaths) {
+  for (const { path: p } of installedPaths) {
     log(`  ${p}/`, colors.dim);
     log(`    commands/ace/       Slash commands`, colors.dim);
     log(`    agents/             Agent definitions`, colors.dim);
+    log(`    hooks/              Statusline & update hooks`, colors.dim);
     log(`    ${ACE_DIR_NAME}/`, colors.dim);
     log(`      templates/        Project & artifact templates`, colors.dim);
     log(`      utils/            Formatting & utility guides`, colors.dim);

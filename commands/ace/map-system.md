@@ -51,6 +51,7 @@ allowed-tools:
         <system-structure-template>@~/.claude/agile-context-engineering/templates/wiki/system-structure.xml</system-structure-template>
         <system-architecture-template>@~/.claude/agile-context-engineering/templates/wiki/system-architecture.xml</system-architecture-template>
         <testing-framework-template>@~/.claude/agile-context-engineering/templates/wiki/testing-framework.xml</testing-framework-template>
+        <wiki-readme-template>@~/.claude/agile-context-engineering/templates/wiki/wiki-readme.xml</wiki-readme-template>
         <questioning>@~/.claude/agile-context-engineering/utils/questioning.xml</questioning>
         <ui-formatting>@~/.claude/agile-context-engineering/utils/ui-formatting.md</ui-formatting>
     </execution-context>
@@ -65,6 +66,7 @@ allowed-tools:
         </objective>
 
         <artifacts>
+            - .docs/wiki/wiki-readme.md (created if not already present)
             - .docs/wiki/system-wide/system-structure.md
             - .docs/wiki/system-wide/system-architecture.md
             - .docs/wiki/system-wide/testing-framework.md

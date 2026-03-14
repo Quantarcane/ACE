@@ -1,6 +1,6 @@
 {
   "name": "agile-context-engineering",
-  "version": "0.1.0",
+  "version": "0.2.1",
   "description": "ACE - Agile Context Engineering: A spec-driven development system for Claude Code and Crush (formerly OpenCode) with Agile workflows",
   "main": "index.js",
   "bin": {
@@ -11,6 +11,7 @@
     "bin",
     "commands",
     "agents",
+    "hooks",
     "agile-context-engineering"
   ],
   "scripts": {

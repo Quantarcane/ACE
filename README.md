@@ -124,6 +124,10 @@ npx agile-context-engineering --opencode --global # Crush (formerly OpenCode), g
 npx agile-context-engineering --all --global      # All runtimes, global install
 ```
 
+### Updating
+
+When a new version is available, your status bar will show a yellow `/ace:update` indicator. Run the `/ace:update` command inside Claude Code to update — it detects your install type (global/local, Claude/Crush) automatically and runs the correct installer.
+
 ### Prerequisites
 
 | Requirement | Purpose |

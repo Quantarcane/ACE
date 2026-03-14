@@ -1,0 +1,276 @@
+<wiki-readme>
+    <purpose>
+        Template for `.docs/wiki/wiki-readme.md` — the entry point and usage guide for the
+        engineering wiki. Generated once when the `.docs/wiki/` directory is first created
+        (typically by `/ace:map-system`).
+
+        Serves two audiences:
+        - **Humans** who want to understand, navigate, and contribute to the wiki
+        - **AI agents** who need to know which documents to load for a given task
+
+        This is NOT a documentation template — it is a META-DOCUMENT that describes how the
+        wiki itself works. Think of it as the README for the wiki system.
+    </purpose>
+
+    <template>
+        <header>
+            # Engineering Wiki
+
+            Living knowledge base for this codebase. Maintained by AI agents after each story
+            and by developers when making structural changes.
+
+            **For humans**: browse by subsystem, read system and pattern docs to understand how things work.
+            **For AI agents**: load the minimal set of docs needed for your current task — every token counts.
+        </header>
+
+        <directory-structure>
+            ## Directory Structure
+
+            ```
+            .docs/wiki/
+            |-- wiki-readme.md                          # This file — how to use the wiki
+            |-- system-wide/                            # Documents that span all subsystems
+            |   |-- system-structure.md                 # Physical layout, subsystem index, shared dirs
+            |   |-- system-architecture.md              # L1/L2 C4 views, core flows, tech stack
+            |   |-- testing-framework.md                # Test runner, patterns, conventions
+            |   |-- coding-standards.md                 # Language and paradigm-specific rules
+            |   `-- tech-debt-index.md                  # Roll-up of all known tech debt
+            `-- subsystems/
+                `-- [subsystem-name]/                    # One folder per subsystem
+                    |-- structure.md                     # File layout, "where to add code"
+                    |-- architecture.md                  # L3 components, internal flows, dependencies
+                    |-- systems/                         # WHAT exists — domain system docs
+                    |   `-- [system-name].md
+                    |-- patterns/                        # HOW to implement — reusable structural patterns
+                    |   `-- [pattern-name].md
+                    |-- cross-cutting/                   # Shared infrastructure spanning systems
+                    |   `-- [concern-name].md
+                    |-- guides/                          # Step-by-step implementation recipes
+                    |   `-- [task-name].md
+                    `-- decisions/                       # WHY — Architecture Decision Records
+                        `-- ADR-NNN-[slug].md
+            ```
+        </directory-structure>
+
+        <document-types>
+            ## Document Types
+
+            ### System-Wide Documents
+
+            | Document | Answers | Created By |
+            |----------|---------|------------|
+            | `system-structure.md` | What subsystems exist and where do they live? | `/ace:map-system` |
+            | `system-architecture.md` | What's the system design, tech stack, and core flows? | `/ace:map-system` |
+            | `testing-framework.md` | How do we test? Runner, patterns, conventions. | `/ace:map-system` |
+            | `coding-standards.md` | What are the mandatory code quality rules? | `/ace:init-coding-standards` |
+            | `tech-debt-index.md` | What known quality issues exist across the codebase? | `/ace:map-story` (auto) |
+
+            ### Subsystem Documents
+
+            | Document | Answers | Created By |
+            |----------|---------|------------|
+            | `structure.md` | Where do files live in this subsystem? Where do I add new code? | `/ace:map-subsystem` |
+            | `architecture.md` | What are the internal components, layers, and flows? | `/ace:map-subsystem` |
+
+            ### Knowledge Documents (per subsystem)
+
+            | Category | Answers | When to Create |
+            |----------|---------|----------------|
+            | `systems/` | How does this domain system work RIGHT NOW? | One doc per coherent domain capability (e.g., drawing system, order processing) |
+            | `patterns/` | How do I implement using this reusable pattern? | When a structural pattern appears in 2+ implementations |
+            | `cross-cutting/` | How does this shared infrastructure work? | For concerns spanning multiple domain systems (DI, events, registry) |
+            | `guides/` | How do I perform this recurring task end-to-end? | When a task is repeated (adding a new tool, endpoint, entity) |
+            | `decisions/` | Why was this significant choice made? | When a meaningful trade-off was evaluated and decided |
+        </document-types>
+
+        <how-to-use>
+            ## How to Use This Wiki
+
+            ### For Humans
+
+            **Understand a subsystem:**
+            1. Read `subsystems/[name]/architecture.md` — components, layers, internal flows
+            2. Read relevant `systems/*.md` — domain systems you care about
+            3. Follow cross-references to patterns and cross-cutting concerns
+
+            **Implement a new feature:**
+            1. Read `system-wide/coding-standards.md` — mandatory rules
+            2. Read the subsystem's `structure.md` — where to add files
+            3. Check `guides/` — there may be a step-by-step recipe for your task
+            4. Read relevant `patterns/` — follow established structural patterns
+            5. Check `decisions/` — respect past architectural decisions
+
+            **Debug or investigate:**
+            1. Start with the relevant `systems/*.md` — it has entry points, flows, and components
+            2. Follow the sequence diagrams to trace data flow
+            3. Check `cross-cutting/` for shared infrastructure behavior
+
+            ### For AI Agents
+
+            **Context loading strategy:**
+            - ALWAYS load system-wide docs first: `system-structure.md`, `system-architecture.md`, `coding-standards.md`, `testing-framework.md`
+            - Then load subsystem docs for the subsystem(s) you are modifying
+            - Load ONLY the `systems/`, `patterns/`, `cross-cutting/`, and `guides/` docs relevant to your task
+            - Check `decisions/` for ADRs that constrain your design choices
+            - Every token in your context window costs reasoning capacity — load less, reason better
+
+            **Finding the right docs:**
+            - Story files include a `## Relevant Wiki` section with curated doc references
+            - Each doc cross-references related docs via markdown links — follow them as needed
+            - `structure.md` → where files live; `architecture.md` → how things connect
+            - `systems/` → domain behavior; `patterns/` → structural recipes; `guides/` → task recipes
+        </how-to-use>
+
+        <how-to-create>
+            ## Creating New Wiki Documents
+
+            Wiki documents are primarily created and updated by AI agents (ace-wiki-mapper) through:
+            - `/ace:map-system` — system-wide documents
+            - `/ace:map-subsystem` — subsystem structure, architecture, and knowledge docs
+            - `/ace:map-story` — updates knowledge docs after story implementation
+
+            ### Manual Creation Guidelines
+
+            If creating a document manually, follow these rules:
+
+            **Naming:**
+            - Use kebab-case for all file names: `drawing-system.md`, `repository-pattern.md`
+            - Systems: name after the domain capability — `drawing-system.md`, `order-processing.md`
+            - Patterns: name after the pattern — `template-method-pattern.md`, `repository-pattern.md`
+            - Cross-cutting: name after the concern — `dependency-injection.md`, `event-system.md`
+            - Guides: name after the task — `adding-drawing-tool.md`, `adding-crud-endpoint.md`
+            - Decisions: `ADR-NNN-kebab-slug.md` — sequential numbering within the subsystem
+
+            **Content rules:**
+            - EXTREMELY SUCCINCT — every word must add value
+            - Bullet points over paragraphs
+            - Code references: `file-path:ClassName.methodName` — never line numbers
+            - All architecture diagrams MUST be mermaid (flowchart, classDiagram, sequenceDiagram)
+            - File trees: ASCII only (`|--` and backtick for last item)
+            - Inline code ONLY for interface/type contracts
+            - Cross-reference related docs with markdown links
+            - Every `systems/*.md` MUST have at least one mermaid sequenceDiagram
+
+            **Topic-scoped, not story-scoped:**
+            - Documents describe a CONCERN, not a story or sprint
+            - "How does the drawing system work?" — good
+            - "What story #19 implemented" — wrong (that goes in `.ace/artifacts/`)
+
+            **Create vs update decision:**
+            1. Does an existing doc already cover this topic? → UPDATE it
+            2. Could this be a new section in an existing doc? → Add the section
+            3. Any overlap with existing docs? → Merge into the existing doc
+            4. Genuinely new topic with no overlap? → CREATE a new doc
+        </how-to-create>
+
+        <keeping-current>
+            ## Keeping the Wiki Current
+
+            ### Automatic Updates
+
+            After each story implementation, `/ace:map-story` analyzes git changes and updates
+            the relevant knowledge documents. This is the primary mechanism for keeping the wiki
+            current.
+
+            ### Manual Update Triggers
+
+            **Update `system-structure.md` when:**
+            - New subsystem added, removed, or merged
+            - Shared directory added or removed
+            - Workspace configuration changed
+
+            **Update `system-architecture.md` when:**
+            - New subsystem or external integration added
+            - Communication pattern changed
+            - Tech stack changed
+
+            **Update `testing-framework.md` when:**
+            - Test runner or mocking approach changed
+            - Coverage requirements changed
+
+            **Update subsystem `structure.md` when:**
+            - Top-level directory added, renamed, or removed within the subsystem
+
+            **Update subsystem `architecture.md` when:**
+            - New architectural layer or component type introduced
+            - New inbound or outbound dependency added
+
+            **Update knowledge docs when:**
+            - `systems/` — new component, behavior, entry point, or integration point
+            - `patterns/` — new implementation added, pattern structure changed
+            - `cross-cutting/` — new registration, mechanism changed
+            - `guides/` — new step required, step order changed, reference implementation changed
+            - `decisions/` — NEVER edit accepted ADRs; create a new one that supersedes
+
+            ### Tech Debt
+
+            Tech debt items are tracked in individual `systems/` and `cross-cutting/` docs (## Tech Debt section)
+            and rolled up in `system-wide/tech-debt-index.md`. Items are removed when fixed.
+        </keeping-current>
+
+        <subsystem-index>
+            ## Subsystems
+
+            [POPULATE FROM system-structure.md — list each subsystem with link to its wiki folder]
+
+            | Subsystem | Wiki Path | Responsibility |
+            |-----------|-----------|----------------|
+            | [name] | [subsystems/name/](subsystems/name/) | [one-line responsibility] |
+        </subsystem-index>
+    </template>
+
+    <guidelines>
+
+        **This is a META-DOCUMENT, not a code documentation template.**
+        It describes the wiki system itself — its structure, conventions, and usage.
+        It does NOT contain code references, mermaid diagrams, or architectural content.
+
+        **Populating the template:**
+        - The Directory Structure section is FIXED — it describes the standard wiki layout.
+          Do NOT customize it per project. It shows the canonical structure.
+        - The Document Types tables are FIXED — they describe what each document type is.
+        - The Subsystems table at the bottom MUST be populated from `system-structure.md`
+          (the subsystem index). If `system-structure.md` doesn't exist yet, leave the table
+          with placeholder rows and a note to populate after `/ace:map-system`.
+        - All wiki paths in the Subsystems table should be relative links from the wiki root.
+
+        **Tone:**
+        - Direct and practical — this is a reference, not a tutorial
+        - Written for two audiences in parallel: humans and AI agents
+        - Short sentences, bullet points, tables over prose
+        - No filler, no motivational text, no history
+
+        **What does NOT belong here:**
+        - Actual code documentation (that lives in the wiki docs themselves)
+        - Project-specific architecture details (that's system-architecture.md)
+        - Process details about ACE workflows (that's internal to the tool)
+        - Story or feature information
+        - Revision history
+
+    </guidelines>
+
+    <evolution>
+
+        This document is MOSTLY STABLE — it describes the wiki system, which rarely changes.
+
+        **Update triggers:**
+        - New document type added to the wiki system (e.g., a new knowledge category)
+        - New subsystem mapped (update the Subsystems table)
+        - Subsystem removed or renamed (update the Subsystems table)
+        - Wiki conventions changed (naming rules, diagram rules, reference format)
+
+        **NOT an update trigger:**
+        - New documents created within existing categories
+        - Content updates to any wiki document
+        - New stories, features, or sprints
+        - Changes to ACE tool internals
+
+        **Update rules:**
+        - UPDATE the Subsystems table when subsystems are added/removed
+        - The rest of the document should rarely need changes
+        - If the wiki structure itself evolves (new folders, new doc types), update the
+          Directory Structure and Document Types sections
+
+    </evolution>
+
+</wiki-readme>

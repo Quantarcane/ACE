@@ -1,0 +1,207 @@
+<workflow>
+
+    <purpose>
+        Check for ACE updates via npm, display version comparison, obtain user confirmation,
+        and execute clean installation with cache clearing.
+    </purpose>
+
+    <mandatory-context>
+        Read all files referenced by the invoking prompt's execution-context before starting.
+    </mandatory-context>
+
+    <process>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 1: DETECT INSTALLATION                                       -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="detect-installation" order="1">
+            Detect whether ACE is installed locally or globally, and for which runtime.
+
+            ```bash
+            if [ -f "./.claude/agile-context-engineering/VERSION" ]; then
+              echo "SCOPE=local"
+              echo "RUNTIME=claude"
+              echo "VERSION=$(cat ./.claude/agile-context-engineering/VERSION)"
+            elif [ -f "$HOME/.claude/agile-context-engineering/VERSION" ]; then
+              echo "SCOPE=global"
+              echo "RUNTIME=claude"
+              echo "VERSION=$(cat $HOME/.claude/agile-context-engineering/VERSION)"
+            elif [ -f "./.opencode/agile-context-engineering/VERSION" ]; then
+              echo "SCOPE=local"
+              echo "RUNTIME=opencode"
+              echo "VERSION=$(cat ./.opencode/agile-context-engineering/VERSION)"
+            elif [ -f "$HOME/.opencode/agile-context-engineering/VERSION" ]; then
+              echo "SCOPE=global"
+              echo "RUNTIME=opencode"
+              echo "VERSION=$(cat $HOME/.opencode/agile-context-engineering/VERSION)"
+            else
+              echo "SCOPE=unknown"
+              echo "RUNTIME=claude"
+              echo "VERSION=0.0.0"
+            fi
+            ```
+
+            Parse SCOPE, RUNTIME, and VERSION from the output.
+
+            **If SCOPE is "unknown":**
+            ```
+            ## ACE Update
+
+            **Installed version:** Unknown
+
+            Your installation doesn't include version tracking.
+            Running fresh install...
+            ```
+
+            Proceed with VERSION=0.0.0.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 2: CHECK LATEST VERSION                                      -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="check-latest-version" order="2">
+            Check npm for the latest published version:
+
+            ```bash
+            npm view agile-context-engineering version 2>/dev/null
+            ```
+
+            **If npm check fails:**
+            ```
+            Couldn't check for updates (offline or npm unavailable).
+
+            To update manually: `npx agile-context-engineering --claude --global`
+            ```
+            Exit.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 3: COMPARE VERSIONS                                          -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="compare-versions" order="3">
+            Compare installed vs latest.
+
+            **If installed == latest:**
+            ```
+            ## ACE Update
+
+            **Installed:** X.Y.Z
+            **Latest:** X.Y.Z
+
+            You're already on the latest version.
+            ```
+            Exit.
+
+            **If installed > latest:**
+            ```
+            ## ACE Update
+
+            **Installed:** X.Y.Z
+            **Latest:** A.B.C
+
+            You're ahead of the latest release (development version?).
+            ```
+            Exit.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 4: CONFIRM UPDATE                                            -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="confirm-update" order="4">
+            If update is available, show what will happen and ask for confirmation:
+
+            ```
+            ## ACE Update Available
+
+            **Installed:** {installed_version}
+            **Latest:** {latest_version}
+
+            The installer performs a clean install of ACE folders:
+            - `commands/ace/` will be wiped and replaced
+            - `agile-context-engineering/` will be wiped and replaced
+            - `agents/ace-*` files will be replaced
+
+            Your custom files are preserved:
+            - Custom commands not in `commands/ace/`
+            - Custom agents not prefixed with `ace-`
+            - Your CLAUDE.md files
+            - Your .ace/ project artifacts
+            ```
+
+            Use AskUserQuestion:
+            - Question: "Proceed with update?"
+            - Options:
+              - "Yes, update now"
+              - "No, cancel"
+
+            **If user cancels:** Exit.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 5: RUN UPDATE                                                -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="run-update" order="5">
+            Run the update using detected SCOPE and RUNTIME from step 1.
+
+            Build the command: `npx agile-context-engineering --{RUNTIME} --{SCOPE}`
+
+            Examples:
+            - Global Claude:  `npx agile-context-engineering --claude --global`
+            - Local Claude:   `npx agile-context-engineering --claude --local`
+            - Global Crush:   `npx agile-context-engineering --opencode --global`
+            - Local Crush:    `npx agile-context-engineering --opencode --local`
+
+            If SCOPE was "unknown", default to `--claude --global`.
+
+            Capture output. If install fails, show error and exit.
+
+            Clear the update cache so statusline indicator disappears:
+
+            **If SCOPE is "local":**
+            ```bash
+            rm -f ./.claude/cache/ace-update-check.json
+            ```
+
+            **If SCOPE is "global":**
+            ```bash
+            rm -f "$HOME/.claude/cache/ace-update-check.json"
+            ```
+
+            For Crush runtime, substitute `.opencode` for `.claude` in the cache path.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 6: DISPLAY RESULT                                            -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="display-result" order="6">
+            Format completion message:
+
+            ```
+            ============================================================
+              ACE Updated: v{old} -> v{new}
+            ============================================================
+
+            Restart Claude Code to pick up the new commands.
+            ```
+        </step>
+
+    </process>
+
+    <success_criteria>
+        <check>Installed version detected correctly (local/global, claude/crush)</check>
+        <check>Latest version checked via npm</check>
+        <check>Update skipped if already current</check>
+        <check>Clean install warning shown</check>
+        <check>User confirmation obtained before update</check>
+        <check>Update executed with correct --runtime and --scope flags</check>
+        <check>Update cache cleared</check>
+        <check>Restart reminder shown</check>
+    </success_criteria>
+
+</workflow>
