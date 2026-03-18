@@ -446,6 +446,9 @@
             </substep>
 
             <substep order="3a.2" name="create-team">
+                **Safety net: if a leftover team exists from a crashed/interrupted previous run,
+                delete it first with TeamDelete before creating the new team.**
+
                 Create an agent team using the decomposition from step 2.7.
 
                 Tell Claude Code to create the team in natural language:
@@ -1069,7 +1072,13 @@
                 ```
             </substep>
 
-            <substep order="7.7" name="display-completion">
+            <substep order="7.7" name="cleanup-agent-team" condition="EXECUTION_MODE is agent-teams">
+                **Clean up the agent team so future stories can create a new one.**
+                Delete the active team using TeamDelete. This prevents the
+                "already leading team" error on the next /ace:execute-story run.
+            </substep>
+
+            <substep order="7.8" name="display-completion">
                 <variant condition="FINAL_STATUS is Done">
                     ```
                     ╔══════════════════════════════════════════════════╗
