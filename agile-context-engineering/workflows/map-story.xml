@@ -199,6 +199,153 @@
                     </variant>
                 </substep>
 
+                <substep order="2e" name="detect-new-subsystems">
+                    Detect whether any subsystems in `subsystem_work` are NEW (not yet documented
+                    in system-structure.md). If found, offer to run full subsystem mapping via
+                    /ace:map-subsystem before proceeding with per-change documentation.
+
+                    Only runs in story mode. Naturally skipped when map-story is invoked as a
+                    background agent (e.g., from execute-story) because the required tools —
+                    Agent, AskUserQuestion — are unavailable to ace-wiki-mapper agents.
+
+                    <substep order="2e.1" name="check-system-structure">
+                        Check if `.docs/wiki/system-wide/system-structure.md` exists.
+
+                        <variant condition="file does not exist">
+                            Display:
+                            ```
+                              i  system-structure.md not found — skipping new subsystem detection.
+                                 Run /ace:map-system first to create system-wide documentation.
+                            ```
+                            Skip the rest of substep 2e.
+                        </variant>
+
+                        <variant condition="file exists">
+                            Read `.docs/wiki/system-wide/system-structure.md`.
+                            Parse the **Subsystem Index** table to extract known subsystem
+                            directory paths (the Directory column values).
+                            Store as `known_subsystems`.
+                        </variant>
+                    </substep>
+
+                    <substep order="2e.2" name="identify-new-subsystems">
+                        For each subsystem key in `subsystem_work`, determine its source
+                        directory path from the changed file paths (the common parent
+                        directory at the subsystem root level).
+
+                        Compare against `known_subsystems`. Any subsystem whose directory
+                        path is NOT in the list → add to `new_subsystems` with name and path.
+
+                        <variant condition="new_subsystems is empty">
+                            No new subsystems detected — skip the rest of substep 2e.
+                        </variant>
+                    </substep>
+
+                    <substep order="2e.3" name="ask-user-approval">
+                        Display:
+                        ```
+                          !  New subsystem(s) detected — not yet in system-structure.md:
+
+                             [For each new subsystem:]
+                             - [subsystem-name] at [path] ([N] changed files)
+                        ```
+
+                        Use AskUserQuestion:
+                        - header: "New Subsystem"
+                        - question: "This story added files in [count] subsystem(s) not yet
+                          documented in system-structure.md:\n\n[list: name at path]\n\nFull
+                          mapping creates structure.md, architecture.md, module discovery, and
+                          all knowledge docs (systems/, patterns/, cross-cutting/, guides/,
+                          decisions/). It also updates system-structure.md and
+                          system-architecture.md.\n\nShould I run full subsystem mapping?"
+                        - options:
+                          - "Yes, map new subsystem(s)" — Run /ace:map-subsystem for each
+                            new subsystem, then continue with remaining work
+                          - "No, just document the changes" — Treat them like existing
+                            subsystems (lightweight per-change docs only)
+
+                        <option value="No, just document the changes">
+                            Skip the rest of substep 2e — new subsystems stay in
+                            `subsystem_work` for normal step 3 processing.
+                        </option>
+                    </substep>
+
+                    <substep order="2e.4" name="run-map-subsystem" condition="user approved">
+                        For each subsystem in `new_subsystems`, run map-subsystem SEQUENTIALLY
+                        (each spawns many internal sub-agents — parallel would be too heavy).
+
+                        Store results in `new_subsystem_reports` list.
+
+                        <loop for-each="subsystem in new_subsystems">
+                            Display:
+                            ```
+                            ┌──────────────────────────────────────────────────┐
+                            │  ACE > Map Story > New Subsystem Mapping          │
+                            └──────────────────────────────────────────────────┘
+
+                              Mapping [subsystem.name] at [subsystem.path]...
+                              ([index] of [total] new subsystems)
+                            ```
+
+                            ```
+                            Agent(
+                                prompt="/ace:map-subsystem subsystem=\"[subsystem.path]\"
+
+                                Execute the map-subsystem workflow end-to-end.
+                                This is a NEW subsystem — no existing docs to triage
+                                (all documents will be created fresh).
+
+                                **Return format — ONLY this, nothing else:**
+                                MAP-SUBSYSTEM COMPLETE
+                                Subsystem: [subsystem.name]
+                                - Structure: created ([N] lines)
+                                - Architecture: created ([N] lines)
+                                - Modules discovered: [count]
+                                - Knowledge docs created: [count]
+                                - system-structure.md: updated
+                                - system-architecture.md: updated",
+                                subagent_type="general-purpose",
+                                description="Map new subsystem [subsystem.name]"
+                            )
+                            ```
+
+                            Parse the agent's return and add to `new_subsystem_reports`.
+
+                            Display:
+                            ```
+                              +  [subsystem.name] mapping complete — [count] docs created
+                            ```
+                        </loop>
+                    </substep>
+
+                    <substep order="2e.5" name="prune-work-map" condition="user approved">
+                        Remove all `new_subsystems` entries from `subsystem_work` to prevent
+                        duplicate documentation in step 3 (map-subsystem already created full
+                        structure, architecture, module discovery, AND all knowledge docs).
+
+                        Display:
+                        ```
+                          i  Removed [count] fully-mapped subsystem(s) from work queue.
+                             Remaining for per-change documentation: [list remaining, or "none"]
+                        ```
+
+                        <variant condition="subsystem_work is now empty AND tech_debt_items exist for new subsystems">
+                            map-subsystem does NOT handle tech debt integration. Spawn a
+                            lightweight ace-wiki-mapper agent per new subsystem that has
+                            tech_debt_items, with instructions to ONLY add ## Tech Debt
+                            sections to the docs that map-subsystem just created.
+                        </variant>
+
+                        <variant condition="subsystem_work is now empty AND no tech debt">
+                            Skip steps 3-4, jump to step 5 (tech debt index update).
+                        </variant>
+
+                        <variant condition="subsystem_work still has entries">
+                            Continue to step 3 normally with the reduced work map.
+                        </variant>
+                    </substep>
+                </substep>
+
             </mode>
 
             <!-- ── File Mode ──────────────────────────────────────────────── -->
@@ -729,7 +876,14 @@
                     **Story**: [story name from artifacts, or "Git changes"]
                     **Affected Subsystems**: [list]
 
-                    [For each subsystem, include the agent's report:]
+                    [If new_subsystem_reports is not empty:]
+
+                    ### New Subsystems Mapped (via map-subsystem)
+                    [For each new subsystem report:]
+                    - **[subsystem.name]** at `[subsystem.path]` — [modules] modules, [docs] knowledge docs
+                      Docs: `.docs/wiki/subsystems/[subsystem.name]/`
+
+                    [For each remaining subsystem, include the agent's report:]
 
                     ### [subsystem_name]
 
@@ -792,6 +946,10 @@
         <criterion>Tech debt index updated with new items and recalculated counts (if provided)</criterion>
         <criterion>Security scan passed (no secrets in generated docs)</criterion>
         <criterion>Clear structured report from each agent, merged into final report</criterion>
+        <criterion>New subsystems detected by comparing subsystem_work against system-structure.md Subsystem Index (story mode only)</criterion>
+        <criterion>User approval required before running map-subsystem on new subsystems</criterion>
+        <criterion>New subsystems removed from subsystem_work after map-subsystem to prevent duplicate docs</criterion>
+        <criterion>New subsystem mapping results included in final report</criterion>
     </success_criteria>
 
 </workflow>

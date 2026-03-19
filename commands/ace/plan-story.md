@@ -1,7 +1,7 @@
 ---
 name: ace:plan-story
 description: Plan a story through deep questioning to create CRYSTAL-CLEAR acceptance criteria with ZERO assumptions, then dispatch wiki research, external analysis, integration analysis, and technical solution design
-argument-hint: "story=<file-path|github-url> [external-codebase=<source-path|github-url>] [external-docs=<weblink|filepath>]"
+argument-hint: "story=<file-path|github-url> [external-codebase=<source-path|github-url>] [external-docs=<weblink|filepath>] [lib-docs=<weblinks-and-filepaths>]"
 allowed-tools:
   - Read
   - Bash
@@ -56,6 +56,15 @@ allowed-tools:
                     Link or path to external system documentation.
                     Only used when external-codebase is also provided.
                     Provides supplementary context for external analysis.
+                </param>
+                <param name="lib-docs" type="weblinks and/or filepaths">
+                    Space-separated string of weblinks and/or file paths to library or API documentation.
+                    These are injected into the story's Relevant Wiki section as a
+                    `### Library Documentation` subsection after pass 2 completes,
+                    so that passes 4-5 (integration analysis, technical solution) can
+                    reference them when designing the implementation.
+                    Useful for third-party libraries, SDK docs, or API references
+                    that inform how the story should be built.
                 </param>
             </optional>
         </parameters>
@@ -127,6 +136,11 @@ allowed-tools:
           story=.ace/artifacts/product/e1-charts/f2-rendering/s3-canvas/s3-canvas.md \
           external-codebase=src/external/lightweight-charts/ \
           external-docs=https://tradingview.github.io/lightweight-charts/
+
+        # With library documentation references
+        /ace:plan-story \
+          story=.ace/artifacts/product/e1-charts/f2-rendering/s3-canvas/s3-canvas.md \
+          lib-docs="https://docs.some-lib.io/api src/vendor/some-lib/README.md"
 
         # With just an issue number (uses configured repo)
         /ace:plan-story story=#95

@@ -1,6 +1,6 @@
 ---
 name: ace:map-story
-description: Update living knowledge docs — either after a story implementation (git-based) or for existing undocumented code (file-based, called by map-subsystem)
+description: Update living knowledge docs — either after a story implementation (git-based, with new subsystem detection) or for existing undocumented code (file-based, called by map-subsystem)
 argument-hint: "story-context='.ace/artifacts/...' commits=3  |  files='a.ts,b.ts' module-name='User Management' subsystem-name='api'"
 allowed-tools:
   - Read
@@ -11,6 +11,7 @@ allowed-tools:
   - Edit
   - Task
   - AskUserQuestion
+  - Agent
 ---
 
 ```xml
@@ -23,6 +24,7 @@ allowed-tools:
             <trigger>Reads story artifacts for intent context</trigger>
             <trigger>Detects affected subsystem(s) from changed file paths</trigger>
             <trigger>Creates or updates living knowledge docs to reflect the CURRENT system state</trigger>
+            <trigger>Detects NEW subsystems not yet in system-structure.md and offers full mapping via map-subsystem</trigger>
         </mode>
         <mode name="file" invoked-by="map-subsystem Step 8.7">
             <trigger>Called automatically during subsystem mapping</trigger>
@@ -125,7 +127,9 @@ allowed-tools:
             (systems/, patterns/, cross-cutting/, guides/, decisions/).
 
             In story mode: analyze git changes to determine what was built, detect
-            affected subsystem(s), and update/create docs to reflect the CURRENT system state.
+            affected subsystem(s), identify NEW subsystems not yet in system-structure.md
+            (offering full map-subsystem mapping with user approval), and update/create
+            docs to reflect the CURRENT system state.
 
             In file mode: document existing undocumented code from the provided file list.
         </objective>
@@ -136,6 +140,8 @@ allowed-tools:
             .docs/wiki/subsystems/[subsystem-name]/cross-cutting/[concern-name].md
             .docs/wiki/subsystems/[subsystem-name]/guides/[guide-name].md
             .docs/wiki/subsystems/[subsystem-name]/decisions/[decision-name].md
+            .docs/wiki/system-wide/system-structure.md (updated if new subsystem mapped)
+            .docs/wiki/system-wide/system-architecture.md (updated if new subsystem mapped)
         </artifacts>
     </output>
 

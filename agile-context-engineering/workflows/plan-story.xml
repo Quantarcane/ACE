@@ -42,6 +42,7 @@
             - `story` (REQUIRED): file path or GitHub URL/issue number
             - `external-codebase` (OPTIONAL): path or GitHub URL to external system
             - `external-docs` (OPTIONAL): weblink or filepath to external docs
+            - `lib-docs` (OPTIONAL): space-separated weblinks and/or filepaths to library documentation
 
             ```bash
             INIT=$(node ~/.claude/agile-context-engineering/src/ace-tools.js init plan-story {story_param})
@@ -83,7 +84,8 @@
                  Provide a valid story file path or GitHub issue.
             ```
 
-            Store `EXTERNAL_CODEBASE` and `EXTERNAL_DOCS` from parsed arguments (may be null).
+            Store `EXTERNAL_CODEBASE`, `EXTERNAL_DOCS`, and `LIB_DOCS` from parsed arguments (may be null).
+            `LIB_DOCS` is a space-separated string of weblinks and/or filepaths.
         </step>
 
         <!-- ══════════════════════════════════════════════════════════════════ -->
@@ -641,6 +643,37 @@
               {+  Pass 3 complete. External analysis written. (if applicable)}
             ```
 
+            <!-- ── 7d.1: Inject Library Documentation into Relevant Wiki ── -->
+
+            **If `LIB_DOCS` is not null/empty:**
+
+            Append a `### Library Documentation` subsection to the `## Relevant Wiki`
+            section in the story file. This ensures passes 4-5 see these references.
+
+            Read the story file, find the `## Relevant Wiki` section, and append
+            the `### Library Documentation` subsection BEFORE the next `## ` heading
+            (i.e., before `## Technical Solution`).
+
+            Split `LIB_DOCS` by spaces. For each entry, determine if it's a weblink
+            (starts with `http://` or `https://`) or a filepath, and format accordingly:
+
+            ```markdown
+            ### Library Documentation
+
+            <!-- Provided via lib-docs parameter. These are external library/API docs
+                 that inform the technical solution design. Passes 4-5 MUST read/fetch
+                 these when designing the implementation. -->
+
+            - `{entry}` — Library/API documentation reference
+            ```
+
+            Use the Edit tool to insert this subsection into the story file.
+
+            Display:
+            ```
+              +  Library documentation ({count} entries) added to Relevant Wiki section.
+            ```
+
             <!-- ── 7e: Dispatch Pass 4 — Integration Analysis ───────────── -->
 
             Display:
@@ -730,6 +763,7 @@
 
                 Execute the research-technical-solution workflow end-to-end.
                 The story file has the full requirements + Relevant Wiki section.
+                {If LIB_DOCS provided: The Relevant Wiki section includes a '### Library Documentation' subsection with external library/API doc references — READ/FETCH these as primary design input.}
                 The integration-analysis.md exists in the story directory.
                 {If external analysis exists: The external-analysis.md exists in the story directory.}
                 Append the Technical Solution section to the story file.
@@ -897,6 +931,7 @@
         - User reviewed and approved pass 1 output
         - Pass 2 (wiki research) dispatched as background agent, wrote to story file
         - Pass 3 (external analysis) offered/dispatched if external-codebase provided
+        - Library documentation entries injected into Relevant Wiki section after pass 2 (if lib-docs provided)
         - Pass 4 (integration analysis) dispatched AFTER passes 2-3 complete
         - Pass 5 (technical solution) dispatched AFTER pass 4 complete
         - NO TaskOutput called on ANY background agent — context window stays clean
