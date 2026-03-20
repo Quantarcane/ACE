@@ -248,6 +248,7 @@ Every completed story triggers a wiki update. The wiki is the AI's institutional
 | **patterns/** | Reusable structural templates — structure diagrams, current implementations, how to apply | Follows existing patterns instead of inventing new ones |
 | **cross-cutting/** | Shared infrastructure — DI containers, event systems, factories, registrations | Knows exactly where to register new components |
 | **guides/** | Step-by-step recipes for common tasks (e.g., "add a new API endpoint") | Follows proven procedures instead of guessing |
+| **walkthroughs/** | Deep tutorial-style flow explanations with actual code snippets | Understands complex multi-class flows before modifying them |
 | **decisions/** | Architecture Decision Records — why choices were made, alternatives rejected | Respects past decisions, doesn't re-litigate them |
 
 When planning a new story, the wiki research pass scans all relevant docs and attaches them to the story. When executing, the agent loads those references as context. After implementation, `map-story` updates the wiki with what changed — so the next story benefits from everything learned.

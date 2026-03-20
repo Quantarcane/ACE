@@ -398,6 +398,7 @@
                     - **Decisions (ADRs)**: Architecture Decision Records that constrain design choices
                     - **Cross-Cutting Concerns**: Shared concerns to respect (auth, logging, errors, etc.)
                     - **Guides**: Implementation guides for common tasks relevant to this story
+                    - **Walkthroughs**: Deep tutorial-style flow explanations with actual code snippets
 
                     These wiki documents replace the obsolete command's parameters:
                     - "related-stories-implementations" — wiki captures this knowledge

@@ -112,6 +112,7 @@ allowed-tools:
         <system-cross-cutting>@~/.claude/agile-context-engineering/templates/wiki/system-cross-cutting.xml</system-cross-cutting>
         <pattern>@~/.claude/agile-context-engineering/templates/wiki/pattern.xml</pattern>
         <guide>@~/.claude/agile-context-engineering/templates/wiki/guide.xml</guide>
+        <walkthrough>@~/.claude/agile-context-engineering/templates/wiki/walkthrough.xml</walkthrough>
         <decizions>@~/.claude/agile-context-engineering/templates/wiki/decizions.xml</decizions>
         <tech-debt-index>@~/.claude/agile-context-engineering/templates/wiki/tech-debt-index.xml</tech-debt-index>
 
@@ -124,12 +125,13 @@ allowed-tools:
             Read the provided source code files (and any existing docs for context),
             then autonomously create or update living knowledge documents.
             One call may produce multiple docs across different categories
-            (systems/, patterns/, cross-cutting/, guides/, decisions/).
+            (systems/, patterns/, cross-cutting/, guides/, walkthroughs/, decisions/).
 
             In story mode: analyze git changes to determine what was built, detect
             affected subsystem(s), identify NEW subsystems not yet in system-structure.md
             (offering full map-subsystem mapping with user approval), and update/create
-            docs to reflect the CURRENT system state.
+            docs to reflect the CURRENT system state. Also suggests potential walkthroughs
+            for complex flows discovered in the code — the user can choose to create them.
 
             In file mode: document existing undocumented code from the provided file list.
         </objective>
@@ -139,6 +141,7 @@ allowed-tools:
             .docs/wiki/subsystems/[subsystem-name]/patterns/[pattern-name].md
             .docs/wiki/subsystems/[subsystem-name]/cross-cutting/[concern-name].md
             .docs/wiki/subsystems/[subsystem-name]/guides/[guide-name].md
+            .docs/wiki/subsystems/[subsystem-name]/walkthroughs/[flow-name].md (if user approves suggestions)
             .docs/wiki/subsystems/[subsystem-name]/decisions/[decision-name].md
             .docs/wiki/system-wide/system-structure.md (updated if new subsystem mapped)
             .docs/wiki/system-wide/system-architecture.md (updated if new subsystem mapped)

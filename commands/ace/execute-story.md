@@ -55,6 +55,7 @@ allowed-tools:
     <execution-context>
         <execute-story-workflow>@~/.claude/agile-context-engineering/workflows/execute-story.xml</execute-story-workflow>
         <story-template>@~/.claude/agile-context-engineering/templates/product/story.xml</story-template>
+        <walkthrough-template>@~/.claude/agile-context-engineering/templates/wiki/walkthrough.xml</walkthrough-template>
         <questioning>@~/.claude/agile-context-engineering/utils/questioning.xml</questioning>
         <ui-formatting>@~/.claude/agile-context-engineering/utils/ui-formatting.md</ui-formatting>
     </execution-context>

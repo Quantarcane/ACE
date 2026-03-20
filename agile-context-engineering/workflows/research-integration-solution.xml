@@ -303,6 +303,7 @@
                  - Cross-cutting concerns to respect
                  - Architecture Decision Records (ADRs) that constrain design
                  - Guides for common implementation tasks
+                 - Walkthroughs of complex multi-class flows
 
             3. **[MANDATORY] Load external analysis (if available):**
                - If EXTERNAL_ANALYSIS_CONTENT is set, study it for:

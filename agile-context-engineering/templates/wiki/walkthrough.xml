@@ -1,0 +1,255 @@
+<walkthrough>
+    <purpose>
+        Template for `.docs/wiki/subsystems/[subsystem-name]/walkthroughs/<flow-name>.md` — a deep,
+        tutorial-style explanation of a complex end-to-end flow. Answers "Walk me through EXACTLY
+        what happens when X."
+
+        Each walkthrough traces a single flow from entry point to exit point, showing ACTUAL code
+        from the codebase at every step, explaining what each piece does and WHY, and calling out
+        framework/library concepts with info boxes when external tools are involved.
+
+        Written for humans (especially new developers and interns) who need to UNDERSTAND a flow
+        before they can work with it. Unlike system docs (terse references for AI agents),
+        walkthroughs prioritize completeness of information — but deliver it in minimal words.
+
+        A "walkthrough" is a traced execution flow through multiple classes and layers:
+        e.g., "Message arrives via SignalR until it reaches the LLM", "LLM calls a tool until
+        the drawing appears on the chart", "User places an order until it's confirmed".
+
+        Create a walkthrough when:
+        - A flow spans 3+ classes across multiple architectural layers
+        - External frameworks/libraries are involved that need explanation (MAF, SignalR, EF Core)
+        - A system doc would need paragraphs of explanation with code snippets (that's a walkthrough, not a system doc)
+        - An intern reading the code alone would not understand what's happening without guidance
+
+        **Emphasis Frameworks:**
+        Walkthroughs can specify one or more "emphasis frameworks" — external frameworks,
+        libraries, APIs, or SDKs that deserve deep explanation throughout the walkthrough.
+        When an emphasis framework is specified:
+        - EVERY step where the flow touches that framework MUST have a framework info box
+        - The info box explains the specific framework concept used in that step
+        - ALL code from ALL steps that interact with the emphasis framework is shown and explained
+        - The agent researches the framework (via WebSearch/context7 or provided docs) if needed
+        - The Framework Concepts Reference table at the end is MANDATORY
+
+        Examples of emphasis frameworks: SignalR, EF Core, MAF (Microsoft Agent Framework),
+        React Query, gRPC, MediatR, AutoMapper. Can be specified by name (agent researches)
+        or with documentation paths/URLs (agent reads provided docs).
+
+        Complements:
+        - systems/ docs (terse WHAT reference — walkthroughs explain the HOW in depth)
+        - patterns/ docs (reusable structural patterns — walkthroughs trace specific flows through them)
+        - guides/ docs (procedural recipes for DOING — walkthroughs explain for UNDERSTANDING)
+        - cross-cutting/ docs (shared infrastructure — walkthroughs show how flows pass through them)
+    </purpose>
+
+    <template>
+        <title>
+            # [Flow Name]
+
+            One line: what this flow does and when it triggers.
+        </title>
+
+        <file-map>
+            ## Files Involved
+
+            Every file this flow touches, in execution order.
+
+            ```
+            src/[layer]/[area]/
+            |-- FileA.cs                    # Entry point
+            |-- FileB.cs                    # Orchestrates flow
+            |-- FileC.cs                    # Core logic
+            `-- FileD.cs                    # Sends result
+            ```
+        </file-map>
+
+        <flow-diagram>
+            ## Flow Overview
+
+            ```mermaid
+            sequenceDiagram
+                participant A as ComponentA
+                participant B as ComponentB
+                participant C as ComponentC
+                participant D as ExternalSystem
+
+                A->>B: step description
+                B->>C: step description
+                C->>D: step description
+                D-->>C: response
+                C-->>B: result
+                B-->>A: result
+            ```
+
+            Participants = real classes/components. Arrows = real method calls.
+            Steps below explain each arrow.
+        </flow-diagram>
+
+        <steps>
+            ## Step-by-Step
+
+            ### Step 1: [What happens]
+
+            **File:** `path/to/File.cs:ClassName.MethodName`
+
+            [1-2 sentences: what this step does and WHY. No filler.]
+
+            ```csharp
+            // Actual code from the codebase
+            public async Task MethodName(string param1, string param2)
+            {
+                var result = await _dependency.DoSomething(param1);
+            }
+            ```
+
+            `_dependency` — injected via constructor, does X.
+            `param1` — the Y received from Z.
+            [Only explain what's non-obvious. Skip what the code already says clearly.]
+
+            ---
+
+            ### Step 2: [What happens]
+
+            **File:** `path/to/AnotherFile.cs:ClassName.MethodName`
+
+            [What and why — terse.]
+
+            ```csharp
+            // Actual code...
+            ```
+
+            > **[Framework]: [Concept]**
+            >
+            > [Succinct explanation of the framework concept. What it is, what it does for us.
+            > No history, no alternatives, no "in general" — just what the reader needs to
+            > understand THIS code.]
+            >
+            > *Source: [link to official docs]*
+
+            ---
+
+            ### Step 3: [What happens]
+
+            ...continue for every step in the flow...
+        </steps>
+
+        <framework-concepts>
+            ## Framework Concepts Reference
+
+            Consolidated lookup for framework concepts explained inline above.
+
+            | Concept | Framework | What It Does | First Appearance |
+            |---------|-----------|-------------|------------------|
+            | `AIFunctionFactory.Create()` | MS Agent Framework | C# method -> LLM tool | [Step N](#step-n) |
+            | `ChatClientAgent` | MS Agent Framework | Wraps IChatClient with auto tool loop | [Step M](#step-m) |
+
+            Include ONLY if external frameworks/libraries are involved.
+        </framework-concepts>
+
+        <related-docs>
+            ## Related Documentation
+
+            - [System Doc](../systems/relevant-system.md) — terse reference
+            - [Guide](../guides/relevant-guide.md) — recipe for adding to this flow
+            - [Official Docs](../framework-docs/relevant-page.md) — framework docs
+        </related-docs>
+    </template>
+
+    <guidelines>
+
+        ### Density Over Prose
+        - **EXTREMELY SUCCINCT** — every word must add value. If a word does not add value, remove it.
+        - **NO FLUFF** — no introductions, no summaries of what the section will contain, no transitions
+        - Bullet points over paragraphs. Tables over bullet points when comparing.
+        - If you can say it in 3 words, don't use 10. Then try to say it in 2.
+        - **BUT: ALL needed information MUST be present.** Succinctness means cutting WORDS, not cutting INFORMATION. Every concept, every parameter, every non-obvious behavior must be explained — just in fewer words.
+
+        ### Complete but Dense Explanations
+        - Explain the WHY, not just the WHAT — "X because Y" not "X happens"
+        - After each code snippet: explain ONLY what's non-obvious. If the code says `price > 0`, don't write "checks that price is positive" — the code already says that. DO explain hidden behaviors, framework magic, non-obvious field origins.
+        - Use inline code references for fields/params: `` `_connectionId` — captured from `Context.ConnectionId` in AgentHub ``
+        - One-line explanations preferred. Multi-line only when genuinely complex.
+
+        ### Code Snippets (MANDATORY per step)
+        - ALWAYS from the actual codebase — verified by reading the file
+        - NEVER pseudocode, NEVER summaries, NEVER fabricated
+        - Use correct language tag: ```csharp, ```typescript, ```json
+        - **FOCUSED**: show ONLY the lines relevant to what the step is explaining. If a method has 50 lines but this step is about lines 10-15, show lines 10-15 with a `// ... (validation above)` or `// ... (setup omitted)` comment for context. The snippet serves the step's explanation, not the other way around.
+        - Short methods (under 20 lines) where the ENTIRE method is relevant: show entirely
+        - Long methods: show the relevant portion only. Use `// ...` comments to indicate omitted sections above/below.
+
+        ### Flow Diagram (MANDATORY)
+        - Every walkthrough MUST start with a mermaid sequenceDiagram
+        - Participants = real classes/components, not abstract concepts
+        - Arrows = real method calls, labeled with method name
+        - The diagram is the map; the steps are the guided tour
+
+        ### Framework Info Boxes (when applicable)
+        - Use markdown blockquotes (`>`) with `> **[Framework]: [Concept]**` header
+        - Explain as if the reader has NEVER used this framework — but in minimal words
+        - Place IMMEDIATELY after the first code snippet that uses the concept
+        - Each concept explained ONCE — do not repeat
+        - Link to official docs with `*Source: [link]*`
+        - Keep it dense: what it is, what it does for us, done. No history, no alternatives.
+
+        ### Emphasis Frameworks (when specified)
+        - When emphasis-frameworks are specified, framework info boxes become MANDATORY
+          for EVERY step that touches the emphasis framework — not just the first occurrence
+        - ALL code that interacts with the emphasis framework must be shown in full
+        - The Framework Concepts Reference table is MANDATORY (not optional)
+        - If the agent does not know the framework: use WebSearch or context7 MCP to research it
+        - If framework docs are provided (file paths or URLs): read them BEFORE writing any steps
+
+        ### Minimum Length
+        - At least 300 lines — length comes from code snippets and completeness, not from prose
+        - Complex flows (3+ frameworks, 10+ classes): 500-1000 lines
+        - Under 200 lines = not enough information, add more steps/explanations
+
+        ### Section Inclusion
+        - Title, File Map, Flow Diagram, Step-by-Step: ALWAYS required
+        - Framework Concepts Reference: MANDATORY if emphasis-frameworks specified; otherwise ONLY if external frameworks involved
+        - Related Documentation: ALWAYS required
+
+        ### What Does NOT Belong Here
+        - Terse bullet-point references (that's systems/)
+        - Structural pattern descriptions (that's patterns/)
+        - Procedural "how to add X" recipes (that's guides/)
+        - Architecture decision rationale (that's decisions/)
+        - Story numbers, sprint context, revision history
+        - Testing instructions or test code
+        - Frontend code in a backend walkthrough (or vice versa) — scope to ONE side
+        - Speculation about future changes — document what IS, not what might be
+        - Filler phrases: "Let's look at", "Now we'll examine", "As mentioned above", "It's worth noting"
+
+    </guidelines>
+
+    <evolution>
+
+        This is a LIVING document — updated when the flow it describes changes.
+
+        **Update triggers:**
+        - New step added to the flow
+        - Step removed from the flow
+        - Step logic changed significantly
+        - Framework/library upgraded, APIs changed
+        - Code snippets no longer match codebase
+        - New framework concept introduced
+
+        **NOT an update trigger:**
+        - Bug fixes that don't change flow structure
+        - Internal refactoring within a single step
+        - New feature using a DIFFERENT flow (create a new walkthrough)
+        - Style/formatting changes to the code
+
+        **Update rules:**
+        - UPDATE code snippets to match current codebase — stale snippets are worse than no docs
+        - ADD new steps when the flow gains a stage
+        - REMOVE steps that no longer exist
+        - UPDATE framework info boxes when APIs change
+        - UPDATE mermaid diagram to reflect current flow
+        - Document must always reflect CURRENT code state, not history
+
+    </evolution>
+
+</walkthrough>

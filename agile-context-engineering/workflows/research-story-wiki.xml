@@ -246,7 +246,7 @@
                 Instructions:
                 1. List all files in .docs/wiki/subsystems/{subsystem_name}/ recursively
                 2. Read each document (structure.md, architecture.md, and any docs in
-                   systems/, patterns/, cross-cutting/, guides/, decisions/ subdirectories)
+                   systems/, patterns/, cross-cutting/, guides/, walkthroughs/, decisions/ subdirectories)
                 3. For each document, assess: does it directly inform the technical solution
                    for THIS story? Apply these criteria:
                    - INCLUDE if: describes a system this story modifies/extends, documents a
@@ -299,6 +299,7 @@
             - **Patterns**: files under `subsystems/*/patterns/`
             - **Cross-Cutting Concerns**: files under `subsystems/*/cross-cutting/`
             - **Guides**: files under `subsystems/*/guides/`
+            - **Walkthroughs**: files under `subsystems/*/walkthroughs/`
             - **Decisions**: files under `subsystems/*/decisions/`
             - **Architecture**: `subsystems/*/architecture.md` files
             - **Structure**: `subsystems/*/structure.md` files (include under Systems category)

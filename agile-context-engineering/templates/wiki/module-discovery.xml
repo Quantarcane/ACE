@@ -8,8 +8,8 @@
 
         Each module is a coherent group of related files that together represent one concern.
         map-story receives the files and autonomously decides what documentation to produce —
-        it may create systems/ docs, patterns/ docs, cross-cutting/ docs, guides/ docs, and
-        decisions/ docs, all from a single call. Discovery does NOT pre-categorize modules
+        it may create systems/ docs, patterns/ docs, cross-cutting/ docs, guides/ docs,
+        walkthroughs/ docs, and decisions/ docs, all from a single call. Discovery does NOT pre-categorize modules
         by document type.
 
         Files CAN appear in multiple modules. A domain model shared by two systems legitimately
@@ -23,7 +23,7 @@
 
         Each row is one coherent group of related files. map-story receives these files
         and autonomously decides what docs to create or update (systems/, patterns/,
-        cross-cutting/, guides/, decisions/).
+        cross-cutting/, guides/, walkthroughs/, decisions/).
 
         | # | Module Name | Files | Relevant Docs |
         |---|-------------|-------|---------------|

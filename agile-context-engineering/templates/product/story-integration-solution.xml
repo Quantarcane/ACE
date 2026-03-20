@@ -526,6 +526,7 @@
                     - **Patterns**: Design patterns in use with examples
                     - **Cross-Cutting Concerns**: Shared concerns (auth, logging, errors, etc.)
                     - **Guides**: How-to guides for common implementation tasks
+                    - **Walkthroughs**: Deep tutorial-style flow explanations with actual code snippets
                     - **Decisions (ADRs)**: Architecture decisions that constrain design
                     - **Architecture**: Subsystem architecture documents
 

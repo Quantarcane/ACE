@@ -65,6 +65,7 @@ allowed-tools:
         <pattern-template>@~/.claude/agile-context-engineering/templates/wiki/pattern.xml</pattern-template>
         <cross-cutting-template>@~/.claude/agile-context-engineering/templates/wiki/system-cross-cutting.xml</cross-cutting-template>
         <guide-template>@~/.claude/agile-context-engineering/templates/wiki/guide.xml</guide-template>
+        <walkthrough-template>@~/.claude/agile-context-engineering/templates/wiki/walkthrough.xml</walkthrough-template>
         <decisions-template>@~/.claude/agile-context-engineering/templates/wiki/decizions.xml</decisions-template>
         <questioning>@~/.claude/agile-context-engineering/utils/questioning.xml</questioning>
         <ui-formatting>@~/.claude/agile-context-engineering/utils/ui-formatting.md</ui-formatting>
@@ -81,7 +82,7 @@ allowed-tools:
             4. Run module discovery — trace E2E flows, identify patterns, find cross-cutting
                concerns by reading actual source code. Produce module-discovery.md artifact.
             5. For EACH discovered module, run map-story in file mode to create or update
-               knowledge documentation (systems/, patterns/, cross-cutting/, guides/, decisions/).
+               knowledge documentation (systems/, patterns/, cross-cutting/, guides/, walkthroughs/, decisions/).
         </objective>
 
         <artifacts>
@@ -91,6 +92,7 @@ allowed-tools:
             - .docs/wiki/subsystems/[subsystem-name]/patterns/*.md (created/updated by map-story)
             - .docs/wiki/subsystems/[subsystem-name]/cross-cutting/*.md (created/updated by map-story)
             - .docs/wiki/subsystems/[subsystem-name]/guides/*.md (created/updated by map-story)
+            - .docs/wiki/subsystems/[subsystem-name]/walkthroughs/*.md (created/updated by map-story)
             - .docs/wiki/subsystems/[subsystem-name]/decisions/*.md (created/updated by map-story)
             - .ace/artifacts/subsystems/[subsystem-name]/module-discovery/module-discovery.md
             - .ace/artifacts/subsystems/[subsystem-name]/module-discovery/existing-docs-inventory.md (if existing-docs directory provided)
@@ -114,7 +116,7 @@ allowed-tools:
         13: Completion report
 
         Steps 10-11 are CRITICAL — they produce the knowledge docs (systems/, patterns/,
-        cross-cutting/, guides/, decisions/) that AI agents need for future implementations.
+        cross-cutting/, guides/, walkthroughs/, decisions/) that AI agents need for future implementations.
         Do NOT skip them.
     </process>
 

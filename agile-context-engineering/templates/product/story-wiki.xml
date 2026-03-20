@@ -55,6 +55,9 @@
             ### Guides
             - [`.docs/wiki/subsystems/[name]/guides/[guide].md`] — [Why this guide is useful for this story]
 
+            ### Walkthroughs
+            - [`.docs/wiki/subsystems/[name]/walkthroughs/[flow].md`] — [Why this flow walkthrough helps understand the implementation context]
+
             ### Decisions
             - [`.docs/wiki/subsystems/[name]/decisions/[decision].md`] — [Why this ADR constrains or informs this story]
 
@@ -94,6 +97,7 @@
             - Documents a pattern this story must follow
             - Covers a cross-cutting concern this story must respect (auth, logging, error handling, etc.)
             - Contains a guide for a task this story requires (e.g., "how to add an API endpoint")
+            - Walks through a complex flow this story extends or modifies
             - Records an ADR that constrains design choices for this story
             - Describes the structure or architecture of a subsystem this story touches
         </include-when>

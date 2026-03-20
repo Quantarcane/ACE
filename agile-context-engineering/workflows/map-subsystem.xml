@@ -12,6 +12,7 @@
         - patterns/*.md — reusable implementation patterns (via map-story)
         - cross-cutting/*.md — concerns spanning multiple systems (via map-story)
         - guides/*.md — step-by-step recipes for common tasks (via map-story)
+        - walkthroughs/*.md — deep tutorial-style flow explanations (via map-story)
         - decisions/*.md — architecture decision records (via map-story)
 
         Also produces `.ace/artifacts/subsystems/[subsystem-name]/module-discovery/module-discovery.md`.
@@ -1005,7 +1006,7 @@
 
                         <instruction order="4" name="decide-docs">
                             You decide what docs to create or update — systems/, patterns/, cross-cutting/,
-                            guides/, decisions/ — based on what you find in the code files. One call may
+                            guides/, walkthroughs/, decisions/ — based on what you find in the code files. One call may
                             produce multiple docs across different categories.
                         </instruction>
 

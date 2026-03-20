@@ -969,7 +969,10 @@
                     - Updated: {list of updated wiki docs}
                     - Created: {list of new wiki docs}
                     - Tech debt integrated: {count} items across {count} wiki docs
-                    - No change needed: {list}",
+                    - No change needed: {list}
+                    WALKTHROUGH SUGGESTIONS
+                    - FLOW: {flow description} | SUBSYSTEM: {name} | EMPHASIS: {frameworks or none} | REASON: {why}
+                    [or: WALKTHROUGH SUGGESTIONS: none]",
                     subagent_type="ace-wiki-mapper",
                     run_in_background=true,
                     description="Wiki update for {INIT.story.id}"
@@ -996,9 +999,12 @@
                 git status --short .docs/wiki/
                 ```
 
-                **IMPORTANT: Do NOT call TaskOutput on WIKI_TASK. The output pollutes the main
-                context window. The wiki mapper writes directly to files — git status is sufficient
-                to enumerate what changed.**
+                Read the agent result to extract walkthrough suggestions. The return format
+                is compact — it will NOT pollute the context window.
+
+                Parse the result for the `WALKTHROUGH SUGGESTIONS` section.
+                Store as WALKTHROUGH_SUGGESTIONS (list of { flow, subsystem, emphasis, reason }).
+                If "none" or not found, set WALKTHROUGH_SUGGESTIONS = empty.
             </substep>
 
             <substep order="7.4" name="write-wiki-updates-section" condition="FINAL_STATUS is Done">
@@ -1030,6 +1036,65 @@
                       project={INIT.github_project.project_number}
                     ```
                 </variant>
+            </substep>
+
+            <!-- ─────────────────────────────────────────────────── -->
+            <!-- WALKTHROUGHS: Offer suggestions from map-story       -->
+            <!-- ─────────────────────────────────────────────────── -->
+
+            <substep order="7.5.1" name="offer-walkthroughs" condition="FINAL_STATUS is Done AND WALKTHROUGH_SUGGESTIONS is not empty">
+                Present walkthrough suggestions to the user.
+
+                Display:
+                ```
+                  i  Potential walkthroughs detected from this story's code:
+
+                     [For each suggestion, numbered:]
+                     [N]. [flow description]
+                          Subsystem: [subsystem] | Emphasis: [frameworks or "none"]
+                          [reason]
+                ```
+
+                Use AskUserQuestion:
+                - header: "Walkthroughs"
+                - question: "Would you like to create any of these walkthroughs?\nYou can also describe your own."
+                - options:
+                  - "Create [numbers]" — e.g., "Create 1,3" or "Create all"
+                  - "Custom" — user describes their own walkthrough
+                  - "Skip" — no walkthroughs
+
+                **If "Skip":** Continue to commit.
+
+                **If "Create [numbers]" or "Create all":**
+                For each selected suggestion, spawn a background agent:
+
+                ```
+                Agent(
+                    prompt="/ace:map-walkthrough flow=\"{suggestion.flow}\" subsystem=\"{suggestion.subsystem}\" emphasis-frameworks=\"{suggestion.emphasis}\"
+
+                    Execute the map-walkthrough workflow end-to-end.",
+                    subagent_type="ace-wiki-mapper",
+                    run_in_background=true,
+                    description="Walkthrough: {short flow name}"
+                )
+                ```
+
+                **If "Custom":**
+                Ask the user for their flow description, subsystem, and optional emphasis-frameworks.
+                Spawn a background agent for that walkthrough too.
+
+                Wait for all walkthrough agents to complete.
+
+                Display:
+                ```
+                  +  [N] walkthrough(s) created.
+                     [For each: path and line count]
+                ```
+
+                Stage walkthrough files:
+                ```bash
+                git add .docs/wiki/subsystems/*/walkthroughs/
+                ```
             </substep>
 
             <!-- ─────────────────────────────────────────────────── -->

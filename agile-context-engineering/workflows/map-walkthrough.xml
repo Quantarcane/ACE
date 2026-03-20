@@ -1,0 +1,457 @@
+<workflow>
+
+    <purpose>
+        Create a deep tutorial-style walkthrough document in
+        `.docs/wiki/subsystems/[subsystem-name]/walkthroughs/`.
+
+        A walkthrough traces a single end-to-end flow from entry point to exit point, showing
+        ACTUAL code from the codebase at every step. Written for humans (especially new
+        developers) who need to UNDERSTAND a complex flow before working with it.
+
+        This workflow is executed directly — NO sub-agents are spawned.
+        The executing agent does everything: finding the entry point, LSP-driven flow tracing,
+        code reading, framework research, and document writing.
+    </purpose>
+
+    <mandatory-context>
+        Read all files referenced by the invoking command's execution-context before starting.
+        Also read any document or text passed as parameter ($ARGUMENTS) in the invoking command.
+    </mandatory-context>
+
+    <process>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 1: SETUP AND VALIDATE                                        -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="setup" order="1">
+
+            <substep order="1.1" name="display-banner">
+                Display stage banner:
+
+                ```
+                ╔══════════════════════════════════════════════════╗
+                ║  ACE > Map Walkthrough                            ║
+                ╚══════════════════════════════════════════════════╝
+                ```
+            </substep>
+
+            <substep order="1.2" name="parse-and-validate">
+                Parse $ARGUMENTS for: `flow`, `subsystem`, `emphasis-frameworks`.
+
+                **If `flow` is missing:** Ask the user:
+                - header: "Walkthrough"
+                - question: "Describe the flow to trace — where does it START and where does it END?\nE.g., 'tick data from bybit websocket to timescaledb'"
+
+                **If `subsystem` is missing:** Ask the user:
+                - header: "Walkthrough"
+                - question: "Which subsystem should this walkthrough live under?\n(The flow may span multiple subsystems — this just determines the wiki location.)"
+            </substep>
+
+            <substep order="1.3" name="resolve-subsystem">
+                Resolve the subsystem. Check if `.docs/wiki/subsystems/[subsystem-name]/` exists.
+
+                **If not found:**
+                ```
+                  !  No wiki found for subsystem "[subsystem]".
+                     Run /ace:map-subsystem first to create the subsystem wiki.
+                ```
+                Exit.
+
+                Ensure walkthroughs directory exists:
+                ```bash
+                mkdir -p .docs/wiki/subsystems/[subsystem_name]/walkthroughs
+                ```
+            </substep>
+
+            Display:
+            ```
+              i  Flow: [flow description]
+                 Subsystem: [subsystem-name]
+                 Emphasis frameworks: [list, or "none"]
+            ```
+
+            Continue to step 2.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 2: CHECK FOR EXISTING WALKTHROUGH                            -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="check-existing" order="2">
+
+            Scan for existing walkthroughs:
+
+            ```
+            Glob(pattern='*.md', path='.docs/wiki/subsystems/[subsystem_name]/walkthroughs')
+            ```
+
+            **If existing walkthroughs found:**
+            Read their titles (first line of each file). Check if any covers the same
+            or overlapping flow.
+
+            **If overlap detected:**
+            Use AskUserQuestion:
+            - header: "Walkthrough"
+            - question: "An existing walkthrough may cover a similar flow:\n\n- `[existing-file]`: [title]\n\nShould I update the existing walkthrough or create a new one?"
+            - options:
+              - "Update existing" — set MODE = update, set TARGET_FILE = existing path
+              - "Create new" — set MODE = create
+
+            **If no overlap or no existing walkthroughs:** Set MODE = create.
+
+            **If MODE = create:**
+            Derive file name from flow description in kebab-case.
+            Set TARGET_FILE = `.docs/wiki/subsystems/[subsystem_name]/walkthroughs/[flow-name].md`
+
+            Continue to step 3.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 3: FIND ENTRY POINT AND TRACE THE ENTIRE FLOW                -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="trace-flow" order="3">
+
+            The flow description tells you WHERE it starts and WHERE it ends.
+            Your job: find the entry point in the codebase, then follow EVERY SINGLE CALL
+            through the entire code until you reach the exit point.
+
+            **The flow may cross subsystem boundaries.** Do NOT stop tracing when
+            the code leaves the specified subsystem. Follow the call chain wherever
+            it goes — across projects, services, layers, subsystems. The `subsystem`
+            parameter only determines where the walkthrough FILE is placed.
+
+            <substep order="3.1" name="find-entry-point">
+                Read the subsystem's structure.md and architecture.md for context.
+
+                From the flow description, identify what the entry point is:
+                - A websocket handler? Grep for websocket/connection setup.
+                - An API endpoint? Grep for route/controller definitions.
+                - A SignalR hub method? Grep for Hub classes.
+                - A message consumer? Grep for queue/topic subscriptions.
+                - A scheduled job? Grep for cron/timer/scheduler setup.
+
+                Use Grep and Glob to find the specific file and class/method that
+                receives the initial input described in the flow.
+
+                Read the file. Confirm you have the right entry point.
+
+                **If you cannot confidently identify the entry point:** ASK the user.
+                Use AskUserQuestion:
+                - header: "Walkthrough"
+                - question: "I found these possible entry points for the flow:\n\n[candidates]\n\nWhich one starts the flow you described? Or point me to the right file/class."
+
+                **If the flow description is ambiguous or could mean multiple things:** ASK.
+                Do NOT guess. A wrong entry point means the entire walkthrough is wrong.
+            </substep>
+
+            <substep order="3.2" name="follow-every-call">
+                From the entry point, follow the COMPLETE call chain.
+
+                **THE RULE: follow EVERY significant method call until the flow terminates.**
+
+                WebSocket handler calls a service method? Follow it.
+                Service calls a repository? Follow it.
+                Repository calls the database? Follow it.
+                Service emits an event? Follow the handler.
+                Handler calls another service? Follow it.
+
+                For each method you encounter:
+                1. Use LSP Go to Definition to find where it lives
+                2. Read the target file and method
+                3. Identify what IT calls next in the flow
+                4. Follow that call too
+                5. Use LSP Find References when tracing callbacks, events, or interface implementations
+                6. Use Grep as fallback when LSP cannot resolve (dynamic dispatch, config-based wiring, DI)
+
+                **Stop when:** data reaches its final destination (database write, HTTP response
+                sent, message published to external system, UI updated) as described in the flow.
+
+                **If the call chain branches or you're unsure which path is the flow:** ASK.
+                Use AskUserQuestion:
+                - header: "Walkthrough"
+                - question: "The flow branches at [class.method]:\n\n[describe branches]\n\nWhich path should I follow?"
+
+                **If a call cannot be resolved** (dynamic dispatch, reflection, config-based):
+                Note it and ask the user only if it blocks the trace. Otherwise grep for
+                likely implementations and pick the one that matches the flow description.
+            </substep>
+
+            <substep order="3.3" name="build-flow-steps">
+                Build an ordered list of every step in the flow:
+
+                ```
+                FLOW_STEPS = [
+                    { file, class, method, code_snippet, calls_next, framework_interactions },
+                    ...
+                ]
+                ```
+
+                For each step:
+                - Read the full surrounding context (constructor, dependencies, class hierarchy)
+                - Extract a FOCUSED code snippet (the relevant portion, `// ...` for omitted parts)
+                - Note any emphasis framework interactions (classes, methods, APIs from those frameworks)
+            </substep>
+
+            Continue to step 4.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 4: RESEARCH EMPHASIS FRAMEWORK USAGES                        -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="research-frameworks" order="4">
+
+            <variant condition="no emphasis-frameworks specified">
+                Skip to step 5.
+            </variant>
+
+            <variant condition="emphasis-frameworks specified">
+
+                <substep order="4.1" name="extract-usages">
+                    From FLOW_STEPS, extract EVERY interaction with emphasis frameworks:
+
+                    For each emphasis framework, compile:
+                    ```
+                    FRAMEWORK_USAGES[framework_name] = [
+                        { step_index, class_name, method_name, api_call, context },
+                        ...
+                    ]
+                    ```
+
+                    E.g., for SignalR:
+                    - Step 2: `TickHub` inherits `Hub` — SignalR Hub base class
+                    - Step 2: `Clients.All.SendAsync("ReceiveTick", data)` — SignalR broadcast
+                    - Step 5: `HubConnection.On("ReceiveTick", handler)` — SignalR client subscription
+
+                    These are the SPECIFIC concepts that need info boxes.
+                </substep>
+
+                <substep order="4.2" name="research-specific-concepts">
+                    For each unique framework concept found in the actual code, research it.
+
+                    Each emphasis-frameworks entry is either a NAME (research it) or a
+                    file path / URL (read it directly and infer the framework name from content).
+
+                    <variant condition="entry is a file path or URL">
+                        Read the document (Read for local files, WebFetch for URLs).
+                        Infer the framework name from the document content.
+
+                        The provided URL is typically a landing/overview page. You MUST
+                        navigate deeper — follow internal links to find the specific pages
+                        that document each concept extracted in 4.1. E.g., if the code uses
+                        `Hub.SendAsync()` and the user gave the SignalR overview URL, follow
+                        links from that page to find the Hubs documentation, then the
+                        server-side API reference for `SendAsync`.
+
+                        For each concept from 4.1:
+                        1. Scan the provided page for links to relevant sub-pages
+                        2. WebFetch those sub-pages
+                        3. Extract the specific documentation for the concept
+                        4. Record the exact URL where the concept is documented
+                    </variant>
+
+                    <variant condition="entry is a framework name — research needed">
+                        For each unique concept, research using context7 first, then WebSearch:
+
+                        ```
+                        mcp__context7__resolve-library-id(libraryName="[framework name]")
+                        ```
+
+                        **If resolved:**
+                        ```
+                        mcp__context7__query-docs(
+                            libraryId=[resolved ID],
+                            query="[specific concept from the code, e.g. 'Hub base class SendAsync', 'HubConnection.On callback']"
+                        )
+                        ```
+
+                        **If context7 fails or insufficient:**
+                        ```
+                        WebSearch(query="[framework] [specific concept] official documentation [language]")
+                        ```
+                        Then fetch the official doc page:
+                        ```
+                        WebFetch(url="[official docs URL]")
+                        ```
+                    </variant>
+
+                    For each concept, store:
+                    ```
+                    CONCEPT_RESEARCH[concept] = {
+                        framework: "[name]",
+                        what_it_is: "[terse explanation]",
+                        what_it_does_for_us: "[how it's used in THIS code]",
+                        official_docs_url: "[URL]"
+                    }
+                    ```
+                </substep>
+            </variant>
+
+            Continue to step 5.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 5: WRITE THE WALKTHROUGH                                     -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="write-walkthrough" order="5">
+
+            Read ALL existing wiki docs under `.docs/wiki/subsystems/[subsystem_name]/`
+            for cross-referencing in the Related Documentation section.
+
+            Follow the walkthrough template structure exactly.
+
+            <substep order="5.1" name="write-header-and-file-map">
+                - Title: derived from flow description
+                - One-line description of what the flow does and when it triggers
+                - Files Involved: list all discovered files in execution order
+            </substep>
+
+            <substep order="5.2" name="write-flow-diagram">
+                Build the mermaid sequenceDiagram from FLOW_STEPS.
+                Participants = real classes/components.
+                Arrows = real method calls, labeled with method names.
+            </substep>
+
+            <substep order="5.3" name="write-steps">
+                For EACH entry in FLOW_STEPS, write one Step section:
+
+                - **File:** reference in `file:Class.Method` format
+                - 1-2 sentences: what this step does and WHY (no filler)
+                - Code snippet: actual code from the file, focused on what the step explains
+                - Post-snippet explanation: ONLY what's non-obvious
+                - **If this step has framework_interactions AND emphasis-frameworks specified:**
+                  Add a framework info box immediately after the code snippet:
+
+                  ```markdown
+                  > **[Framework]: [Concept]**
+                  >
+                  > [From CONCEPT_RESEARCH: what_it_is + what_it_does_for_us. Dense. No filler.]
+                  >
+                  > *Source: [official_docs_url]*
+                  ```
+
+                  Each concept explained ONCE at its first appearance. Subsequent steps
+                  reference the first: "See [Step N](#step-n-...) for [Concept] explanation."
+            </substep>
+
+            <substep order="5.4" name="write-framework-reference">
+                **If emphasis-frameworks specified:**
+                Write the Framework Concepts Reference table:
+
+                | Concept | Framework | What It Does | First Appearance |
+                |---------|-----------|-------------|------------------|
+                | [concept] | [framework] | [one-line from research] | [Step N](#step-n) |
+            </substep>
+
+            <substep order="5.5" name="write-related-docs">
+                Cross-reference related wiki docs:
+                - Relevant system docs under this subsystem
+                - Relevant pattern docs
+                - Relevant guides
+                - Official framework docs (from research URLs)
+            </substep>
+
+            <substep order="5.6" name="write-or-update">
+                **If MODE = create:** Write the complete document to TARGET_FILE.
+                **If MODE = update:** Read the existing walkthrough, merge changes
+                (update code snippets, add/remove steps, update diagram), write to TARGET_FILE.
+            </substep>
+
+            Continue to step 6.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 6: VERIFY, COMMIT, AND REPORT                                -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="verify-and-report" order="6">
+
+            <substep order="6.1" name="quality-check">
+                Re-read TARGET_FILE and verify:
+
+                <verification-checklist>
+                    <check>300+ lines (500+ for complex flows with 3+ frameworks)</check>
+                    <check>Title + one-line description present</check>
+                    <check>Files Involved lists all source files in execution order</check>
+                    <check>Mermaid sequenceDiagram present and accurate</check>
+                    <check>Every step has **File:** reference + code snippet</check>
+                    <check>Code snippets are actual code (spot-check 2-3 against source files)</check>
+                    <check>No pseudocode, no fabricated code, no filler phrases</check>
+                    <check>[If emphasis-frameworks] Every framework interaction has an info box</check>
+                    <check>[If emphasis-frameworks] Framework Concepts Reference table present</check>
+                    <check>[If emphasis-frameworks] Info box links point to real official doc URLs</check>
+                    <check>Related Documentation section present</check>
+                    <check>Code references use `file:Symbol` format, not line numbers</check>
+                </verification-checklist>
+
+                Fix any failures by editing the document directly.
+            </substep>
+
+            <substep order="6.2" name="security-scan">
+                ```
+                Grep(
+                    pattern="(sk-[a-zA-Z0-9]{20,}|sk_live_|sk_test_|ghp_[a-zA-Z0-9]{36}|AKIA[A-Z0-9]{16}|-----BEGIN.*PRIVATE KEY)",
+                    path="[TARGET_FILE]",
+                    output_mode="content"
+                )
+                ```
+
+                <variant condition="matches found">SECRETS_FOUND — alert user, do NOT commit.</variant>
+                <variant condition="no matches">CLEAN.</variant>
+            </substep>
+
+            <substep order="6.3" name="commit">
+                ```bash
+                git add [TARGET_FILE]
+                git commit -m "docs([subsystem_name]): add walkthrough — [flow-name]"
+                ```
+            </substep>
+
+            <substep order="6.4" name="report">
+                Display:
+
+                ```
+                ╔══════════════════════════════════════════════════╗
+                ║  ACE > Map Walkthrough > Complete                 ║
+                ╚══════════════════════════════════════════════════╝
+
+                  +  [TARGET_FILE] ([line count] lines)
+
+                     Flow: [flow description]
+                     Steps: [step count]
+                     Emphasis frameworks: [list or "none"]
+                     Framework info boxes: [count]
+
+                  Next > /clear first for a fresh context window, then:
+
+                         /ace:map-walkthrough — create another walkthrough
+                         /ace:map-subsystem [subsystem] — map or refresh an entire subsystem
+                         Review file at [TARGET_FILE]
+                ```
+            </substep>
+
+            End workflow.
+        </step>
+
+    </process>
+
+    <success_criteria>
+        <criterion>Entry point found from flow description using subsystem docs + grep</criterion>
+        <criterion>EVERY call followed from entry to exit — no gaps in the trace</criterion>
+        <criterion>All source files in the flow discovered and read via LSP + code reading</criterion>
+        <criterion>Emphasis framework usages extracted from actual code (not generic research)</criterion>
+        <criterion>Each specific framework concept researched with official docs link</criterion>
+        <criterion>Walkthrough written to .docs/wiki/subsystems/[name]/walkthroughs/</criterion>
+        <criterion>Minimum 300 lines (500+ for complex flows)</criterion>
+        <criterion>Every step has actual code snippet verified against source file</criterion>
+        <criterion>Mermaid sequenceDiagram accurately reflects the traced flow</criterion>
+        <criterion>Framework info box at every emphasis framework interaction</criterion>
+        <criterion>Framework Concepts Reference table present (if emphasis-frameworks specified)</criterion>
+        <criterion>No pseudocode, no fabricated code, no filler</criterion>
+        <criterion>Security scan passed, document committed</criterion>
+    </success_criteria>
+
+</workflow>
