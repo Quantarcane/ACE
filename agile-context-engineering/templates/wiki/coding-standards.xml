@@ -60,6 +60,44 @@
             - **NEVER leave stub implementations** — No `throw NotImplemented`, no `pass`, no `...`
             - If code exists in the codebase, it must be complete and functional
 
+            ### Defensive Programming — Zero Tolerance for Permissive Code
+
+            **WE USE DEFENSIVE PROGRAMMING + FAIL-FAST. PERMISSIVE PROGRAMMING IS BANNED.**
+
+            Permissive programming ("be liberal in what you accept") has caused catastrophic bugs.
+            It hides errors, delays failures, and makes debugging impossible. Every parameter must
+            be validated. Every error must be surfaced. No exceptions.
+
+            **MANDATORY — Do This:**
+            - **Validate EVERY input at the boundary** — check types, ranges, formats, required
+              fields BEFORE processing
+            - **Fail fast and loud** — if something is wrong, return an error immediately with a
+              clear message explaining WHAT is wrong and WHY
+            - **Read the function you're calling** — check its constructor/signature to know EXACTLY
+              what parameters it requires before writing the caller
+            - **Required means required** — if a function needs a value, the caller MUST provide it.
+              No nullable wrappers. No default fallbacks that mask missing data
+            - **Return errors, not defaults** — if a value is missing or invalid, return an error
+              string/throw, do NOT return `""`, `0`, `null`, `[]`, or any placeholder
+            - **Validate on BOTH client and server** — server validates before processing/pushing,
+              client validates as a redundant safety net. Both layers reject garbage
+            - **Surface errors visibly** — errors must reach whoever can fix them (the LLM, the user,
+              the developer). Log them, display them, return them. Never swallow them
+
+            **ABSOLUTELY FORBIDDEN — Never Do This:**
+            - `string? param = null` when the value is actually required — use `string param` and validate
+            - `return ""` or `return null` or `return []` when an operation fails — return an error with context
+            - `.optional()` or `.nullable()` on schema fields that the consuming function REQUIRES
+            - Fallback defaults that hide missing data (e.g., `value ?? defaultValue` to mask a null
+              that should never be null)
+            - `try/catch` that swallows exceptions and returns empty objects
+            - Silently stripping, transforming, or cleaning invalid data to make it pass validation
+            - Writing a caller without reading the callee's actual parameter signature first
+            - Using Postel's Law ("be liberal in what you accept") as justification for accepting garbage
+
+            **The Principle:**
+            **Garbage in → ERROR out. Never garbage in → silence.**
+
             ### No Assumptions
             - **Use LSPs first when available** — Check diagnostics, go-to-definition, and find-references before guessing. The LSP knows the codebase better than a text search.
             - **NEVER assume** libraries, classes, models, methods, or APIs exist
