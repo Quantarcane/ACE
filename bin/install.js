@@ -318,6 +318,14 @@ function installForRuntime(runtime, scope, packageDir) {
   const versionFile = path.join(acePath, 'VERSION');
   fs.writeFileSync(versionFile, VERSION, 'utf-8');
 
+  // Copy CHANGELOG.md
+  const changelogSrc = path.join(packageDir, 'CHANGELOG.md');
+  const changelogDest = path.join(acePath, 'CHANGELOG.md');
+  if (fs.existsSync(changelogSrc)) {
+    fs.copyFileSync(changelogSrc, changelogDest);
+    log(`  ✓ CHANGELOG.md installed`, colors.green);
+  }
+
   return basePath;
 }
 

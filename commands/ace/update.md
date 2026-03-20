@@ -1,10 +1,11 @@
 ---
 name: ace:update
-description: Update ACE to latest version
+description: Update ACE to latest version with changelog display
 argument-hint: ""
 allowed-tools:
   - Bash
   - AskUserQuestion
+  - WebFetch
 ---
 
 ```xml
@@ -31,7 +32,7 @@ allowed-tools:
 
     <output>
         <objective>
-            Check for ACE updates, install if available.
+            Check for ACE updates, install if available, and display what changed.
             Automatically detects local vs global installation and Claude vs Crush runtime.
         </objective>
     </output>
@@ -44,10 +45,11 @@ allowed-tools:
         1. Installation detection (local/global, Claude/Crush)
         2. Latest version checking via npm
         3. Version comparison
-        4. Clean install warning display
-        5. User confirmation
-        6. Update execution
-        7. Cache clearing and restart reminder
+        4. Changelog fetching and display
+        5. Clean install warning display
+        6. User confirmation
+        7. Update execution
+        8. Cache clearing and restart reminder
     </process>
 
 </command>

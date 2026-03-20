@@ -1,8 +1,8 @@
 <workflow>
 
     <purpose>
-        Check for ACE updates via npm, display version comparison, obtain user confirmation,
-        and execute clean installation with cache clearing.
+        Check for ACE updates via npm, display changelog for versions between installed and latest,
+        obtain user confirmation, and execute clean installation with cache clearing.
     </purpose>
 
     <mandatory-context>
@@ -108,17 +108,45 @@
         </step>
 
         <!-- ══════════════════════════════════════════════════════════════════ -->
-        <!-- STEP 4: CONFIRM UPDATE                                            -->
+        <!-- STEP 4: FETCH AND SHOW CHANGELOG                                 -->
         <!-- ══════════════════════════════════════════════════════════════════ -->
 
-        <step name="confirm-update" order="4">
-            If update is available, show what will happen and ask for confirmation:
+        <step name="show-changelog-and-confirm" order="4">
+            If update is available, fetch the changelog and show what's new BEFORE updating.
+
+            1. **Try local changelog first** — check if CHANGELOG.md exists in the installation:
+
+               For SCOPE=local: `./.claude/agile-context-engineering/CHANGELOG.md`
+               For SCOPE=global: `~/.claude/agile-context-engineering/CHANGELOG.md`
+               (substitute `.opencode` for Crush runtime)
+
+               If found, read it directly.
+
+            2. **Fall back to GitHub** — if local file not found, use WebFetch to fetch:
+               `https://raw.githubusercontent.com/Quantarcane/ACE/main/CHANGELOG.md`
+
+               If fetch fails, skip changelog display and proceed without it.
+
+            3. **Extract relevant entries** — from the fetched/read content, extract all
+               changelog sections between the installed version and the latest version.
+
+               Look for lines matching `## [X.Y.Z]` and extract everything from
+               `## [{latest_version}]` down to (but not including) `## [{installed_version}]`.
+
+            4. **Display preview and ask for confirmation:**
 
             ```
             ## ACE Update Available
 
             **Installed:** {installed_version}
             **Latest:** {latest_version}
+
+            ### What's New
+            ────────────────────────────────────────────────────────────
+
+            {extracted changelog entries}
+
+            ────────────────────────────────────────────────────────────
 
             The installer performs a clean install of ACE folders:
             - `commands/ace/` will be wiped and replaced
@@ -180,7 +208,7 @@
         <!-- ══════════════════════════════════════════════════════════════════ -->
 
         <step name="display-result" order="6">
-            Format completion message:
+            Format completion message (changelog was already shown in confirmation step):
 
             ```
             ============================================================
@@ -188,6 +216,8 @@
             ============================================================
 
             Restart Claude Code to pick up the new commands.
+
+            View full changelog: https://github.com/Quantarcane/ACE/blob/main/CHANGELOG.md
             ```
         </step>
 
@@ -197,6 +227,7 @@
         <check>Installed version detected correctly (local/global, claude/crush)</check>
         <check>Latest version checked via npm</check>
         <check>Update skipped if already current</check>
+        <check>Changelog fetched and displayed BEFORE update</check>
         <check>Clean install warning shown</check>
         <check>User confirmation obtained before update</check>
         <check>Update executed with correct --runtime and --scope flags</check>

@@ -1,0 +1,64 @@
+name: Release & Publish
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Extract changelog for this version
+        id: changelog
+        run: |
+          # Extract the section for this version from CHANGELOG.md
+          # Captures everything between ## [X.Y.Z] and the next ## [
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          NOTES=$(awk -v ver="$VERSION" '
+            /^## \[/ {
+              if (found) exit
+              if (index($0, "[" ver "]")) found=1
+              next
+            }
+            found { print }
+          ' CHANGELOG.md)
+
+          # Write to file for gh release create --notes-file
+          echo "$NOTES" > release-notes.md
+
+          # Fail if no notes found (version not in changelog)
+          if [ -z "$NOTES" ]; then
+            echo "WARNING: No changelog entry found for version $VERSION"
+            echo "## v$VERSION" > release-notes.md
+            echo "" >> release-notes.md
+            echo "No changelog entry for this version." >> release-notes.md
+          fi
+
+      - name: Create GitHub Release
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            --title "v${{ steps.version.outputs.VERSION }}" \
+            --notes-file release-notes.md
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish to npm
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

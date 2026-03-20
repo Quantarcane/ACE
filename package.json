@@ -12,7 +12,8 @@
     "commands",
     "agents",
     "hooks",
-    "agile-context-engineering"
+    "agile-context-engineering",
+    "CHANGELOG.md"
   ],
   "scripts": {
     "test": "node --test agile-context-engineering/src/ace-tools.test.js"
@@ -32,7 +33,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/agile-context-engineering/ace"
+    "url": "https://github.com/Quantarcane/ACE"
   },
   "engines": {
     "node": ">=16.7.0"
