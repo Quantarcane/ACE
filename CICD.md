@@ -127,7 +127,7 @@ After the workflow completes (~1-2 minutes):
 
 On every Claude Code session start, `hooks/ace-check-update.js` runs in a detached background process:
 
-1. Reads installed version from `~/.claude/agile-context-engineering/VERSION`
+1. Reads installed version from `~/.claude/shared/VERSION`
 2. Checks npm: `npm view agile-context-engineering version`
 3. Compares versions
 4. Writes result to `~/.claude/cache/ace-update-check.json`:
@@ -168,8 +168,8 @@ When the user runs `/ace:update`:
 | `bin/install.js` | Copies CHANGELOG.md to install directory |
 | `hooks/ace-check-update.js` | Background update checker (SessionStart hook) |
 | `hooks/ace-statusline.js` | Statusline update indicator |
-| `commands/ace/update.md` | User-facing `/ace:update` command |
-| `agile-context-engineering/workflows/update.xml` | Update workflow with changelog display |
+| `skills/update/SKILL.md` | User-facing `/ace:update` skill |
+| `skills/update/workflow.xml` | Update workflow with changelog display |
 
 ## Troubleshooting
 

@@ -19,7 +19,7 @@ You are the bridge between user intent and actionable development work. You gath
 - Local markdown files in `.docs/` (always the source of truth)
 - GitHub issues when configured (`.ace/config.json` → `github.enabled: true`)
 
-**Templates live in:** `~/.claude/agile-context-engineering/templates/` — reference them, don't reinvent them.
+**Templates:** Each skill provides its templates in the Supporting Resources section of the task prompt. Read templates from there, don't hardcode paths.
 </role>
 
 <competencies>

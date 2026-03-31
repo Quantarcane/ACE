@@ -1,0 +1,1219 @@
+<workflow>
+
+    <purpose>
+        Orchestrate story execution: load a fully-planned story (with AC + Technical Solution),
+        create an execution plan via Claude Code Plan Mode, execute the plan (solo or agent teams),
+        run code review, present results for user verification, update state across all ACE
+        artifacts, and trigger wiki mapping.
+
+        The story file IS the plan — AC + Technical Solution = the specification.
+        Claude Code Plan Mode creates a tactical execution plan on top of that.
+
+        Two execution modes:
+        - **Solo Mode** (default): Main plans → executor subagent implements (fresh 200k context)
+        - **Agent Teams Mode** (when enabled + assessment recommends it): Lead + teammates for parallel work
+
+        NO intermediary commits during implementation. Only ONE commit after user approval.
+    </purpose>
+
+    <mandatory-context>
+        Read all files referenced by the invoking command's execution-context before starting.
+        Also read any document or text passed as parameter ($ARGUMENTS) in the invoking command.
+    </mandatory-context>
+
+    <process>
+
+        **STRICT STEP-BY-STEP EXECUTION. This workflow is NOT a reference document — it is a
+        script you MUST follow in order. Complete each step and ALL its substeps before moving
+        to the next step. Do NOT read ahead and freestyle. Do NOT explore the codebase or read
+        the story file before running the init command. Do NOT create your own plan or ask
+        "Shall I proceed?" — follow the workflow steps exactly as written.**
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 1: INIT & VALIDATE                                           -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="init-and-validate" order="1">
+
+            **MANDATORY FIRST STEP — Run the init command (substep 1.2) BEFORE any other action.
+            Do NOT read the story file. Do NOT explore code. Do NOT start planning.
+            Run init FIRST, parse the output, THEN proceed through substeps 1.3-1.7 in order.**
+
+            <substep order="1.1" name="parse-arguments">
+                Parse `$ARGUMENTS` to extract:
+                - `story` (REQUIRED): file path or GitHub URL/issue number
+                - `--agent-teams-off` (OPTIONAL FLAG): force solo mode
+            </substep>
+
+            <substep order="1.2" name="run-init">
+                Execute environment detection:
+
+                ```bash
+                INIT=$(node "${CLAUDE_SKILL_DIR}/script.js" init {story_param})
+                ```
+
+                Parse INIT JSON for:
+                - `executor_model`, `reviewer_model`
+                - `commit_docs`, `has_git`, `has_gh_cli`, `github_project`
+                - `agent_teams`
+                - `story_source`, `story_valid`, `story_error`, `story_content`
+                - `story` (id, title, status, size), `feature` (id, title), `epic` (id, title)
+                - `has_acceptance_criteria`, `acceptance_criteria_count`
+                - `has_technical_solution`, `has_wiki_refs`, `has_coding_standards`
+                - `paths.*`
+            </substep>
+
+            <substep order="1.3" name="display-banner">
+                ```
+                ╔══════════════════════════════════════════════════╗
+                ║  ACE > Execute Story                              ║
+                ╚══════════════════════════════════════════════════╝
+                ```
+
+                If `has_git` is false: `git init`
+            </substep>
+
+            <substep order="1.4" name="validate-story">
+                <validation-gate condition="INIT.story_valid is false">
+                    Display `INIT.story_error` and STOP:
+                    ```
+                      x  {INIT.story_error}
+                         Provide a valid story file path or GitHub issue.
+                    ```
+                </validation-gate>
+
+                <validation-gate condition="INIT.has_acceptance_criteria is false">
+                    STOP:
+                    ```
+                      x  Story has no acceptance criteria.
+                         Run /ace:plan-story first to define AC scenarios.
+                    ```
+                </validation-gate>
+
+                <validation-gate condition="INIT.has_technical_solution is false">
+                    STOP:
+                    ```
+                      x  Story has no technical solution.
+                         Run /ace:plan-story first to generate the technical solution.
+                    ```
+                </validation-gate>
+
+                <validation-gate condition="INIT.story.status is 'Done'">
+                    STOP:
+                    ```
+                      x  Story is already marked as Done. Nothing to execute.
+                    ```
+                </validation-gate>
+
+                <validation-gate condition="INIT.story.status is 'DevReady'">
+                    Story was previously implemented and approved as DevReady (pending manual testing).
+                    Resuming from verification to allow promoting to Done.
+
+                    ```
+                      i  Story status: DevReady — previously implemented, pending verification.
+                         Resuming from verification (step 5.2).
+                         Skipping planning, execution, and code review.
+                    ```
+
+                    Set `RESUME_FROM_DEVREADY = true`.
+                    After displaying context (substep 1.7), jump DIRECTLY to step 5.2.
+                    Skip substeps 1.5, 1.6 and steps 2, 3, 4, 5.1 entirely.
+                </validation-gate>
+            </substep>
+
+            <substep order="1.5" name="detect-existing-implementation">
+                First check if there are any uncommitted changes (staged or unstaged):
+                ```bash
+                git status --short
+                ```
+
+                <variant condition="git status output is EMPTY (no uncommitted changes)">
+                    Fresh start — no uncommitted changes detected. Proceed normally to step 2.
+                </variant>
+
+                <variant condition="git status output is NOT EMPTY (uncommitted changes exist)">
+                    Uncommitted changes detected. Check if they relate to this story's implementation.
+
+                    Extract the list of expected files from the Technical Solution section
+                    of the story file (component breakdown — file paths).
+
+                    Check which of these files already exist in the working tree:
+                    ```bash
+                    for file in [expected_files_from_technical_solution]; do
+                      [ -f "$file" ] &amp;&amp; echo "EXISTS: $file" || echo "MISSING: $file"
+                    done
+                    ```
+
+                    <variant condition="ALL expected files exist">
+                        ```
+                          !  Implementation appears complete — all expected files exist.
+                             Uncommitted changes detected in working tree.
+                        ```
+
+                        Display the file check results (EXISTS/MISSING for each expected file).
+
+                        Use AskUserQuestion:
+                        - header: "Resume?"
+                        - question: "All files from the Technical Solution already exist and there are uncommitted changes. Is the implementation done? Do you want to skip to code review (step 4)?"
+                        - options:
+                          - "Yes, skip to review" — Implementation is done, continue from step 4 (code review → approval → state → wiki → commit)
+                          - "No, start fresh" — Plan and execute from scratch (I'll handle the working tree)
+
+                        <option value="Yes, skip to review">
+                            Skip steps 2 and 3 entirely.
+                            Jump DIRECTLY to step 4 (code review).
+                        </option>
+                        <option value="No, start fresh">
+                            Proceed normally from step 2 (user is responsible for cleaning working tree).
+                        </option>
+                    </variant>
+
+                    <variant condition="SOME expected files exist (partial implementation)">
+                        ```
+                          !  Partial implementation detected — some expected files exist.
+                        ```
+
+                        Display the file check results (EXISTS/MISSING for each expected file).
+
+                        Use AskUserQuestion:
+                        - header: "Resume?"
+                        - question: "Some files from the Technical Solution already exist. What would you like to do?"
+                        - options:
+                          - "Continue from plan" — Create a plan that accounts for existing files
+                          - "Start fresh" — Plan and execute from scratch (I'll handle the working tree)
+
+                        <option value="Continue from plan">
+                            Proceed to step 2. The plan must account for already-existing files
+                            and only implement what's missing.
+                        </option>
+                        <option value="Start fresh">
+                            Proceed normally from step 2 (user is responsible for cleaning working tree).
+                        </option>
+                    </variant>
+
+                    <variant condition="NO expected files from Technical Solution exist">
+                        Uncommitted changes exist but none match expected story files.
+                        Proceed normally to step 2.
+                    </variant>
+                </variant>
+            </substep>
+
+            <substep order="1.6" name="resolve-agent-teams">
+                <rule condition="--agent-teams-off flag present">Set `USE_AGENT_TEAMS = false` regardless of setting.</rule>
+                <rule condition="flag not present">Set `USE_AGENT_TEAMS = INIT.agent_teams`.</rule>
+            </substep>
+
+            <substep order="1.7" name="display-context">
+                ```
+                  i  Story: {INIT.story.id} — {INIT.story.title}
+                     Feature: {INIT.feature.id} — {INIT.feature.title}
+                     Status: {INIT.story.status} | Size: {INIT.story.size}
+                     AC scenarios: {INIT.acceptance_criteria_count}
+                     Technical solution: present
+                     Agent teams: {USE_AGENT_TEAMS ? "enabled" : "disabled"}
+                ```
+            </substep>
+
+        </step>
+
+        <!-- ═══ CHECKPOINT: Step 1 MUST be complete. Init MUST have run. Banner MUST be displayed. Context MUST be shown. ═══ -->
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 2: LOAD CONTEXT & CHOOSE EXECUTION MODE                     -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="load-and-decide" order="2">
+
+            <substep order="2.1" name="display-banner">
+                ```
+                ┌──────────────────────────────────────────────────┐
+                │  ACE > Execute Story > Planning                    │
+                └──────────────────────────────────────────────────┘
+                ```
+            </substep>
+
+            <substep order="2.2" name="read-story-sections">
+                Read `INIT.paths.story_file` and extract:
+                - **Acceptance Criteria** — Gherkin scenarios (WHAT to build)
+                - **Technical Solution** — component breakdown, sequence diagrams (HOW)
+                - **Relevant Wiki** — file references for codebase context (WHERE)
+                - **Out of Scope** — explicit exclusions (what NOT to build)
+                - **Dependencies** — what must exist before this story
+                - **Definition of Done** — quality checklist
+            </substep>
+
+            <substep order="2.3" name="read-coding-standards">
+                <variant condition="INIT.has_coding_standards is true">
+                    Read `INIT.paths.coding_standards` in full — coding standards are mandatory context.
+                </variant>
+            </substep>
+
+            <substep order="2.4" name="assess-and-choose-execution-mode">
+                **BEFORE any planning — analyze the story and ask the user to choose execution mode.**
+
+                Analyze the Technical Solution to assess complexity. Count ALL of the following signals:
+
+                <complexity-signals>
+                    <signal weight="high" name="story-size">Story size >= 5 SP</signal>
+                    <signal weight="high" name="file-count">Technical solution touches 6+ files</signal>
+                    <signal weight="high" name="new-code-volume">Technical solution estimates 100+ new lines of code</signal>
+                    <signal weight="high" name="implementation-phases">Technical solution defines 3+ implementation phases</signal>
+                    <signal weight="medium" name="cross-cutting">Changes span multiple layers (state + UI + services + tests)</signal>
+                    <signal weight="medium" name="complex-patterns">Story involves concurrency, cancellation, retry logic, race conditions, or state machines</signal>
+                    <signal weight="medium" name="independent-components">Technical solution shows 3+ independent components that could be built in parallel</signal>
+                    <signal weight="medium" name="ac-count">Story has 5+ acceptance criteria scenarios</signal>
+                    <signal weight="low" name="multi-subsystem">Changes touch multiple backend/frontend subsystems via API calls</signal>
+                    <signal weight="low" name="context-window-risk">Estimated implementation would exceed ~140k tokens (70% of 200k context)</signal>
+                </complexity-signals>
+
+                <assessment-rules>
+                    **Recommend Agent Teams** when ANY of:
+                    - 3+ HIGH signals present
+                    - 2+ HIGH signals AND 2+ MEDIUM signals
+                    - Story has independent components that can genuinely be built in parallel
+
+                    **Recommend Solo** when:
+                    - Mostly sequential work with tight dependencies between components
+                    - Small story (1-3 SP) with few files
+                    - Simple CRUD or single-file changes
+
+                    **When in doubt → recommend Agent Teams.** It's better to have teammates
+                    that finish early than a solo session that runs out of context window.
+                </assessment-rules>
+
+                **MANDATORY: Always present this choice to the user using AskUserQuestion — NEVER skip it, NEVER auto-decide.**
+
+                Present your complexity assessment summary, then ask:
+
+                <variant condition="USE_AGENT_TEAMS is true">
+                    Use AskUserQuestion:
+                    - header: "Execution"
+                    - question: "How should this story be executed?\n\nComplexity: {count high/medium/low signals hit}\n{list the signals that matched}\n\nMy recommendation: {Solo|Agent Teams} because {reasoning}"
+                    - options:
+                      - "{Recommended option} (Recommended)" — with reasoning
+                      - "{Other option}" — with reasoning
+                    - The recommended option goes first with "(Recommended)" suffix
+                </variant>
+
+                <variant condition="USE_AGENT_TEAMS is false">
+                    Agent teams are disabled by configuration. Use AskUserQuestion:
+                    - header: "Execution"
+                    - question: "Agent teams are disabled.\n\nComplexity: {count signals hit}\n{list the signals that matched}\n\nExecute in solo mode?"
+                    - options:
+                      - "Solo (Confirmed)" — proceed with solo execution
+                      - "Enable Agent Teams" — I want agent teams for this story (override the setting)
+
+                    <variant condition="user chose Enable Agent Teams">
+                        Override: set `USE_AGENT_TEAMS = true` and re-present the full
+                        Solo vs Agent Teams choice as in the variant above.
+                    </variant>
+                </variant>
+
+                Store the user's choice as `EXECUTION_MODE` (solo | agent-teams).
+            </substep>
+
+            <!-- ─────────────────────────────────────────────────── -->
+            <!-- SOLO PATH: Main creates plan, executor agent runs  -->
+            <!-- ─────────────────────────────────────────────────── -->
+
+            <substep order="2.5" name="solo-plan-mode" condition="EXECUTION_MODE is solo">
+                **BEFORE entering Plan Mode, display this highlighted warning to the user:**
+
+                ```
+                ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+                ┃  ⚠️  IMPORTANT — READ BEFORE EXITING PLAN MODE               ┃
+                ┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
+                ┃                                                              ┃
+                ┃  When Claude Code wants to exit plan mode, do NOT choose     ┃
+                ┃  the option with "clear context" no matter how filled        ┃
+                ┃  the context is! This will interrupt our command!             ┃
+                ┃                                                              ┃
+                ┃  The implementation in solo mode is done by a different       ┃
+                ┃  subagent with a fresh context window — no need to clear it.  ┃
+                ┃                                                              ┃
+                ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+                ```
+
+                Enter Plan Mode using the EnterPlanMode tool.
+
+                Feed into Plan Mode context:
+
+                ```
+                Create an execution plan for this story based on the technical solution.
+
+                STORY: {INIT.story.id} — {INIT.story.title}
+
+                ACCEPTANCE CRITERIA:
+                {extracted AC scenarios}
+
+                TECHNICAL SOLUTION:
+                {extracted technical solution}
+
+                RELEVANT WIKI:
+                {extracted wiki references}
+
+                CODING STANDARDS:
+                {full coding standards document}
+
+                OUT OF SCOPE:
+                {extracted out-of-scope items}
+                ```
+
+                <plan-rules>
+                    <rule>Follow the technical solution's component breakdown and sequence diagrams</rule>
+                    <rule>Each task must map to one or more AC scenarios</rule>
+                    <rule>Include verification steps (tests, build checks) after implementation tasks</rule>
+                    <rule>Follow coding standards from wiki</rule>
+                    <rule>DO NOT implement anything outside the AC scenarios (respect Out of Scope)</rule>
+                    <rule>NO intermediary commits — all changes accumulate as working tree changes</rule>
+                    <rule>ONE commit happens AFTER user approval at the end</rule>
+                </plan-rules>
+
+                <deviation-rules>
+                    <rule id="1" name="Auto-fix Bugs" approval="auto">Broken behavior, errors, type errors, security → fix inline, track as [Rule 1 - Bug]</rule>
+                    <rule id="2" name="Auto-add Missing Critical" approval="auto">Missing validation, error handling, auth → add, track as [Rule 2 - Missing Critical]</rule>
+                    <rule id="3" name="Auto-fix Blocking" approval="auto">Missing deps, broken imports, build errors → fix, track as [Rule 3 - Blocking]</rule>
+                    <rule id="4" name="Architectural Changes" approval="user">New DB tables, switching libraries, breaking API → STOP and ask user</rule>
+                </deviation-rules>
+
+                <self-verification>
+                    After each significant step:
+                    - Build check: run build command — must pass
+                    - Test check: run relevant tests — must pass
+                    - File existence: verify created files exist
+                    - Import check: verify new modules are imported/used where expected
+                </self-verification>
+            </substep>
+
+            <substep order="2.6" name="solo-approve-plan" condition="EXECUTION_MODE is solo">
+                User approves the plan (standard Plan Mode approval flow via ExitPlanMode).
+
+                After plan approval, **read the plan file** that Plan Mode created.
+                Store its contents as `APPROVED_PLAN` — this will be passed to the executor agent.
+
+                Proceed to step 3b (solo execution via executor agent).
+            </substep>
+
+            <!-- ─────────────────────────────────────────────────── -->
+            <!-- AGENT TEAMS PATH: Main stays out of Plan Mode      -->
+            <!-- Teammates plan their own work — lead approves      -->
+            <!-- ─────────────────────────────────────────────────── -->
+
+            <substep order="2.7" name="teams-task-decomposition" condition="EXECUTION_MODE is agent-teams">
+                **Main does NOT enter Plan Mode.** The Technical Solution IS the high-level plan.
+
+                Decompose the Technical Solution into teammate assignments:
+                - Identify 2-4 independent work streams from the implementation phases/components
+                - Assign each stream to a teammate role (e.g., "state-layer", "ui-layer", "integration", "tests")
+                - Map AC scenarios to teammates (each AC must be covered by at least one teammate)
+                - Identify shared interfaces/contracts between teammates
+                - Identify task dependencies (which teammate's work blocks another)
+
+                Present the team composition to the user using AskUserQuestion:
+                - header: "Team"
+                - question: "Proposed agent team:\n\n{for each teammate: role, files owned, tasks, AC coverage}\n\nDoes this look right?"
+                - options:
+                  - "Approve team" — create the team as proposed
+                  - "Adjust" — I want to change the team composition
+
+                <variant condition="user chose Adjust">
+                    Ask what they want to change → adjust → re-present.
+                </variant>
+
+                Proceed to step 3a (agent teams execution).
+            </substep>
+
+        </step>
+
+        <!-- ═══ CHECKPOINT: Step 2 MUST be complete. Execution mode MUST be chosen via AskUserQuestion. Plan MUST be approved (solo) or team MUST be approved (teams). ═══ -->
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 3a: AGENT TEAMS EXECUTION                                    -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="agent-teams-execution" order="3a">
+            **This step only runs when agent teams mode is selected.**
+            **Main (lead) does NOT enter Plan Mode — teammates plan their own work.**
+
+            <substep order="3a.1" name="display-banner">
+                ```
+                ┌──────────────────────────────────────────────────┐
+                │  ACE > Execute Story > Agent Teams                 │
+                └──────────────────────────────────────────────────┘
+
+                  i  Creating agent team for story implementation...
+                ```
+            </substep>
+
+            <substep order="3a.2" name="create-team">
+                **Safety net: if a leftover team exists from a crashed/interrupted previous run,
+                delete it first with TeamDelete before creating the new team.**
+
+                Create an agent team using the decomposition from step 2.7.
+
+                Tell Claude Code to create the team in natural language:
+
+                ```
+                Create an agent team for implementing story {INIT.story.id} — {INIT.story.title}.
+
+                Teammates:
+                {For each teammate from the approved decomposition:}
+                N. "{role}" — {description of work}
+                   Files owned: {list of files this teammate owns — NO overlap with other teammates}
+                   Tasks: {task list from decomposition}
+                   Require plan approval before they make any changes.
+
+                {If coding standards exist:}
+                N+1. "reviewer" — Review code written by other teammates
+                   Watches for: TODOs, stubs, placeholders, hardcoded values, missing tests,
+                   deviation from coding standards, missing error handling, dead code,
+                   backwards-compatible shims.
+                   Messages teammates directly when issues found.
+                   Creates tasks in shared task list for issues requiring fixes.
+                   Does a final sweep when all teammates are done.
+
+                All teammates must follow:
+                - Coding standards from {INIT.paths.coding_standards}
+                - Technical solution from story file
+                - NO intermediary commits — changes accumulate as working tree changes
+                - Deviation rules: auto-fix bugs/critical/blocking (Rules 1-3), STOP for architectural (Rule 4)
+
+                Only approve plans that:
+                - Follow the technical solution's component design exactly
+                - Include verification steps (build check, type check) after implementation
+                - Do NOT touch files owned by another teammate
+                - Map to AC scenarios from the story
+                ```
+
+                Each teammate enters plan mode automatically (via "Require plan approval").
+                The lead reviews and approves/rejects each teammate's plan autonomously.
+            </substep>
+
+            <substep order="3a.3" name="monitor-execution">
+                After plans are approved, teammates execute in parallel:
+
+                <task>Each teammate implements their approved plan</task>
+                <task>Teammates message each other for coordination on shared interfaces</task>
+                <task>Reviewer teammate monitors — checks code as it's written, messages others about issues</task>
+                <task>User can interact with any teammate via `Shift+Down`</task>
+                <task>If lead starts implementing tasks itself, tell it: "Wait for your teammates to complete their tasks before proceeding"</task>
+                <task>When all teammates idle → lead collects results</task>
+            </substep>
+
+            <substep order="3a.4" name="final-verification">
+                After all teammates complete:
+                <task>Run `git status` to see all changes</task>
+                <task>Run build + test suite to verify everything works together</task>
+                <task>If build/tests fail → coordinate fixes with relevant teammate</task>
+
+                Proceed to step 4 (reviewer teammate's final sweep serves as the review).
+            </substep>
+
+        </step>
+
+        <!-- ═══ CHECKPOINT: Step 3a runs ONLY if agent-teams mode was chosen. Otherwise skip to 3b. ═══ -->
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 3b: SOLO EXECUTION                                           -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="solo-execution" order="3b">
+            **This step runs when solo mode is selected.**
+            **Main spawns an executor subagent with a FRESH context window.**
+
+            <substep order="3b.1" name="display-banner">
+                ```
+                ┌──────────────────────────────────────────────────┐
+                │  ACE > Execute Story > Implementing                │
+                └──────────────────────────────────────────────────┘
+
+                  i  Spawning executor agent with fresh context...
+                ```
+            </substep>
+
+            <substep order="3b.2" name="spawn-executor-agent">
+                Spawn a subagent to execute the approved plan in a **fresh 200k context window**.
+                The main session's context is preserved for post-implementation steps (review, state, wiki).
+
+                ```
+                Agent(
+                    prompt="You are the ACE Story Executor. Implement this story by following
+                    the approved execution plan EXACTLY.
+
+                    STORY: {INIT.story.id} — {INIT.story.title}
+                    STORY FILE: {INIT.paths.story_file}
+
+                    Read the story file to get the full Acceptance Criteria and Technical Solution.
+
+                    {If INIT.has_coding_standards:}
+                    CODING STANDARDS: {INIT.paths.coding_standards}
+                    Read coding standards in full before starting implementation.
+
+                    APPROVED EXECUTION PLAN:
+                    {APPROVED_PLAN}
+
+                    RULES:
+                    - Follow the plan step by step — do NOT skip steps or reorder
+                    - After each significant step: run build check + test check
+                    - NO commits — all changes stay as working tree changes
+                    - Auto-fix bugs, missing critical code, and blocking issues (Rules 1-3)
+                    - For architectural changes beyond story scope (Rule 4): STOP and include
+                      in your return report — main will ask the user
+                    - Respect Out of Scope — do NOT implement anything not in the AC
+
+                    SELF-VERIFICATION (after ALL implementation is complete):
+                    - Verify all key files from the plan exist
+                    - Run full build — must pass
+                    - Run full test suite — must pass
+                    - If verification fails, fix before returning
+
+                    **Return format — ONLY this, nothing else:**
+                    IMPLEMENTATION COMPLETE
+                    - Files created: {list}
+                    - Files modified: {list}
+                    - Build: {pass/fail}
+                    - Tests: {pass/fail — include test command and result}
+                    - Deviations: {list of [Rule N] deviations, or 'None'}
+                    - Rule 4 blockers: {list of architectural issues needing user decision, or 'None'}
+                    - Notes: {anything the main session needs to know}",
+                    subagent_type="general-purpose",
+                    model="{INIT.executor_model}",
+                    description="Execute {INIT.story.id}"
+                )
+                ```
+
+                Parse the executor's return report.
+            </substep>
+
+            <substep order="3b.3" name="handle-executor-result">
+                <variant condition="Rule 4 blockers reported">
+                    The executor hit architectural issues it couldn't auto-resolve.
+                    Present each blocker to the user:
+
+                    ```
+                      !  Executor reported architectural issue(s) requiring your decision:
+
+                      {For each Rule 4 blocker:}
+                         ? {description}
+                           Proposed change: {what the executor wants to do}
+                           Impact: {what it affects}
+                    ```
+
+                    Use AskUserQuestion for each blocker:
+                    - header: "Rule 4"
+                    - question: "{blocker description} — approve this change?"
+                    - options:
+                      - "Approve" — allow the change
+                      - "Reject" — find an alternative approach
+                      - "Reject and stop" — stop implementation entirely
+
+                    If approved: spawn a follow-up executor agent to apply the approved changes.
+                    If rejected: spawn a follow-up executor agent with alternative instructions.
+                    If stopped: proceed to step 5 with partial implementation for user review.
+                </variant>
+
+                <variant condition="Build or tests failed">
+                    ```
+                      x  Executor reported build/test failures.
+                         Spawning follow-up agent to fix...
+                    ```
+                    Spawn a follow-up executor agent focused on fixing the failures.
+                    Include the failure output in the prompt.
+                </variant>
+
+                <variant condition="All clear — implementation complete">
+                    Proceed to step 4 (code review).
+                </variant>
+            </substep>
+
+            <substep order="3b.4" name="no-intermediary-commits">
+                **CRITICAL: Do NOT commit during implementation.**
+                All changes accumulate as working tree changes (unstaged/staged).
+                Only ONE commit happens after user approval in step 5.
+
+                Store the executor's deviation list for the Summary &amp; State section.
+            </substep>
+
+        </step>
+
+        <!-- ═══ CHECKPOINT: Implementation MUST be complete (step 3a or 3b). Executor report MUST be parsed. ═══ -->
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 4: CODE REVIEW                                               -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="code-review" order="4">
+
+            <substep order="4.1" name="display-banner">
+                ```
+                ┌──────────────────────────────────────────────────┐
+                │  ACE > Execute Story > Code Review                 │
+                └──────────────────────────────────────────────────┘
+
+                  i  Running code review...
+                ```
+            </substep>
+
+            <substep order="4.2" name="determine-review-mode">
+                <variant condition="Agent Teams mode">
+                    The reviewer teammate's final sweep serves as the review.
+                    Skip the subagent spawn — use the reviewer teammate's report.
+                    If the reviewer has already flagged and resolved all issues, proceed to step 5.
+                </variant>
+
+                <variant condition="Solo mode">
+                    Dispatch /ace:review-story as a subagent (see substep 4.3).
+                </variant>
+            </substep>
+
+            <substep order="4.3" name="dispatch-review-story">
+                **Solo mode only.** Dispatch the review-story command:
+
+                ```
+                Agent(
+                    prompt="/ace:review-story story={INIT.paths.story_file}
+
+                    Execute the review-story workflow end-to-end.
+
+                    **Return format — ONLY this, nothing else:**
+                    REVIEW COMPLETE
+                    Status: {passed | issues_found}
+                    - Blockers: {count}
+                    - Warnings: {count}
+                    - Files reviewed: {count}
+                    - Artifacts verified: {passed}/{total} (3-level)
+                    - AC coverage: {covered}/{total} scenarios
+                    - Tech debt items discovered: {count}
+
+                    [Blocker list with file:line, description, severity, suggested fix]
+                    [Warning list with file:line, description, severity, suggested fix]
+                    [Tech debt list in YAML format]",
+                    subagent_type="ace-code-reviewer",
+                    model="{INIT.reviewer_model}",
+                    description="Code review for {INIT.story.id}"
+                )
+                ```
+            </substep>
+
+            <substep order="4.4" name="fix-verify-loop">
+                **If blockers found → auto-fix cycle:**
+
+                <loop max-iterations="3">
+                    <task>Review reports blockers</task>
+                    <task>Fix them (deviation rules 1-3 apply — most blocker fixes are auto-approved)</task>
+                    <task>Re-run review (focused on previously-failed items only)</task>
+                    <task>Repeat until zero blockers</task>
+                </loop>
+
+                <escalation condition="blockers persist after 3 rounds">
+                    Escalate to user (Rule 4 behavior).
+                </escalation>
+
+                Warnings don't block — they're presented to user alongside verification.
+                Each fix round is tracked as a deviation in the summary.
+                Store the code review results (including tech debt YAML) for later steps.
+            </substep>
+
+        </step>
+
+        <!-- ═══ CHECKPOINT: Code review MUST be complete with zero blockers before proceeding. ═══ -->
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 5: USER VERIFICATION & COMMIT                                -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="user-verification" order="5">
+
+            <substep order="5.1" name="display-verification">
+                <variant condition="RESUME_FROM_DEVREADY is true">
+                    ```
+                    ╔══════════════════════════════════════════════════╗
+                    ║  ACE > Execute Story > Verification               ║
+                    ╚══════════════════════════════════════════════════╝
+
+                    Story: {INIT.story.id} — {INIT.story.title}
+
+                    Previously implemented and marked DevReady.
+                    Ready to promote to Done after manual verification.
+                    ```
+                </variant>
+
+                <variant condition="RESUME_FROM_DEVREADY is false (normal execution)">
+                    ```
+                    ╔══════════════════════════════════════════════════╗
+                    ║  ACE > Execute Story > Verification               ║
+                    ╚══════════════════════════════════════════════════╝
+
+                    Story: {INIT.story.id} — {INIT.story.title}
+
+                    Implementation complete. Please verify:
+
+                      Acceptance Criteria Walkthrough:
+                      ────────────────────────────────
+                      1. ✓ {scenario name} — [auto-verified: tests pass]
+                      2. ? {scenario name} — [needs manual check: {instructions}]
+                      ...
+
+                      Code Review Results:
+                      ────────────────────
+                      ✓ No blockers found
+                      {⚠ N warning(s): {brief descriptions}}
+
+                      Deviations:
+                      ────────────
+                      {deviation list or "None — plan executed as written"}
+                    ```
+                </variant>
+            </substep>
+
+            <substep order="5.2" name="ask-user">
+                <variant condition="RESUME_FROM_DEVREADY is true">
+                    Use AskUserQuestion:
+                    - header: "Verify"
+                    - question: "Story was previously implemented as DevReady. Has manual testing passed?"
+                    - options:
+                      - "Approve (Done)" — Manual testing passed, promote to Done
+                      - "Fix issues" — Something still needs to be changed
+
+                    <option value="Fix issues">
+                        Ask what needs fixing → apply fixes (deviation rules apply) →
+                        return to this verification prompt.
+                    </option>
+
+                    <option value="Approve (Done)">
+                        Set `FINAL_STATUS = Done`.
+                        Proceed to step 6 (state updates) → step 7 (wiki + commit).
+                    </option>
+                </variant>
+
+                <variant condition="RESUME_FROM_DEVREADY is false (normal execution)">
+                    Use AskUserQuestion:
+                    - header: "Verify"
+                    - question: "Implementation and code review complete. Does everything look correct?"
+                    - options:
+                      - "Approve (Done)" — All AC verified, mark story as Done
+                      - "Approve (DevReady)" — Implementation done but I need to test manually first
+                      - "Fix issues" — Something needs to be changed
+
+                    <option value="Fix issues">
+                        Ask what needs fixing → apply fixes (deviation rules apply) →
+                        re-run code review (focused) → return to verification prompt.
+                    </option>
+
+                    <option value="Approve (Done)">
+                        Set `FINAL_STATUS = Done`.
+                        Proceed to step 6 (state updates) → step 7 (wiki + commit).
+                    </option>
+
+                    <option value="Approve (DevReady)">
+                        Set `FINAL_STATUS = DevReady`.
+
+                        Present manual testing instructions:
+                        ```
+                          !  Manual testing required before wiki mapping.
+                             The following scenarios need manual verification:
+
+                          {For each AC scenario that was NOT auto-verified by tests:}
+                             ? {scenario name}
+                               How to test: {step-by-step manual test instructions}
+
+                          After testing, run /ace:execute-story again with this story.
+                          It will detect DevReady status and skip directly to verification.
+                        ```
+
+                        **DevReady path: skip wiki, commit code + state only.**
+                        Proceed to step 6 (state updates) → step 7.6 (commit) directly.
+                        Do NOT run step 7.1-7.5 (wiki mapping) — the code may still change
+                        after manual testing. Wiki mapping happens when the story reaches Done.
+                    </option>
+                </variant>
+            </substep>
+
+        </step>
+
+        <!-- ═══ CHECKPOINT: User MUST have approved via AskUserQuestion (Done or DevReady). ═══ -->
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 6: STATE UPDATES                                             -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="state-updates" order="6">
+
+            <substep order="6.1" name="display-banner">
+                ```
+                ┌──────────────────────────────────────────────────┐
+                │  ACE > Execute Story > State Updates               │
+                └──────────────────────────────────────────────────┘
+                ```
+            </substep>
+
+            <substep order="6.2" name="write-summary-section">
+                Write `## Summary &amp; State` section into the story file at the
+                `&lt;section name="summary-and-state"&gt;` location:
+
+                ```markdown
+                ## Summary &amp; State
+
+                **Status**: {FINAL_STATUS}
+                **Executed**: {current date YYYY-MM-DD}
+                **Duration**: {execution duration}
+
+                ### Implementation Summary
+                {Substantive one-liner — e.g., "OAuth buttons with Google/GitHub using next-auth providers"}
+
+                ### Commits
+                | # | Hash    | Type     | Description                          |
+                |---|---------|----------|--------------------------------------|
+                | 1 | {hash}  | feat     | {description}                        |
+
+                ### Deviations
+                {None — plan executed as written}
+                OR
+                {1. [Rule N] description of deviation}
+
+                ### Code Review
+                - Blockers found: {count} (all resolved)
+                - Warnings: {count}
+                - AC coverage: {covered}/{total} scenarios
+                - Tech debt discovered: {count} items
+                ```
+            </substep>
+
+            <substep order="6.3" name="update-state-via-tools">
+                ```bash
+                node "${CLAUDE_SKILL_DIR}/script.js" update-state \
+                  story={INIT.paths.story_file} \
+                  status={FINAL_STATUS}
+                ```
+
+                Parse result for: `story_updated`, `feature_updated`, `backlog_updated`, `feature_status_changed`.
+
+                ```
+                  +  Story status updated to {FINAL_STATUS}
+                  {+  Feature file updated (if feature_updated)}
+                  {+  Product backlog updated (if backlog_updated)}
+                  {+  Feature status changed to Done! (if feature_status_changed)}
+                ```
+            </substep>
+
+            <substep order="6.4" name="update-github">
+                <variant condition="INIT.github_project.enabled is false OR INIT.has_gh_cli is false">
+                    ```
+                      —  GitHub sync skipped (not configured or gh CLI unavailable).
+                    ```
+                </variant>
+
+                <variant condition="INIT.github_project.enabled is true AND INIT.has_gh_cli is true">
+                    Sync story and feature GitHub issues in a single call.
+                    This command prints status lines directly to the console (stderr)
+                    so the user ALWAYS sees whether each issue was updated or not.
+
+                    ```bash
+                    node "${CLAUDE_SKILL_DIR}/script.js" sync-github \
+                      repo={INIT.github_project.repo} \
+                      story_file={INIT.paths.story_file} \
+                      feature_file={INIT.paths.feature_file} \
+                      owner={INIT.github_project.owner} \
+                      project={INIT.github_project.project_number}
+                    ```
+
+                    The command handles all cases:
+                    - Story/feature has no GitHub issue linked → prints skip message
+                    - Update succeeds → prints success message with issue number
+                    - Update fails → prints error message with details
+                </variant>
+            </substep>
+
+        </step>
+
+        <!-- ═══ CHECKPOINT: State updates MUST be complete (story, feature, backlog, GitHub). ═══ -->
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 7: WIKI UPDATE                                               -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="wiki-and-commit" order="7">
+
+            <!-- ─────────────────────────────────────────────────── -->
+            <!-- WIKI MAPPING: Only when FINAL_STATUS = Done         -->
+            <!-- DevReady skips straight to commit (7.6)             -->
+            <!-- ─────────────────────────────────────────────────── -->
+
+            <substep order="7.1" name="display-banner" condition="FINAL_STATUS is Done">
+                ```
+                ┌──────────────────────────────────────────────────┐
+                │  ACE > Execute Story > Wiki Update                 │
+                └──────────────────────────────────────────────────┘
+
+                  i  Wiki mapper running (background agent)...
+                ```
+            </substep>
+
+            <substep order="7.2" name="dispatch-map-story" condition="FINAL_STATUS is Done">
+                Dispatch /ace:map-story as a background agent.
+                Pass tech debt from the code review output as a parameter — map-story
+                handles all tech debt integration (wiki docs + index).
+
+                **CRITICAL — Context Window Protection:**
+                The agent writes directly to wiki files and returns ONLY a confirmation.
+                Do NOT call TaskOutput on the background agent — it pollutes the main context.
+
+                ```
+                Agent(
+                    prompt="/ace:map-story story-context={INIT.paths.story_file} tech-debt=\"{tech_debt_yaml from code review output}\"
+
+                    Execute the map-story workflow end-to-end.
+
+                    **Return format — ONLY this, nothing else:**
+                    WIKI UPDATE COMPLETE
+                    - Updated: {list of updated wiki docs}
+                    - Created: {list of new wiki docs}
+                    - Tech debt integrated: {count} items across {count} wiki docs
+                    - No change needed: {list}
+                    WALKTHROUGH SUGGESTIONS
+                    - FLOW: {flow description} | SUBSYSTEM: {name} | EMPHASIS: {frameworks or none} | REASON: {why}
+                    [or: WALKTHROUGH SUGGESTIONS: none]",
+                    subagent_type="ace-wiki-mapper",
+                    run_in_background=true,
+                    description="Wiki update for {INIT.story.id}"
+                )
+                ```
+
+                Store the agent task ID as `WIKI_TASK`.
+            </substep>
+
+            <substep order="7.3" name="wait-for-wiki-completion" condition="FINAL_STATUS is Done">
+                **BLOCKING WAIT — Do NOT proceed to substep 7.4 until the wiki mapper has finished.**
+
+                Poll using TaskGet until the background agent completes:
+                ```
+                Loop (max 60 iterations, 10 second intervals):
+                    TaskGet(id=WIKI_TASK)
+                    If status is "completed" → break, proceed to 7.4
+                    If status is "failed" → log warning, proceed to 7.4 (commit without wiki)
+                    Otherwise → continue polling
+                ```
+
+                Once complete, verify wiki files exist:
+                ```bash
+                git status --short .docs/wiki/
+                ```
+
+                Read the agent result to extract walkthrough suggestions. The return format
+                is compact — it will NOT pollute the context window.
+
+                Parse the result for the `WALKTHROUGH SUGGESTIONS` section.
+                Store as WALKTHROUGH_SUGGESTIONS (list of { flow, subsystem, emphasis, reason }).
+                If "none" or not found, set WALKTHROUGH_SUGGESTIONS = empty.
+            </substep>
+
+            <substep order="7.4" name="write-wiki-updates-section" condition="FINAL_STATUS is Done">
+                Write `## Wiki Updates` section into the story file:
+
+                ```markdown
+                ## Wiki Updates
+
+                **Updated**: {current date}
+
+                | Document | Action | Path |
+                |----------|--------|------|
+                | {doc name} | Updated | {path} |
+                | {doc name} | Created | {path} |
+                | {doc name} | No change | {path} |
+                ```
+            </substep>
+
+            <substep order="7.5" name="update-github-with-wiki" condition="FINAL_STATUS is Done">
+                <variant condition="INIT.github_project.enabled is true AND INIT.has_gh_cli is true">
+                    Update GitHub issues again (story file now includes the Wiki Updates section):
+
+                    ```bash
+                    node "${CLAUDE_SKILL_DIR}/script.js" sync-github \
+                      repo={INIT.github_project.repo} \
+                      story_file={INIT.paths.story_file} \
+                      feature_file={INIT.paths.feature_file} \
+                      owner={INIT.github_project.owner} \
+                      project={INIT.github_project.project_number}
+                    ```
+                </variant>
+            </substep>
+
+            <!-- ─────────────────────────────────────────────────── -->
+            <!-- WALKTHROUGHS: Offer suggestions from map-story       -->
+            <!-- ─────────────────────────────────────────────────── -->
+
+            <substep order="7.5.1" name="offer-walkthroughs" condition="FINAL_STATUS is Done AND WALKTHROUGH_SUGGESTIONS is not empty">
+                Present walkthrough suggestions to the user.
+
+                Display:
+                ```
+                  i  Potential walkthroughs detected from this story's code:
+
+                     [For each suggestion, numbered:]
+                     [N]. [flow description]
+                          Subsystem: [subsystem] | Emphasis: [frameworks or "none"]
+                          [reason]
+                ```
+
+                Use AskUserQuestion:
+                - header: "Walkthroughs"
+                - question: "Would you like to create any of these walkthroughs?\nYou can also describe your own."
+                - options:
+                  - "Create [numbers]" — e.g., "Create 1,3" or "Create all"
+                  - "Custom" — user describes their own walkthrough
+                  - "Skip" — no walkthroughs
+
+                **If "Skip":** Continue to commit.
+
+                **If "Create [numbers]" or "Create all":**
+                For each selected suggestion, spawn a background agent:
+
+                ```
+                Agent(
+                    prompt="/ace:map-walkthrough flow=\"{suggestion.flow}\" subsystem=\"{suggestion.subsystem}\" emphasis-frameworks=\"{suggestion.emphasis}\"
+
+                    Execute the map-walkthrough workflow end-to-end.",
+                    subagent_type="ace-wiki-mapper",
+                    run_in_background=true,
+                    description="Walkthrough: {short flow name}"
+                )
+                ```
+
+                **If "Custom":**
+                Ask the user for their flow description, subsystem, and optional emphasis-frameworks.
+                Spawn a background agent for that walkthrough too.
+
+                Wait for all walkthrough agents to complete.
+
+                Display:
+                ```
+                  +  [N] walkthrough(s) created.
+                     [For each: path and line count]
+                ```
+
+                Stage walkthrough files:
+                ```bash
+                git add .docs/wiki/subsystems/*/walkthroughs/
+                ```
+            </substep>
+
+            <!-- ─────────────────────────────────────────────────── -->
+            <!-- COMMIT: Always runs (both Done and DevReady)        -->
+            <!-- ─────────────────────────────────────────────────── -->
+
+            <substep order="7.6" name="create-story-commit">
+                **ONE single commit for the entire story — code + state {+ wiki if Done}.**
+
+                Stage all files individually (NEVER `git add .` or `git add -A`):
+                ```bash
+                git status --short
+                git add {each implementation file}
+                git add {INIT.paths.story_file} {INIT.paths.feature_file} .ace/artifacts/product/product-backlog.md
+                ```
+
+                <variant condition="FINAL_STATUS is Done">
+                    Also stage wiki files:
+                    ```bash
+                    git add .docs/wiki/
+                    ```
+                </variant>
+
+                Commit with conventional format:
+                ```
+                feat({INIT.story.id}): {INIT.story.title}
+
+                - {key change 1}
+                - {key change 2}
+                - {key change 3}
+                ```
+
+                Record commit hash:
+                ```bash
+                COMMIT_HASH=$(git rev-parse --short HEAD)
+                ```
+
+                ```
+                  +  Story committed: {COMMIT_HASH}
+                ```
+            </substep>
+
+            <substep order="7.7" name="cleanup-agent-team" condition="EXECUTION_MODE is agent-teams">
+                **Clean up the agent team so future stories can create a new one.**
+                Delete the active team using TeamDelete. This prevents the
+                "already leading team" error on the next /ace:execute-story run.
+            </substep>
+
+            <substep order="7.8" name="display-completion">
+                <variant condition="FINAL_STATUS is Done">
+                    ```
+                    ╔══════════════════════════════════════════════════╗
+                    ║  ACE > Story Executed                             ║
+                    ║  {INIT.story.id} "{INIT.story.title}"            ║
+                    ╚══════════════════════════════════════════════════╝
+
+                      +  Story execution complete.
+
+                      Status: Done
+                      Commit: {COMMIT_HASH}
+                      AC coverage: {covered}/{total} scenarios
+                      Deviations: {count}
+                      Wiki docs updated: {count}
+
+                      Next > /ace:execute-story story={next story path}
+                             Execute the next story in the feature.
+                           > /ace:plan-story story={next story path}
+                             Plan the next story.
+                    ```
+                </variant>
+
+                <variant condition="FINAL_STATUS is DevReady">
+                    ```
+                    ╔══════════════════════════════════════════════════╗
+                    ║  ACE > Story Implemented (DevReady)               ║
+                    ║  {INIT.story.id} "{INIT.story.title}"            ║
+                    ╚══════════════════════════════════════════════════╝
+
+                      !  Implementation committed. Manual testing required.
+
+                      Status: DevReady
+                      Commit: {COMMIT_HASH}
+                      AC coverage: {covered}/{total} scenarios
+                      Deviations: {count}
+                      Wiki: skipped (waiting for Done)
+
+                      After manual testing:
+                      > /ace:execute-story story={INIT.paths.story_file}
+                        Re-run to promote to Done (will detect DevReady status
+                        and skip directly to verification → approve as Done → wiki mapping).
+                    ```
+                </variant>
+            </substep>
+
+        </step>
+
+    </process>
+
+    <success_criteria>
+        <criterion>Init function executed (environment detected, story validated, paths computed)</criterion>
+        <criterion>Acceptance criteria present — STOPPED if missing</criterion>
+        <criterion>Technical solution present — STOPPED if missing</criterion>
+        <criterion>Plan Mode entered and execution plan created</criterion>
+        <criterion>User approved execution plan</criterion>
+        <criterion>Agent teams vs solo decision correctly made</criterion>
+        <criterion>Implementation executed following technical solution</criterion>
+        <criterion>Deviation rules applied correctly (Rules 1-3 auto, Rule 4 asks)</criterion>
+        <criterion>Self-verification passed (build, tests, file existence, imports)</criterion>
+        <criterion>Code review completed with zero blockers</criterion>
+        <criterion>All coding standards violations resolved (mandatory check)</criterion>
+        <criterion>Dead code and backwards-compatible shims DELETED (zero tolerance)</criterion>
+        <criterion>User verified and approved implementation</criterion>
+        <criterion>Story file updated with Summary &amp; State section</criterion>
+        <criterion>Story status updated in story file, feature file, product backlog</criterion>
+        <criterion>GitHub issue updated (if applicable)</criterion>
+        <criterion>Feature status updated to Done if all stories are Done</criterion>
+        <criterion>Wiki mapper dispatched (background) with tech debt integration</criterion>
+        <criterion>Wiki Updates section written to story file</criterion>
+        <criterion>ONE single commit created after everything is done (code + state + wiki)</criterion>
+    </success_criteria>
+
+</workflow>

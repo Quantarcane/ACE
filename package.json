@@ -1,6 +1,6 @@
 {
   "name": "agile-context-engineering",
-  "version": "0.3.0",
+  "version": "0.5.0",
   "description": "ACE - Agile Context Engineering: A spec-driven development system for Claude Code and Crush (formerly OpenCode) with Agile workflows",
   "main": "index.js",
   "bin": {
@@ -9,14 +9,15 @@
   },
   "files": [
     "bin",
-    "commands",
+    "skills",
+    "shared",
     "agents",
     "hooks",
-    "agile-context-engineering",
+    ".claude-plugin",
     "CHANGELOG.md"
   ],
   "scripts": {
-    "test": "node --test agile-context-engineering/src/ace-tools.test.js"
+    "test": "node --test shared/lib/*.test.js skills/*/script.test.js"
   },
   "keywords": [
     "claude-code",

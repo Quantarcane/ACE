@@ -7,14 +7,24 @@ const path = require('path');
 const os = require('os');
 const { spawn } = require('child_process');
 
+// Use CLAUDE_PLUGIN_DATA for persistent cache (survives plugin updates)
+// Use CLAUDE_PLUGIN_ROOT to find the bundled VERSION file
+const pluginData = process.env.CLAUDE_PLUGIN_DATA;
+const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT;
+
+// Fallback for legacy standalone installs
 const homeDir = os.homedir();
 const cwd = process.cwd();
-const cacheDir = path.join(homeDir, '.claude', 'cache');
+
+const cacheDir = pluginData || path.join(homeDir, '.claude', 'cache');
 const cacheFile = path.join(cacheDir, 'ace-update-check.json');
 
-// VERSION file locations (check project first, then global)
-const projectVersionFile = path.join(cwd, '.claude', 'agile-context-engineering', 'VERSION');
-const globalVersionFile = path.join(homeDir, '.claude', 'agile-context-engineering', 'VERSION');
+// VERSION file: prefer plugin root, then legacy locations
+const versionFiles = [
+  pluginRoot ? path.join(pluginRoot, 'shared', 'VERSION') : null,
+  path.join(cwd, '.claude', 'shared', 'VERSION'),
+  path.join(homeDir, '.claude', 'shared', 'VERSION'),
+].filter(Boolean);
 
 // Ensure cache directory exists
 if (!fs.existsSync(cacheDir)) {
@@ -27,16 +37,15 @@ const child = spawn(process.execPath, ['-e', `
   const { execSync } = require('child_process');
 
   const cacheFile = ${JSON.stringify(cacheFile)};
-  const projectVersionFile = ${JSON.stringify(projectVersionFile)};
-  const globalVersionFile = ${JSON.stringify(globalVersionFile)};
+  const versionFiles = ${JSON.stringify(versionFiles)};
 
-  // Check project directory first (local install), then global
   let installed = '0.0.0';
   try {
-    if (fs.existsSync(projectVersionFile)) {
-      installed = fs.readFileSync(projectVersionFile, 'utf8').trim();
-    } else if (fs.existsSync(globalVersionFile)) {
-      installed = fs.readFileSync(globalVersionFile, 'utf8').trim();
+    for (const vf of versionFiles) {
+      if (fs.existsSync(vf)) {
+        installed = fs.readFileSync(vf, 'utf8').trim();
+        break;
+      }
     }
   } catch (e) {}
 

@@ -1,0 +1,1285 @@
+<workflow>
+
+    <purpose>
+        Orchestrate story specification: load a story seed (from file or GitHub issue),
+        absorb any existing description, conduct deep questioning to define CRYSTAL-CLEAR
+        acceptance criteria with ZERO ambiguity, write the story specification (pass 1),
+        then dispatch passes 2-5 as background agents that write their outputs directly
+        to files — keeping this orchestrator's context window clean.
+
+        Produces `.ace/artifacts/product/&lt;id-epic_name&gt;/&lt;id-feature_name&gt;/&lt;id-story_name&gt;/&lt;id-story_name&gt;.md`
+        — a complete story specification with INVEST-compliant user story, Gherkin acceptance
+        criteria, definition of done, scope boundaries, and relevant wiki references.
+
+        Additionally produces (via background agents):
+        - `external-analysis.md` in story directory (OPTIONAL — pass 3)
+        - `integration-analysis.md` in story directory (pass 4)
+        - Technical Solution section appended to story file (pass 5)
+
+        The orchestrator's context window contains ONLY story requirements information.
+        Passes 2-5 write to disk and return only completion confirmations.
+        The orchestrator MUST NOT call TaskOutput on any background agent.
+        TaskOutput returns the agent's FULL internal transcript (every file read, every search,
+        every tool call) — calling it will inflate the context window by 10-20%. THIS IS FORBIDDEN.
+        Do NOT call TaskOutput. Do NOT call TaskOutput. Do NOT call TaskOutput.
+    </purpose>
+
+    <mandatory-context>
+        Read all supporting resource files listed in the skill before starting.
+        Also read any document or text passed as parameter ($ARGUMENTS).
+    </mandatory-context>
+
+    <process>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 1: SETUP                                                     -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="setup" order="1">
+            **MANDATORY FIRST STEP — Use preprocessed environment data:**
+
+            The INIT JSON was already preprocessed by the skill's shell injection
+            and is available in the Environment Context section above the workflow.
+            Parse it directly — do NOT re-run the init script.
+
+            INIT contains:
+            - `commit_docs`
+            - `has_git`, `has_gh_cli`, `github_project`
+            - `is_brownfield`, `is_greenfield`, `has_wiki`
+            - `has_product_vision`, `has_product_backlog`
+            - `story_source` (`file`, `github`, `text`, `new`), `story_valid`, `story_error`, `story_content`
+            - `story` (id, title, status, size), `feature` (id, title), `epic` (id, title)
+            - `user_story`, `description`, `acceptance_criteria_count`
+            - `paths.*` (story_dir, story_file, feature_dir, feature_file, etc.)
+            - `has_external_analysis`, `has_integration_analysis`, `has_feature_file`, `has_story_file`
+
+            Also extract from `$ARGUMENTS` (not in INIT):
+            - `external-codebase` (OPTIONAL): path or GitHub URL to external system
+            - `external-docs` (OPTIONAL): weblink or filepath to external docs
+            - `lib-docs` (OPTIONAL): space-separated weblinks and/or filepaths to library documentation
+
+            Store `EXTERNAL_CODEBASE`, `EXTERNAL_DOCS`, and `LIB_DOCS` from parsed arguments (may be null).
+
+            Display stage banner:
+
+            ```
+            ╔══════════════════════════════════════════════════╗
+            ║  ACE > Plan Story                                ║
+            ╚══════════════════════════════════════════════════╝
+            ```
+
+            <!-- ── Validate and determine mode ─────────────────────────── -->
+
+            **If `INIT.story_valid` is false AND `INIT.story_source` is not `new` and not `text`:**
+            Display error using `INIT.story_error` and exit:
+            ```
+              x  {INIT.story_error}
+                 Provide a valid story file path, GitHub issue, or use text= for a new story.
+            ```
+
+            **Determine `IS_NEW_STORY`:**
+            - `IS_NEW_STORY = true` if: `INIT.story_source` is `new` or `text`,
+              OR `INIT.story.id == null` OR `INIT.feature.id == null`
+              (file exists but has no ACE structure/feature reference — treat as new story with seed content)
+            - `IS_NEW_STORY = false` if: both story.id and feature.id are set (proper ACE story file)
+
+            If `IS_NEW_STORY = true`: set `STORY_CONTENT = INIT.story_content` (may be null for `new` mode).
+
+            <!-- ── Git init if needed ─────────────────────────────────────── -->
+
+            **If `has_git` is false:** Initialize git:
+            ```bash
+            git init
+            ```
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 2: BACKLOG CHECK AND PLACEMENT                               -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="backlog-check-placement" order="2">
+
+            Execute ONLY when `IS_NEW_STORY` is true.
+            If `IS_NEW_STORY` is false: skip entirely, continue to step 3.
+
+            Display:
+            ```
+            ┌──────────────────────────────────────────────────┐
+            │  ACE > Plan Story > Backlog Placement            │
+            └──────────────────────────────────────────────────┘
+            ```
+
+            <!-- ── 2a: No backlog — minimal context flow ─────────────────── -->
+
+            **If `has_product_backlog` is false:**
+
+            Display:
+            ```
+              !  No product backlog found. Proceeding without backlog integration.
+            ```
+
+            Use AskUserQuestion:
+            - header: "Story Context"
+            - question: "No product backlog found. How would you like to proceed?"
+            - options:
+              - "Provide epic & feature context" — I'll give the epic and feature details
+              - "Create as standalone" — Save under uncategorized path
+
+            **If "Create as standalone":**
+            - Derive STORY_TITLE from STORY_CONTENT first line/heading, or ask with AskUserQuestion
+            - STORY_ID = S1
+            - Jump to 2f (compute paths with epic=uncategorized, feature=uncategorized)
+
+            **If "Provide epic & feature context":**
+            Ask user (two AskUserQuestion calls):
+            1. "What is the Epic ID and Title?" (e.g., E1 — User Authentication)
+            2. "What is the Feature ID and Title?" (e.g., F1 — OAuth2 Login)
+            Set TARGET_FEATURE from user answers. STORY_ID = S1. Jump to 2c.
+
+            <!-- ── 2b: Read backlog, identify feature ────────────────────── -->
+
+            **If `has_product_backlog` is true:**
+
+            Read `.ace/artifacts/product/product-backlog.md`.
+            Parse all features across all epics: ID, Title, Status, Epic ID, Epic Title.
+
+            **Determine STORY_TITLE:**
+            If STORY_CONTENT is not empty: extract from first heading (`# Title`) or first sentence.
+            If unclear: Use AskUserQuestion:
+            - header: "Story Title"
+            - question: "What is the title for this new story?"
+            (free-form text — accept any response as STORY_TITLE)
+
+            **Present feature list:**
+
+            Display features grouped by epic as a tree (same style as plan-feature):
+            ```
+              E1  User Authentication
+              ├── F1  OAuth2 Login Flow           [Todo]
+              └── F2  Session Management          [Refined]
+              E2  Data Export
+              └── F3  CSV Export                  [Todo]
+            ```
+
+            Use AskUserQuestion:
+            - header: "Feature Placement"
+            - question: "Which feature should '{STORY_TITLE}' belong to?"
+            - options: list all feature IDs + titles (up to 4 per page), plus "Create under a new feature"
+
+            **If "Create under a new feature":**
+            ```
+              !  Creating a new feature requires /ace:plan-feature first.
+                 Run /ace:plan-feature to define the feature, then re-run /ace:plan-story.
+            ```
+            Exit workflow.
+
+            Set `TARGET_FEATURE = { id, title, epic_id, epic_title }` from user selection.
+
+            <!-- ── 2c: Compute feature file path ─────────────────────────── -->
+
+            ```bash
+            EPIC_SLUG=$(node ${CLAUDE_SKILL_DIR}/script.js generate-slug "{TARGET_FEATURE.epic_id}-{TARGET_FEATURE.epic_title}" --raw)
+            FEATURE_SLUG=$(node ${CLAUDE_SKILL_DIR}/script.js generate-slug "{TARGET_FEATURE.id}-{TARGET_FEATURE.title}" --raw)
+            ```
+
+            FEATURE_DIR = .ace/artifacts/product/{EPIC_SLUG}/{FEATURE_SLUG}
+            FEATURE_FILE = {FEATURE_DIR}/{FEATURE_SLUG}.md
+
+            Check if feature file exists:
+            ```bash
+            test -f {FEATURE_FILE} && echo "exists" || echo "missing"
+            ```
+            Set `HAS_FEATURE_FILE` = true/false.
+
+            <!-- ── 2d: Assign story ID and ordering ──────────────────────── -->
+
+            **Find the next story ID for this feature:**
+
+            Scan existing story subdirectories in FEATURE_DIR:
+            ```bash
+            ls {FEATURE_DIR}/ 2>/dev/null | grep -E '^(s|#)[0-9]'
+            ```
+
+            If HAS_FEATURE_FILE is true: also read the story breakdown table in FEATURE_FILE
+            to confirm the highest existing S[N] or #[N].
+
+            Assign `STORY_ID = S[N+1]` where N is the highest found. If none: `STORY_ID = S1`.
+
+            **Ask about ordering (only if feature has existing stories):**
+
+            If there are existing stories, use AskUserQuestion:
+            - header: "Story Order"
+            - question: "Where should '{STORY_TITLE}' appear in the feature's story breakdown?"
+            - options: (build from existing story list)
+              - "After {last story ID} — {last story title}" (default/most common)
+              - "After {S[N]} — {title}" for each existing story
+              - "At the beginning"
+
+            Set `INSERT_AFTER` = selected story ID, or "end" if no existing stories / last position chosen,
+            or "beginning" if first position chosen.
+
+            <!-- ── 2e: Ask about dependencies ────────────────────────────── -->
+
+            If there are existing stories in the feature:
+
+            Use AskUserQuestion:
+            - header: "Dependencies"
+            - question: "Does '{STORY_TITLE}' have dependencies with existing stories?"
+            - options:
+              - "None" — No dependencies
+              - "Blocked by a story" — This story depends on another completing first
+              - "Blocks a story" — Another story must wait for this one
+              - "Both" — Mutual dependency
+
+            **If "Blocked by a story" or "Both":**
+            Use AskUserQuestion:
+            - header: "Blocked By"
+            - question: "Which story must complete before '{STORY_TITLE}'?"
+            - options: list existing story IDs + titles
+            Set `BLOCKED_BY = { id, title }`.
+
+            **If "Blocks a story" or "Both":**
+            Use AskUserQuestion:
+            - header: "Blocks"
+            - question: "Which story requires '{STORY_TITLE}' to complete first?"
+            - options: list existing story IDs + titles
+            Set `BLOCKS = { id, title }`.
+
+            Else: `BLOCKED_BY = null`, `BLOCKS = null`.
+
+            <!-- ── 2f: Compute final story paths ──────────────────────────── -->
+
+            ```bash
+            STORY_SLUG=$(node ${CLAUDE_SKILL_DIR}/script.js generate-slug "{STORY_ID}-{STORY_TITLE}" --raw)
+            ```
+
+            STORY_DIR = {FEATURE_DIR}/{STORY_SLUG}
+            STORY_FILE = {STORY_DIR}/{STORY_SLUG}.md
+
+            <!-- ── 2g: Create stub file ──────────────────────────────────── -->
+
+            ```bash
+            mkdir -p {STORY_DIR}
+            ```
+
+            Write stub file to `{STORY_FILE}`:
+
+            ```markdown
+            # {STORY_ID}: {STORY_TITLE}
+
+            **Feature**: {TARGET_FEATURE.id} {TARGET_FEATURE.title} | **Epic**: {TARGET_FEATURE.epic_id} {TARGET_FEATURE.epic_title}
+            **Status**: Todo | **Size**: — | **Sprint**: — | **Link**: —
+
+            ## Description
+
+            {STORY_CONTENT if non-empty, otherwise empty section}
+
+            ## Dependencies
+
+            {If BLOCKED_BY set: - **Blocked By**: {BLOCKED_BY.id} — {BLOCKED_BY.title}}
+            {If BLOCKS set: - **Blocks**: {BLOCKS.id} — {BLOCKS.title}}
+            {If neither: _No dependencies._}
+
+            ---
+            *Stub created by plan-story. Proceeding to formal specification.*
+            ```
+
+            Display:
+            ```
+              +  Stub created: {STORY_FILE}
+            ```
+
+            <!-- ── 2h: Update feature file ────────────────────────────────── -->
+
+            If `HAS_FEATURE_FILE` is true:
+
+            Spawn a Task agent to update the feature file:
+
+            ```
+            Task(
+                prompt="Read `{FEATURE_FILE}`.
+
+                1. Add a new row to the Story Breakdown table:
+                   | {STORY_ID} | {STORY_TITLE} | — | Todo | — | — |
+                   Insert it: {after story {INSERT_AFTER} / at the beginning / at the end}.
+
+                2. Add a story detail section after the existing story details:
+                   ### {STORY_ID}: {STORY_TITLE}
+                   {STORY_CONTENT or '(Description to be filled via plan-story.)'}
+
+                {If BLOCKS is set:
+                3. Locate the Dependencies section of story {BLOCKS.id} and add:
+                   - **Blocked By**: {STORY_ID} — {STORY_TITLE}}
+
+                Maintain all table formatting — pad ALL cells so | separators align vertically.
+                Use the Edit tool to modify in place.
+
+                **Return format — ONLY this:**
+                DONE
+                - Feature: {Feature ID} — updated
+                - Story row: added at position {INSERT_AFTER}
+                - Dependency updates: {count}",
+                subagent_type="ace-product-owner",
+                model="{PO_MODEL}",
+                description="Add story to feature file"
+            )
+            ```
+
+            Display:
+            ```
+              +  Feature file updated: {STORY_ID} added to story breakdown.
+            ```
+
+            <!-- ── 2i: GitHub sync (if enabled) ───────────────────────────── -->
+
+            **If `github_project.enabled` is false OR `has_gh_cli` is false:** Skip to 2j.
+
+            **If GitHub is enabled:**
+
+            Display:
+            ```
+              i  GitHub enabled — creating story issue...
+                 Repo: {github_project.repo} | Project: #{github_project.project_number}
+            ```
+
+            Determine parent feature's GitHub issue number:
+            If HAS_FEATURE_FILE is true: read FEATURE_FILE and extract `**Link**:` value.
+            Else: check backlog for the feature's Link column.
+            If feature has a GitHub link (e.g., `[#78](url)`): extract FEATURE_ISSUE_NUMBER.
+            If no link found: FEATURE_ISSUE_NUMBER = null (warn: "Feature has no GitHub issue — story will be created without a parent.").
+
+            Resolve project fields:
+            ```bash
+            GH_FIELDS=$(node "${CLAUDE_SKILL_DIR}/script.js" resolve-fields \
+              repo={github_project.repo} owner={github_project.owner} project={github_project.project_number})
+            ```
+
+            Parse: PROJECT_ID, STORY_TYPE_ID, STATUS_FIELD_ID, STATUS_OPTIONS, ESTIMATE_FIELD_ID.
+
+            Create story GitHub issue:
+            ```bash
+            STORY_RESULT=$(node "${CLAUDE_SKILL_DIR}/script.js" create-issue \
+              type=Story \
+              "title={STORY_TITLE}" \
+              body_file={STORY_FILE} \
+              repo={github_project.repo} \
+              owner={github_project.owner} \
+              project={github_project.project_number} \
+              project_id={PROJECT_ID} \
+              [type_id={STORY_TYPE_ID}] \
+              status_field_id={STATUS_FIELD_ID} \
+              status_option_id={STATUS_OPTIONS["Todo"]} \
+              [parent={FEATURE_ISSUE_NUMBER}])
+            ```
+
+            Parse response: `STORY_ISSUE_NUMBER`, `STORY_ISSUE_URL`.
+
+            **Rename directory and file to use GitHub issue number:**
+
+            ```bash
+            NEW_STORY_SLUG=$(node ${CLAUDE_SKILL_DIR}/script.js generate-slug "#{STORY_ISSUE_NUMBER}-{STORY_TITLE}" --raw)
+            mv {STORY_DIR} {FEATURE_DIR}/{NEW_STORY_SLUG}
+            ```
+
+            Update `STORY_DIR = {FEATURE_DIR}/{NEW_STORY_SLUG}`
+            Update `STORY_FILE = {STORY_DIR}/{NEW_STORY_SLUG}.md`
+
+            **Update stub file header** with GitHub link:
+            Edit `{STORY_FILE}`: change `**Link**: —` to `**Link**: [#{STORY_ISSUE_NUMBER}]({STORY_ISSUE_URL})`.
+
+            **Update feature file** Link column for this story:
+            Edit `{FEATURE_FILE}`: change the story row's Link cell from `—` to
+            `[#{STORY_ISSUE_NUMBER}]({STORY_ISSUE_URL})`.
+
+            Display:
+            ```
+              +  Created GitHub story issue #{STORY_ISSUE_NUMBER}
+                 Directory renamed: {STORY_DIR}
+            ```
+
+            <!-- ── 2j: Re-init with final story path ─────────────────────── -->
+
+            Re-run init to populate all INIT fields from the newly created story file:
+            ```bash
+            INIT=$(node ${CLAUDE_SKILL_DIR}/script.js init story={STORY_FILE})
+            ```
+
+            If `INIT.story_valid` is false: display error and exit.
+
+            Display:
+            ```
+              +  Story ready for specification:
+                 File:    {STORY_FILE}
+                 Feature: {TARGET_FEATURE.id} — {TARGET_FEATURE.title}
+                 Story:   {STORY_ID} — {STORY_TITLE}
+            ```
+
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 3: LOAD STORY SEED                                           -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="load-story-seed" order="3">
+
+            The story seed is the raw description of what needs to be built.
+            It may come from:
+            - A stub file created by `plan-feature` (has Description section)
+            - A GitHub issue with free-text description
+            - Any markdown file with story context
+
+            **Read the story content** (already available in `INIT.story_content`).
+            Parse and hold as `STORY_SEED`:
+            - Title (from header or first heading)
+            - Description (any free-text description of what needs to be done)
+            - Any existing AC scenarios (if the story was previously partially refined)
+            - Any images referenced (markdown `![](path)` or HTML `&lt;img src="path"&gt;`)
+
+            <!-- ── 2a: Image validation ──────────────────────────────────── -->
+
+            Extract ALL image references from the story content:
+            - Markdown: `![alt](path)`
+            - HTML: `&lt;img src="path"&gt;`
+
+            For EACH image reference, attempt to READ it using the Read tool.
+
+            **IF ANY IMAGE CANNOT BE READ:**
+            ```
+              x  STOP: Cannot proceed — Referenced images are not accessible.
+
+                 Image validation results:
+                 - [image1.png] -> SUCCESS
+                 - [image2.png] -> FAILED: File not found
+
+                 Please provide correct paths or describe what each missing image contains.
+            ```
+            Wait for user response before proceeding.
+
+            <!-- ── 2b: Detect run mode ───────────────────────────────────── -->
+
+            **If `INIT.acceptance_criteria_count > 0`:**
+            The story has existing AC — this is a REFINE run.
+            Set `RUN_MODE = REFINE`.
+
+            Use AskUserQuestion:
+            - header: "Story exists"
+            - question: "This story already has {INIT.acceptance_criteria_count} acceptance criteria scenarios. What would you like to do?"
+            - options:
+              - "Refine it" — Review and update the existing specification
+              - "Start fresh" — Discard existing AC and rebuild from the description
+              - "Skip to research" — Keep current AC, skip to passes 2-5
+
+            If "Start fresh": set `RUN_MODE = CREATE`, clear existing AC from working copy.
+            If "Skip to research": jump directly to step 8 (dispatch passes 2-5).
+            If "Refine it": continue to step 4 with existing content as context.
+
+            **If `INIT.acceptance_criteria_count == 0`:**
+            Set `RUN_MODE = CREATE`. Continue to step 4.
+
+            Display:
+            ```
+              i  Story loaded: {title}
+                 Source: {file path or GitHub issue}
+                 Mode: {CREATE | REFINE}
+                 Description: {first 100 chars of description}...
+            ```
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 4: LOAD FOUNDATION CONTEXT                                   -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="load-foundation" order="4">
+
+            **3a. Load parent feature document (if exists):**
+
+            If `INIT.has_feature_file` is true:
+            - Read the feature document at `INIT.paths.feature_file`
+            - Extract: Feature description, scope (includes/excludes), benefit hypothesis,
+              story breakdown (other stories and their scopes), acceptance criteria, technical context
+            - Hold as `FEATURE_CONTEXT`
+
+            If false: set `FEATURE_CONTEXT = null`
+
+            **3b. Load product vision (if exists):**
+
+            If `INIT.has_product_vision` is true:
+            - Read `.docs/product/product-vision.md`
+            - Extract personas, target audience, key objectives
+            - Hold as `VISION` (used to validate persona in user story statement)
+
+            If false: set `VISION = null`
+
+            **3c. Load product backlog (if exists):**
+
+            If `INIT.has_product_backlog` is true:
+            - Read `.ace/artifacts/product/product-backlog.md`
+            - Extract the parent epic's context and any related features
+            - Hold as `BACKLOG_CONTEXT`
+
+            If false: set `BACKLOG_CONTEXT = null`
+
+            Display loaded context:
+            ```
+              i  Context loaded:
+                 [+] Parent feature document ({lines} lines)
+                 [+] Product vision (personas: {list})
+                 [ ] Product backlog (not found)
+            ```
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 5: DEEP QUESTIONING                                          -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="deep-questioning" order="5">
+            Follow the questioning guide from `questioning.xml`. You are a thinking partner,
+            not an interviewer.
+
+            Display:
+            ```
+            ┌──────────────────────────────────────────────────┐
+            │  ACE > Plan Story > Questioning                   │
+            └──────────────────────────────────────────────────┘
+            ```
+
+            <!-- ── 4a: Opening — present what you know ───────────────────── -->
+
+            Start by presenting your understanding of the story from the seed:
+
+            "Based on the story description and feature context, here's what I understand
+            this story delivers: {summary}. Let me ask some questions to make sure the
+            acceptance criteria are crystal clear."
+
+            If FEATURE_CONTEXT is available, reference the story's position within
+            the feature — what it builds on and what it enables.
+
+            <!-- ── 4b: ZERO-ASSUMPTION questioning ───────────────────────── -->
+
+            **CRITICAL MANDATE: ZERO ASSUMPTIONS**
+
+            Every acceptance criterion MUST be so explicit that an AI agent with NO prior
+            context can implement it correctly. This means:
+
+            **For EVERY behavior, probe until you have:**
+            1. **Exact trigger** — What SPECIFIC user action or system event starts this?
+               - Bad: "When the user submits" → Submit what? Where? How?
+               - Good: "When the user clicks the 'Save' button on the Settings page"
+
+            2. **Exact preconditions** — What state MUST exist before the trigger?
+               - Bad: "Given the user is logged in" → What kind of user? What permissions?
+               - Good: "Given a user with 'admin' role is authenticated and on the Dashboard page"
+
+            3. **Exact expected outcome** — What OBSERVABLE result occurs?
+               - Bad: "Then it works" → How do you KNOW it works?
+               - Bad: "Then the data is saved" → Saved WHERE? What confirmation does the user see?
+               - Good: "Then a success toast appears with message 'Settings saved' and the page
+                 reflects the updated value without requiring a refresh"
+
+            4. **Exact data/values** — What SPECIFIC data is involved?
+               - Bad: "The form has fields" → Which fields? What types? What validation?
+               - Good: "The form contains: Name (text, required, max 100 chars), Email (email format,
+                 required), Role (dropdown: Admin/Editor/Viewer, default: Viewer)"
+
+            5. **Exact error handling** — What happens when things go wrong?
+               - Bad: "Show an error" → What error? Where? What message?
+               - Good: "Display inline validation error below the Email field: 'Please enter a valid
+                 email address' in red (#DC3545), field border turns red"
+
+            6. **Exact edge cases** — What happens at boundaries?
+               - What if the list is empty? What placeholder is shown?
+               - What if the input is at max length? What happens at max+1?
+               - What if the network request fails? Timeout? 403? 500?
+               - What if the user double-clicks? Navigates away mid-operation?
+
+            **QUESTIONING TECHNIQUES for extracting precision:**
+
+            - "You said [vague thing]. What does that actually look like on screen?"
+            - "Walk me through exactly what happens, step by step, from the user's perspective."
+            - "What does the user SEE when this succeeds? What EXACT message, where on the page?"
+            - "What if [edge case]? What should happen? What should the user see?"
+            - "You mentioned [behavior]. Is that a modal dialog, an inline message, a page redirect, or something else?"
+            - "When you say 'update', do you mean replace the entire record, merge specific fields, or append?"
+            - "What validation rules apply? Be specific: required/optional, min/max, format, allowed values."
+            - "How does the user know this worked? What visual feedback do they get?"
+
+            **USE AskUserQuestion for specific clarification:**
+
+            When the user gives a vague answer, present concrete interpretations:
+
+            ```
+            header: "Behavior"
+            question: "When the save fails due to network error, what should the user see?"
+            options:
+              - "Toast notification" — Non-blocking message at top of page
+              - "Modal dialog" — Blocking popup requiring acknowledgment
+              - "Inline error" — Error message below the form
+              - "Let me explain" — Different approach
+            ```
+
+            <!-- ── 4c: Template-field coverage (background checklist) ────── -->
+
+            As you question, mentally track coverage against story.xml template sections:
+            - [ ] **User Story** — As/I want/So that (persona must match vision if available)
+            - [ ] **Description** — 2-4 sentences of observable user behavior and feature context
+            - [ ] **Acceptance Criteria** — ALL scenarios with EXACT Given/When/Then
+                  - [ ] Happy path(s) — main success scenario(s)
+                  - [ ] Edge cases — boundary conditions, empty states, max limits
+                  - [ ] Error paths — validation failures, network errors, permission issues
+                  - [ ] Each scenario: EXACT trigger, EXACT precondition, EXACT outcome
+            - [ ] **Out of Scope** — Things someone might assume are included but are NOT
+            - [ ] **Dependencies** — Blocked by, Blocks, External
+            - [ ] **Definition of Done** — Any story-specific additions to the default checklist
+            - [ ] **Size** — Fibonacci estimate (1, 2, 3, 5, 8)
+
+            Don't walk through this as a checklist. Weave questions naturally.
+            When gaps remain after conversation feels complete, probe those areas.
+
+            <!-- ── 4d: AC Scenario crafting ──────────────────────────────── -->
+
+            Once you have enough context, draft the Gherkin scenarios:
+
+            Present each scenario and VALIDATE with the user:
+
+            ```
+            Here's what I have so far:
+
+            ### Scenario: Successful settings save
+            **Given** an admin user is on the Settings page with unsaved changes
+            **When** they click the "Save Settings" button
+            **Then** a success toast appears with message "Settings saved successfully"
+            **And** the updated values are reflected on the page without refresh
+            **And** the "Save Settings" button becomes disabled (no unsaved changes)
+
+            ### Scenario: Validation failure — invalid email
+            **Given** an admin user is on the Settings page
+            **When** they enter "not-an-email" in the Contact Email field and click "Save Settings"
+            **Then** the Contact Email field border turns red
+            **And** an inline error appears below the field: "Please enter a valid email address"
+            **And** the form is NOT submitted
+            **And** focus moves to the Contact Email field
+
+            Does this capture the behavior correctly? Anything missing or wrong?
+            ```
+
+            Use AskUserQuestion:
+            - header: "Scenarios"
+            - question: "Review the acceptance criteria scenarios above. Are they correct and complete?"
+            - options:
+              - "Looks good" — Scenarios are accurate and complete
+              - "Fix a scenario" — Something is wrong or missing in a scenario
+              - "Add a scenario" — There's a case I haven't mentioned
+              - "Too many" — Some scenarios should be removed or combined
+
+            Loop until the user confirms all scenarios are correct.
+
+            **CRITICAL: Scenario count check.**
+            If more than 6-8 scenarios are needed, the story is likely too large:
+            ```
+              !  This story has {N} scenarios, which suggests it may be too large.
+                 Stories with more than 6-8 scenarios should usually be split.
+            ```
+
+            Use AskUserQuestion:
+            - header: "Story size"
+            - question: "This story has {N} acceptance criteria. Should we split it?"
+            - options:
+              - "Keep as-is" — The story is coherent and should not be split
+              - "Split it" — Let's break this into smaller stories
+
+            If "Split it": discuss the split, identify natural cut points, and restart
+            questioning for the reduced-scope story.
+
+            <!-- ── 4e: Decision gate ─────────────────────────────────────── -->
+
+            When story specification feels complete:
+
+            Use AskUserQuestion:
+            - header: "Ready?"
+            - question: "I have the full story spec: {N} acceptance criteria, size {estimate}. Ready to write the story document?"
+            - options:
+              - "Write story document" — Create the specification
+              - "Keep exploring" — I want to add or change something
+              - "Show summary" — Show me what you have before deciding
+
+            If "Show summary":
+            ```
+            Story: {ID} — {Title}
+            Feature: {Feature ID} — {Feature Title}
+
+            User Story:
+            > As a [persona], I want [action], so that [benefit].
+
+            Description: {2-4 sentences}
+
+            Acceptance Criteria: {N} scenarios
+            1. {scenario name} — {one-line summary}
+            2. {scenario name} — {one-line summary}
+            ...
+
+            Out of Scope: {M} items
+            Size: {estimate}
+            ```
+            Return to decision gate.
+
+            If "Keep exploring" — ask what they want to add or identify gaps.
+            Loop until "Write story document" selected.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 6: WRITE STORY DOCUMENT (Pass 1)                             -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="write-story" order="6">
+
+            Display:
+            ```
+            ┌──────────────────────────────────────────────────┐
+            │  ACE > Plan Story > Writing Document (Pass 1)     │
+            └──────────────────────────────────────────────────┘
+
+              i  Writing story specification...
+                 Output: {STORY_FILE}
+            ```
+
+            Create directory structure:
+            ```bash
+            mkdir -p {INIT.paths.story_dir}
+            ```
+
+            Prepare the full story document following the story.xml template EXACTLY.
+            Include ALL sections 1-8:
+            - **Header**: Story ID, Title, Feature reference, Epic reference, Status=Refined,
+              Size, Sprint=—, Link
+            - **User Story**: As/I want/So that format
+            - **Description**: 2-4 sentences of observable behavior and feature context
+            - **Acceptance Criteria**: ALL Gherkin scenarios from questioning
+            - **Out of Scope**: Explicit exclusions
+            - **Dependencies**: Blocked By, Blocks, External
+            - **Definition of Done**: Standard checklist + any story-specific items
+            - **Relevant Wiki**: Placeholder — `&lt;!-- Pass 2. Populated by research-story-wiki. --&gt;`
+            - **Technical Solution**: Placeholder — `&lt;!-- Pass 5. Populated by research-technical-solution. --&gt;`
+            - **Metadata**: Created date, Last refined date, Refinements count, Feature path
+
+            Write the file using the Write tool to `{INIT.paths.story_file}`.
+
+            **If RUN_MODE is REFINE:**
+            Increment the metadata refinement count and update "Last refined" date.
+            Preserve any existing Relevant Wiki or Technical Solution sections.
+
+            Display:
+            ```
+              +  Story specification written to {INIT.paths.story_file}
+                 Sections 1-8 complete. {N} acceptance criteria scenarios.
+            ```
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 7: REVIEW AND APPROVE (Pass 1)                               -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="review-pass1" order="7">
+
+            Use AskUserQuestion:
+            - header: "Story"
+            - question: "Story specification written to `{INIT.paths.story_file}`. Review the file in your editor. Does it look right?"
+            - options:
+              - "Approve" — Looks good, proceed to research passes
+              - "Adjust" — I want to change some things
+              - "Redo questioning" — Let's go back and explore more
+
+            **If "Adjust":**
+            - Ask what needs changing
+            - Apply edits using the Edit tool directly on `{INIT.paths.story_file}`
+            - Present for review again. Loop until approved.
+
+            **If "Redo questioning":**
+            - Return to step 5 (deep-questioning)
+            - Preserve FEATURE_CONTEXT, VISION, BACKLOG_CONTEXT
+            - Hold previous answers as additional context
+
+            **If "Approve":**
+            Continue to step 8.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 8: DISPATCH RESEARCH PASSES (2-5)                            -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="dispatch-research" order="8">
+
+            Display:
+            ```
+            ┌──────────────────────────────────────────────────┐
+            │  ACE > Plan Story > Research Passes               │
+            └──────────────────────────────────────────────────┘
+
+              i  Story requirements complete. Dispatching research passes...
+            ```
+
+            <!-- ── 8a: Offer external analysis (Pass 3 — OPTIONAL) ──────── -->
+
+            **If `EXTERNAL_CODEBASE` was provided as parameter:**
+            Set `RUN_EXTERNAL = true`.
+
+            **If `EXTERNAL_CODEBASE` was NOT provided:**
+
+            Use AskUserQuestion:
+            - header: "External"
+            - question: "Does this story reference an external system or reference implementation you'd like to analyze?"
+            - options:
+              - "No external system" — Skip external analysis
+              - "Yes, provide path" — I have an external codebase to analyze
+
+            If "Yes, provide path":
+            Ask for the external-codebase path (and optionally external-docs).
+            Set `EXTERNAL_CODEBASE` and `EXTERNAL_DOCS` from user response.
+            Set `RUN_EXTERNAL = true`.
+
+            If "No external system":
+            Set `RUN_EXTERNAL = false`.
+
+            <!-- ── 8b: Dispatch Pass 2 — Wiki Research ──────────────────── -->
+
+            **If `has_wiki` is false:** Skip pass 2. Display:
+            ```
+              i  No wiki found. Skipping pass 2 (wiki research).
+            ```
+
+            **If `has_wiki` is true:**
+
+            Display:
+            ```
+              i  Pass 2: Dispatching wiki research...
+                 Agent will update story file with Relevant Wiki section.
+            ```
+
+            **CRITICAL — Context Window Protection:**
+            The agent writes to the story file and returns ONLY a ~10-line confirmation.
+            This prevents agent output from inflating the main context window.
+
+            **CRITICAL — Do NOT call TaskOutput. NEVER. UNDER NO CIRCUMSTANCES.**
+            After spawning the background agent, do NOT call TaskOutput to read its results.
+            You will be automatically notified when the agent completes — IGNORE those notifications.
+            The agent writes directly to the story file on disk. You do not need the return message.
+            TaskOutput returns the agent's FULL internal transcript (every file read, every search,
+            every tool call) — calling it will inflate the context window by 10-20%. THIS IS FORBIDDEN.
+            After the notification arrives, verify the file with `wc -l`, then READ the file
+            directly from disk using the Read tool if needed. That is how you get the results.
+
+            Spawn background agent:
+            ```
+            Agent(
+                prompt="/ace:research-story-wiki story={INIT.paths.story_file}
+
+                Execute the research-story-wiki workflow end-to-end.
+                Write the Relevant Wiki section directly into the story file.
+
+                **Return format — ONLY this, nothing else:**
+                DONE
+                - Story: {story ID} — {story title}
+                - Wiki refs: {count} total ({system_wide} system-wide + {subsystem} subsystem)
+                - File updated: {story file path}",
+                subagent_type="ace-wiki-mapper",
+                model="{PO_MODEL}",
+                run_in_background=true,
+                description="Pass 2: Wiki research"
+            )
+            ```
+
+            Store the agent task ID as `PASS2_TASK`.
+
+            **After background notification arrives — IGNORE it:**
+
+            Do NOT call TaskOutput. Do NOT call TaskOutput. Do NOT call TaskOutput.
+            Just verify the file and read it directly from disk if needed.
+
+            <!-- ── 8c: Dispatch Pass 3 — External Analysis (OPTIONAL) ───── -->
+
+            **If `RUN_EXTERNAL` is false:** Skip pass 3.
+
+            **If `RUN_EXTERNAL` is true:**
+
+            Display:
+            ```
+              i  Pass 3: Dispatching external analysis...
+                 Agent will create external-analysis.md in story directory.
+            ```
+
+            **CRITICAL — Context Window Protection:**
+            The agent writes to a separate file and returns ONLY a ~10-line confirmation.
+            This prevents agent output from inflating the main context window.
+
+            **CRITICAL — Do NOT call TaskOutput. NEVER. UNDER NO CIRCUMSTANCES.**
+            After spawning the background agent, do NOT call TaskOutput to read its results.
+            You will be automatically notified when the agent completes — IGNORE those notifications.
+            The agent writes to `{INIT.paths.external_analysis_file}` on disk. You do not need the return message.
+            TaskOutput returns the agent's FULL internal transcript (every file read, every search,
+            every tool call) — calling it will inflate the context window by 10-20%. THIS IS FORBIDDEN.
+
+            Spawn background agent:
+            ```
+            Agent(
+                prompt="/ace:research-external-solution story={INIT.paths.story_file} external-codebase={EXTERNAL_CODEBASE} {external-docs={EXTERNAL_DOCS} if provided}
+
+                Execute the research-external-solution workflow end-to-end.
+                Write the output to {INIT.paths.external_analysis_file}.
+
+                **Return format — ONLY this, nothing else:**
+                DONE
+                - Story: {story ID} — {story title}
+                - External files analyzed: {count}
+                - Output: {external analysis file path}",
+                subagent_type="ace-code-discovery-analyst",
+                model="{PO_MODEL}",
+                run_in_background=true,
+                description="Pass 3: External analysis"
+            )
+            ```
+
+            Store the agent task ID as `PASS3_TASK`.
+
+            **After background notification arrives — IGNORE it:**
+
+            Do NOT call TaskOutput. Do NOT call TaskOutput. Do NOT call TaskOutput.
+            Just verify the file and read it directly from disk if needed.
+
+            <!-- ── 8d: Wait for passes 2 (and 3 if running) before pass 4 ── -->
+
+            Display:
+            ```
+              i  Waiting for pass 2{" and pass 3" if RUN_EXTERNAL} to complete
+                 before dispatching integration analysis (pass 4)...
+            ```
+
+            **Wait for PASS2_TASK notification** (and PASS3_TASK if running).
+            Do NOT call TaskOutput. Do NOT call TaskOutput. Do NOT call TaskOutput.
+            Just wait for the background notifications.
+
+            After notifications arrive, verify the outputs exist:
+            ```bash
+            wc -l {INIT.paths.story_file}
+            ```
+            If RUN_EXTERNAL:
+            ```bash
+            wc -l {INIT.paths.external_analysis_file}
+            ```
+
+            Display:
+            ```
+              +  Pass 2 complete. Story file updated with Relevant Wiki section.
+              {+  Pass 3 complete. External analysis written. (if applicable)}
+            ```
+
+            <!-- ── 8d.1: Inject Library Documentation into Relevant Wiki ── -->
+
+            **If `LIB_DOCS` is not null/empty:**
+
+            Append a `### Library Documentation` subsection to the `## Relevant Wiki`
+            section in the story file. This ensures passes 4-5 see these references.
+
+            Read the story file, find the `## Relevant Wiki` section, and append
+            the `### Library Documentation` subsection BEFORE the next `## ` heading
+            (i.e., before `## Technical Solution`).
+
+            Split `LIB_DOCS` by spaces. For each entry, determine if it's a weblink
+            (starts with `http://` or `https://`) or a filepath, and format accordingly:
+
+            ```markdown
+            ### Library Documentation
+
+            <!-- Provided via lib-docs parameter. These are external library/API docs
+                 that inform the technical solution design. Passes 4-5 MUST read/fetch
+                 these when designing the implementation. -->
+
+            - `{entry}` — Library/API documentation reference
+            ```
+
+            Use the Edit tool to insert this subsection into the story file.
+
+            Display:
+            ```
+              +  Library documentation ({count} entries) added to Relevant Wiki section.
+            ```
+
+            <!-- ── 8e: Dispatch Pass 4 — Integration Analysis ───────────── -->
+
+            Display:
+            ```
+              i  Pass 4: Dispatching integration analysis...
+                 Agent will create integration-analysis.md in story directory.
+            ```
+
+            **CRITICAL — Context Window Protection:**
+            The agent writes to a separate file and returns ONLY a ~10-line confirmation.
+            This prevents agent output from inflating the main context window.
+
+            **CRITICAL — Do NOT call TaskOutput. NEVER. UNDER NO CIRCUMSTANCES.**
+            After spawning the background agent, do NOT call TaskOutput to read its results.
+            You will be automatically notified when the agent completes — IGNORE those notifications.
+            The agent writes to `{INIT.paths.integration_analysis_file}` on disk. You do not need the return message.
+            TaskOutput returns the agent's FULL internal transcript (every file read, every search,
+            every tool call) — calling it will inflate the context window by 10-20%. THIS IS FORBIDDEN.
+
+            Spawn background agent:
+            ```
+            Agent(
+                prompt="/ace:research-integration-solution story={INIT.paths.story_file}
+
+                Execute the research-integration-solution workflow end-to-end.
+                Write the output to {INIT.paths.integration_analysis_file}.
+                The story file now has the Relevant Wiki section (pass 2 complete).
+                {If external analysis exists: The external-analysis.md file exists in the story directory.}
+
+                **Return format — ONLY this, nothing else:**
+                DONE
+                - Story: {story ID} — {story title}
+                - Integration points found: {count}
+                - Output: {integration analysis file path}",
+                subagent_type="ace-code-integration-analyst",
+                model="{PO_MODEL}",
+                run_in_background=true,
+                description="Pass 4: Integration analysis"
+            )
+            ```
+
+            Store the agent task ID as `PASS4_TASK`.
+
+            **After background notification arrives — IGNORE it:**
+
+            Do NOT call TaskOutput. Do NOT call TaskOutput. Do NOT call TaskOutput.
+            Just verify the file and read it directly from disk if needed.
+
+            <!-- ── 8f: Wait for pass 4 before pass 5 ────────────────────── -->
+
+            **Wait for PASS4_TASK notification.**
+            Do NOT call TaskOutput. Do NOT call TaskOutput. Do NOT call TaskOutput.
+
+            After notification arrives, verify:
+            ```bash
+            wc -l {INIT.paths.integration_analysis_file}
+            ```
+
+            Display:
+            ```
+              +  Pass 4 complete. Integration analysis written.
+            ```
+
+            <!-- ── 8g: Dispatch Pass 5 — Technical Solution ─────────────── -->
+
+            Display:
+            ```
+              i  Pass 5: Dispatching technical solution design...
+                 Agent will append Technical Solution to story file.
+            ```
+
+            **CRITICAL — Context Window Protection:**
+            The agent writes directly into the story file and returns ONLY a ~10-line confirmation.
+            This prevents agent output from inflating the main context window.
+
+            **CRITICAL — Do NOT call TaskOutput. NEVER. UNDER NO CIRCUMSTANCES.**
+            After spawning the background agent, do NOT call TaskOutput to read its results.
+            You will be automatically notified when the agent completes — IGNORE those notifications.
+            The agent writes directly to the story file on disk. You do not need the return message.
+            TaskOutput returns the agent's FULL internal transcript (every file read, every search,
+            every tool call) — calling it will inflate the context window by 10-20%. THIS IS FORBIDDEN.
+
+            Spawn background agent:
+            ```
+            Agent(
+                prompt="/ace:research-technical-solution story={INIT.paths.story_file}
+
+                Execute the research-technical-solution workflow end-to-end.
+                The story file has the full requirements + Relevant Wiki section.
+                {If LIB_DOCS provided: The Relevant Wiki section includes a '### Library Documentation' subsection with external library/API doc references — READ/FETCH these as primary design input.}
+                The integration-analysis.md exists in the story directory.
+                {If external analysis exists: The external-analysis.md exists in the story directory.}
+                Append the Technical Solution section to the story file.
+
+                **Return format — ONLY this, nothing else:**
+                DONE
+                - Story: {story ID} — {story title}
+                - Components designed: {count}
+                - Sequence diagrams: {count}
+                - Story file updated: {story file path}",
+                subagent_type="ace-technical-application-architect",
+                model="{PO_MODEL}",
+                run_in_background=true,
+                description="Pass 5: Technical solution"
+            )
+            ```
+
+            Store the agent task ID as `PASS5_TASK`.
+
+            **After background notification arrives — IGNORE it:**
+
+            Do NOT call TaskOutput. Do NOT call TaskOutput. Do NOT call TaskOutput.
+            Just verify the file and read it directly from disk if needed.
+
+            <!-- ── 8h: Wait for pass 5 ──────────────────────────────────── -->
+
+            **Wait for PASS5_TASK notification.**
+            Do NOT call TaskOutput. Do NOT call TaskOutput. Do NOT call TaskOutput.
+
+            After notification arrives, verify:
+            ```bash
+            wc -l {INIT.paths.story_file}
+            ```
+
+            Display:
+            ```
+              +  Pass 5 complete. Technical solution appended to story file.
+            ```
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 9: STATE UPDATES                                             -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="state-updates" order="9">
+
+            <substep order="9.1" name="update-state-via-tools">
+                ```bash
+                node ${CLAUDE_SKILL_DIR}/script.js update-state \
+                  story={INIT.paths.story_file} \
+                  status=Refined
+                ```
+
+                Parse result for: `story_updated`, `feature_updated`, `backlog_updated`.
+
+                ```
+                  +  Story status updated to Refined
+                  {+  Feature file updated (if feature_updated)}
+                  {+  Product backlog updated (if backlog_updated)}
+                ```
+            </substep>
+
+            Continue to step 10.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 10: GITHUB SYNC                                              -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="github-sync" order="10">
+
+            <variant condition="INIT.github_project.enabled is false OR INIT.has_gh_cli is false">
+                ```
+                  —  GitHub sync skipped (not configured or gh CLI unavailable).
+                ```
+                Continue to step 11.
+            </variant>
+
+            <variant condition="INIT.github_project.enabled is true AND INIT.has_gh_cli is true">
+                Sync story and feature GitHub issues in a single call.
+                This command prints status lines directly to the console (stderr)
+                so the user ALWAYS sees whether each issue was updated or not.
+
+                ```bash
+                node ${CLAUDE_SKILL_DIR}/script.js sync-github \
+                  repo={INIT.github_project.repo} \
+                  story_file={INIT.paths.story_file} \
+                  feature_file={INIT.paths.feature_file} \
+                  owner={INIT.github_project.owner} \
+                  project={INIT.github_project.project_number}
+                ```
+
+                The command handles all cases:
+                - Story/feature has no GitHub issue linked → prints skip message
+                - Update succeeds → prints success message with issue number
+                - Update fails → prints error message with details
+
+                Continue to step 11.
+            </variant>
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 11: COMMIT                                                   -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="commit" order="11">
+
+            **If `commit_docs` is false:** Skip commit.
+
+            Stage all changed/created files:
+            ```bash
+            git add {INIT.paths.story_dir}/
+            git add {INIT.paths.feature_file} .ace/artifacts/product/product-backlog.md
+            ```
+
+            Commit with descriptive message:
+            - CREATE mode: `git commit -m "docs: plan story {Story ID} — {Story Title}"`
+            - REFINE mode: `git commit -m "docs: refine story {Story ID} — {brief summary of changes}"`
+
+            Display completion:
+
+            ```
+            ╔══════════════════════════════════════════════════╗
+            ║  ACE > Story [Planned | Refined]                 ║
+            ║  {Story ID} "{Story Title}"                      ║
+            ╚══════════════════════════════════════════════════╝
+
+              +  Story specification complete. All passes finished.
+
+              Artifacts:
+              ────────
+              Story file:            {INIT.paths.story_file}
+              {External analysis:    {INIT.paths.external_analysis_file} (if created)}
+              Integration analysis:  {INIT.paths.integration_analysis_file}
+
+              Summary:
+              ────────
+              Acceptance criteria: {N} scenarios
+              Size: {estimate}
+              Passes completed: {2-5 count}
+
+              Next > /ace:execute-story story={INIT.paths.story_file}
+                     Execute the story implementation.
+                   > /ace:plan-story story={next story}
+                     Plan the next story in the feature.
+            ```
+        </step>
+
+    </process>
+
+    <success_criteria>
+        - Init function executed (environment detected, story validated or env-only init for new stories)
+        - IS_NEW_STORY correctly determined: true when no story param, story has no ACE structure, or file has no feature reference
+        - Step 2 (backlog-check-placement) executed when IS_NEW_STORY is true:
+          - Product backlog read and features presented for selection
+          - Story title extracted from STORY_CONTENT or asked via AskUserQuestion
+          - Feature placement confirmed (TARGET_FEATURE set)
+          - Story ID assigned as next S[N] in the selected feature
+          - Story ordering within feature confirmed (INSERT_AFTER set)
+          - Dependencies asked and recorded (BLOCKED_BY, BLOCKS)
+          - Story stub file created at correct ACE path with proper header (Feature/Epic/Status/Link)
+          - Feature file updated: story row added to breakdown table, detail section appended, blocking story's Dependencies section updated if applicable
+          - GitHub issue created (if enabled): issue linked as parent of feature issue, file header updated with link, directory and file renamed to #{issue_number}-{slug}
+          - INIT re-run with final story file path; story_valid confirmed true
+        - Step 2 skipped when IS_NEW_STORY is false (story is a proper ACE file with feature reference)
+        - Story seed loaded and parsed (title, description, images validated)
+        - CREATE vs REFINE mode correctly determined
+        - Feature context loaded (parent feature document, if available)
+        - Deep questioning conducted with ZERO-ASSUMPTION mandate
+        - Every acceptance criterion has EXACT trigger, precondition, outcome, data, error handling
+        - No vague terms remain ("it works", "shows error", "updates data" — all must be specific)
+        - All Gherkin scenarios follow Given/When/Then format correctly
+        - Scenarios are independent — no scenario depends on another's state
+        - Minimum coverage: happy path + edge case + error path
+        - Story passes INVEST checklist
+        - Story size is Fibonacci (1, 2, 3, 5, 8) — split if > 8 or > 6-8 scenarios
+        - Story document written following story.xml template exactly (sections 1-8)
+        - User reviewed and approved pass 1 output
+        - Pass 2 (wiki research) dispatched as background agent, wrote to story file
+        - Pass 3 (external analysis) offered/dispatched if external-codebase provided
+        - Library documentation entries injected into Relevant Wiki section after pass 2 (if lib-docs provided)
+        - Pass 4 (integration analysis) dispatched AFTER passes 2-3 complete
+        - Pass 5 (technical solution) dispatched AFTER pass 4 complete
+        - NO TaskOutput called on ANY background agent — context window stays clean
+        - Each background agent wrote output directly to disk (story file or separate artifact)
+        - Story status updated to Refined via ace-tools (story file, feature file, product backlog)
+        - GitHub issue synced (if applicable): updated with full story body and project status
+        - All artifacts committed with descriptive message (story dir + feature file + backlog)
+    </success_criteria>
+
+</workflow>

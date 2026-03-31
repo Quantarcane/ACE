@@ -1,7 +1,6 @@
 {
   "permissions": {
     "allow": [
-      "Bash(node agile-context-engineering/src/ace-tools.js init product-vision:*)",
       "Bash(node:*)",
       "Bash(gh repo view --json nameWithOwner,url)",
       "Bash(gh issue list --repo Quantarcane/qarc --state all --search \"[Epic]\" --limit 100)",

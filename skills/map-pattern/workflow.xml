@@ -1,0 +1,331 @@
+<workflow>
+
+    <purpose>
+        Create or update a pattern document in
+        `.docs/wiki/subsystems/[subsystem-name]/patterns/`.
+
+        A pattern doc describes a reusable structural approach used by 2+ implementations.
+        It is the document an AI agent reads to ensure new code follows established
+        conventions — structure diagram, how it works, how to apply, current implementations.
+
+        This workflow is executed directly — NO sub-agents are spawned.
+        The executing agent does everything: finding implementations, extracting the
+        abstract pattern, and writing the document.
+    </purpose>
+
+    <mandatory-context>
+        Read all files referenced by the invoking command's execution-context before starting.
+        Also read any document or text passed as parameter ($ARGUMENTS) in the invoking command.
+    </mandatory-context>
+
+    <process>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 1: SETUP AND VALIDATE                                        -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="setup" order="1">
+
+            <substep order="1.1" name="display-banner">
+                Display stage banner:
+
+                ```
+                ╔══════════════════════════════════════════════════╗
+                ║  ACE > Map Pattern                                 ║
+                ╚══════════════════════════════════════════════════╝
+                ```
+            </substep>
+
+            <substep order="1.2" name="parse-and-validate">
+                Parse $ARGUMENTS for: `text`, `subsystem`, `story-context`, `commits`.
+
+                **If `text` is missing:** Ask the user:
+                - header: "Pattern"
+                - question: "Describe the pattern to document — what structural approach is reused?\nE.g., 'Template Method pattern used by all drawing paths'"
+
+                **If `subsystem` is missing:** Ask the user:
+                - header: "Pattern"
+                - question: "Which subsystem does this pattern belong to?"
+            </substep>
+
+            <substep order="1.3" name="resolve-subsystem">
+                Resolve the subsystem. Check if `.docs/wiki/subsystems/[subsystem-name]/` exists.
+
+                **If not found:**
+                ```
+                  !  No wiki found for subsystem "[subsystem]".
+                     Run /ace:map-subsystem first to create the subsystem wiki.
+                ```
+                Exit.
+
+                Ensure patterns directory exists:
+                ```bash
+                mkdir -p .docs/wiki/subsystems/[subsystem_name]/patterns
+                ```
+            </substep>
+
+            Display:
+            ```
+              i  Pattern: [text description]
+                 Subsystem: [subsystem-name]
+                 Story context: [path/issue, or "none"]
+                 Commits: [value, or "search codebase directly"]
+            ```
+
+            Continue to step 2.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 2: CHECK FOR EXISTING PATTERN DOC                            -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="check-existing" order="2">
+
+            Scan for existing pattern docs:
+
+            ```
+            Glob(pattern='*.md', path='.docs/wiki/subsystems/[subsystem_name]/patterns')
+            ```
+
+            **If existing pattern docs found:**
+            Read their titles and "The Pattern" sections. Check if any covers the same
+            or overlapping structural approach.
+
+            **If overlap detected:**
+            Use AskUserQuestion:
+            - header: "Pattern"
+            - question: "An existing pattern doc may cover a similar approach:\n\n- `[existing-file]`: [title]\n\nShould I update the existing doc or create a new one?"
+            - options:
+              - "Update existing" — set MODE = update, set TARGET_FILE = existing path
+              - "Create new" — set MODE = create
+
+            **If no overlap or no existing pattern docs:** Set MODE = create.
+
+            **If MODE = create:**
+            Derive file name from pattern name in kebab-case.
+            Set TARGET_FILE = `.docs/wiki/subsystems/[subsystem_name]/patterns/[pattern-name].md`
+
+            Continue to step 3.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 3: GATHER CODE CONTEXT AND FIND IMPLEMENTATIONS              -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="gather-context" order="3">
+
+            <substep order="3.1" name="read-story-context">
+                <variant condition="story-context is a path">
+                    Read all markdown files in the story artifacts folder.
+                    Extract: what pattern was used, what was implemented.
+                </variant>
+
+                <variant condition="story-context is a GitHub issue">
+                    ```bash
+                    gh issue view [issue-number] --json title,body,labels,comments
+                    ```
+                    Extract context about the pattern.
+                </variant>
+
+                <variant condition="no story-context">
+                    Skip — discover pattern from codebase only.
+                </variant>
+            </substep>
+
+            <substep order="3.2" name="find-all-implementations">
+                <variant condition="commits provided as number N">
+                    ```bash
+                    git diff --name-only HEAD~[N]..HEAD
+                    ```
+                    Start with changed files. Read them to identify the pattern.
+                    Then search the full codebase for other implementations of the same pattern.
+                </variant>
+
+                <variant condition="commits provided as SHAs">
+                    ```bash
+                    git diff --name-only [first-sha]^..[last-sha]
+                    ```
+                    Start with changed files. Read them to identify the pattern.
+                    Then search the full codebase for other implementations.
+                </variant>
+
+                <variant condition="no commits — search codebase directly">
+                    Use the `text` description to find the pattern and its implementations:
+
+                    1. Read the subsystem's structure.md and architecture.md for orientation
+                    2. Grep for keywords from the text description (base classes, interfaces, etc.)
+                    3. Find the abstract base/interface that defines the pattern
+                    4. Find ALL concrete implementations (use Grep for extends/implements)
+                    5. Read each implementation to understand the pattern mechanics
+                </variant>
+
+                **A pattern requires 2+ implementations.** If only 1 found, ask the user:
+                - header: "Pattern"
+                - question: "I found only 1 implementation of this pattern. Patterns typically need 2+. Should I continue documenting it as a pattern, or is there another implementation I'm missing?"
+            </substep>
+
+            <substep order="3.3" name="extract-pattern-structure">
+                From the implementations, extract the abstract pattern:
+
+                1. What is the base class / interface contract?
+                2. What factory methods / abstract methods must be overridden?
+                3. What is the template method / orchestration flow?
+                4. What are the extension points?
+                5. What registrations/configurations are required?
+                6. What are the common gotchas across implementations?
+
+                Build a complete mental model of the pattern.
+            </substep>
+
+            Continue to step 4.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 4: WRITE THE PATTERN DOC                                     -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="write-doc" order="4">
+
+            Read ALL existing wiki docs under `.docs/wiki/subsystems/[subsystem_name]/`
+            for cross-referencing.
+
+            Follow the pattern template structure exactly.
+
+            <substep order="4.1" name="write-the-pattern">
+                - Title: "# [Pattern Name]"
+                - The Pattern: ONE paragraph — what it is, when to use it.
+                  Name the GoF/industry pattern if applicable, then explain how it
+                  manifests in THIS codebase. Not a textbook definition.
+            </substep>
+
+            <substep order="4.2" name="write-structure">
+                Build a mermaid classDiagram showing the pattern's structure.
+                Show the abstract/interface hierarchy with key method signatures.
+                Show the pattern skeleton — not every concrete implementation.
+            </substep>
+
+            <substep order="4.3" name="write-how-it-works">
+                Numbered steps tracing the pattern's execution flow.
+                Every step references actual code with `file:ClassName.method`.
+                Focus on mechanics an agent needs to understand.
+            </substep>
+
+            <substep order="4.4" name="write-how-to-apply">
+                The MOST ACTIONABLE section. Steps for creating a new instance:
+                - Which files to create
+                - Which registrations to add
+                - Which factories to update
+                - Reference existing implementations as "copy from" targets
+            </substep>
+
+            <substep order="4.5" name="write-current-implementations">
+                Complete list of ALL known implementations with file paths.
+                Agent uses this as a reference gallery.
+            </substep>
+
+            <substep order="4.6" name="write-gotchas">
+                Timing issues, naming conventions, registration requirements, common mistakes.
+                Anything an agent would get wrong on first attempt.
+            </substep>
+
+            <substep order="4.7" name="write-or-update">
+                **If MODE = create:** Write the complete document to TARGET_FILE.
+                **If MODE = update:** Read the existing doc, add new implementations,
+                update How to Apply if changed, add new gotchas. Write to TARGET_FILE.
+            </substep>
+
+            Continue to step 5.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 5: VERIFY, COMMIT, AND REPORT                               -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="verify-and-report" order="5">
+
+            <substep order="5.1" name="quality-check">
+                Re-read TARGET_FILE and verify:
+
+                <verification-checklist>
+                    <check>50+ lines of substantial content</check>
+                    <check>"The Pattern" section present (ONE paragraph, codebase-specific)</check>
+                    <check>Mermaid classDiagram present showing pattern structure</check>
+                    <check>"How It Works" has numbered steps with code references</check>
+                    <check>"How to Apply" is actionable with concrete steps and "copy from" targets</check>
+                    <check>"Current Implementations" lists ALL known implementations with file paths</check>
+                    <check>At least 2 implementations listed (pattern requires 2+)</check>
+                    <check>"Gotchas" section present</check>
+                    <check>Code references use `file:Symbol` format, not line numbers</check>
+                    <check>No textbook definitions — pattern is codebase-specific</check>
+                    <check>No filler phrases, no generic advice</check>
+                </verification-checklist>
+
+                Fix any failures by editing the document directly.
+            </substep>
+
+            <substep order="5.2" name="security-scan">
+                ```
+                Grep(
+                    pattern="(sk-[a-zA-Z0-9]{20,}|sk_live_|sk_test_|ghp_[a-zA-Z0-9]{36}|AKIA[A-Z0-9]{16}|-----BEGIN.*PRIVATE KEY)",
+                    path="[TARGET_FILE]",
+                    output_mode="content"
+                )
+                ```
+
+                <variant condition="matches found">SECRETS_FOUND — alert user, do NOT commit.</variant>
+                <variant condition="no matches">CLEAN.</variant>
+            </substep>
+
+            <substep order="5.3" name="commit">
+                ```bash
+                git add [TARGET_FILE]
+                git commit -m "docs([subsystem_name]): add pattern — [pattern-name]"
+                ```
+            </substep>
+
+            <substep order="5.4" name="report">
+                Display:
+
+                ```
+                ╔══════════════════════════════════════════════════╗
+                ║  ACE > Map Pattern > Complete                      ║
+                ╚══════════════════════════════════════════════════╝
+
+                  +  [TARGET_FILE] ([line count] lines)
+
+                     Pattern: [text description]
+                     Implementations found: [count]
+                     Gotchas: [count]
+
+                  Next > /clear first for a fresh context window, then:
+
+                         /ace:map-pattern — create another pattern document
+                         /ace:map-guide — create a guide that uses this pattern
+                         /ace:map-sys-doc — document a system that uses this pattern
+                         Review file at [TARGET_FILE]
+                ```
+            </substep>
+
+            End workflow.
+        </step>
+
+    </process>
+
+    <success_criteria>
+        <criterion>Pattern description parsed and subsystem validated</criterion>
+        <criterion>All implementations discovered (from commits or codebase search)</criterion>
+        <criterion>At least 2 implementations found (pattern requires 2+)</criterion>
+        <criterion>Abstract pattern extracted from implementations</criterion>
+        <criterion>Existing pattern docs checked to avoid duplication (create vs update)</criterion>
+        <criterion>Pattern doc follows template structure from pattern.xml</criterion>
+        <criterion>Mermaid classDiagram present showing pattern structure</criterion>
+        <criterion>"How to Apply" is actionable with concrete steps and "copy from" targets</criterion>
+        <criterion>All current implementations listed with file paths</criterion>
+        <criterion>Gotchas section present with practical warnings</criterion>
+        <criterion>Code references use file:Symbol format, no line numbers</criterion>
+        <criterion>No textbook definitions — pattern is codebase-specific</criterion>
+        <criterion>No filler, no generic advice, no pseudocode</criterion>
+        <criterion>Security scan passed, document committed</criterion>
+    </success_criteria>
+
+</workflow>

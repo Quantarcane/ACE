@@ -1,0 +1,336 @@
+<workflow>
+
+    <purpose>
+        Create or update a system document in
+        `.docs/wiki/subsystems/[subsystem-name]/systems/`.
+
+        A system doc describes a coherent domain system — WHAT exists, HOW it works,
+        WHERE things live. It is the primary document an AI agent reads before
+        implementing a related story.
+
+        This workflow is executed directly — NO sub-agents are spawned.
+        The executing agent does everything: finding relevant code, reading it,
+        analyzing components/flows, and writing the document.
+    </purpose>
+
+    <mandatory-context>
+        Read all files referenced by the invoking command's execution-context before starting.
+        Also read any document or text passed as parameter ($ARGUMENTS) in the invoking command.
+    </mandatory-context>
+
+    <process>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 1: SETUP AND VALIDATE                                        -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="setup" order="1">
+
+            <substep order="1.1" name="display-banner">
+                Display stage banner:
+
+                ```
+                ╔══════════════════════════════════════════════════╗
+                ║  ACE > Map System Doc                              ║
+                ╚══════════════════════════════════════════════════╝
+                ```
+            </substep>
+
+            <substep order="1.2" name="parse-and-validate">
+                Parse $ARGUMENTS for: `text`, `subsystem`, `story-context`, `commits`.
+
+                **If `text` is missing:** Ask the user:
+                - header: "System Doc"
+                - question: "Describe the system to document — what domain concern does it address?\nE.g., 'Drawing system - manages all drawing tools on the chart'"
+
+                **If `subsystem` is missing:** Ask the user:
+                - header: "System Doc"
+                - question: "Which subsystem does this system belong to?"
+            </substep>
+
+            <substep order="1.3" name="resolve-subsystem">
+                Resolve the subsystem. Check if `.docs/wiki/subsystems/[subsystem-name]/` exists.
+
+                **If not found:**
+                ```
+                  !  No wiki found for subsystem "[subsystem]".
+                     Run /ace:map-subsystem first to create the subsystem wiki.
+                ```
+                Exit.
+
+                Ensure systems directory exists:
+                ```bash
+                mkdir -p .docs/wiki/subsystems/[subsystem_name]/systems
+                ```
+            </substep>
+
+            Display:
+            ```
+              i  System: [text description]
+                 Subsystem: [subsystem-name]
+                 Story context: [path/issue, or "none"]
+                 Commits: [value, or "search codebase directly"]
+            ```
+
+            Continue to step 2.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 2: CHECK FOR EXISTING SYSTEM DOC                             -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="check-existing" order="2">
+
+            Scan for existing system docs:
+
+            ```
+            Glob(pattern='*.md', path='.docs/wiki/subsystems/[subsystem_name]/systems')
+            ```
+
+            **If existing system docs found:**
+            Read their titles and overview sections. Check if any covers the same
+            or overlapping domain concern.
+
+            **If overlap detected:**
+            Use AskUserQuestion:
+            - header: "System Doc"
+            - question: "An existing system doc may cover a similar concern:\n\n- `[existing-file]`: [title]\n\nShould I update the existing doc or create a new one?"
+            - options:
+              - "Update existing" — set MODE = update, set TARGET_FILE = existing path
+              - "Create new" — set MODE = create
+
+            **If no overlap or no existing docs:** Set MODE = create.
+
+            **If MODE = create:**
+            Derive file name from the system description in kebab-case.
+            Set TARGET_FILE = `.docs/wiki/subsystems/[subsystem_name]/systems/[system-name].md`
+
+            Continue to step 3.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 3: GATHER CODE CONTEXT                                       -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="gather-context" order="3">
+
+            <substep order="3.1" name="read-story-context">
+                <variant condition="story-context is a path">
+                    Read all markdown files in the story artifacts folder.
+                    Extract a brief summary of intent: what was built and why.
+                </variant>
+
+                <variant condition="story-context is a GitHub issue">
+                    ```bash
+                    gh issue view [issue-number] --json title,body,labels,comments
+                    ```
+                    Extract a brief summary of intent from the issue.
+                </variant>
+
+                <variant condition="no story-context">
+                    Skip — rely on code analysis only.
+                </variant>
+            </substep>
+
+            <substep order="3.2" name="collect-relevant-files">
+                <variant condition="commits provided as number N">
+                    ```bash
+                    git diff --name-only HEAD~[N]..HEAD
+                    ```
+                    Filter to files within the subsystem. Read each file.
+                </variant>
+
+                <variant condition="commits provided as SHAs">
+                    ```bash
+                    git diff --name-only [first-sha]^..[last-sha]
+                    ```
+                    Filter to files within the subsystem. Read each file.
+                </variant>
+
+                <variant condition="no commits — search codebase directly">
+                    Use the `text` description to identify the system's files:
+
+                    1. Read the subsystem's structure.md and architecture.md for orientation
+                    2. Grep for keywords from the text description (class names, domain terms)
+                    3. Follow imports/references to find all files belonging to this system
+                    4. Read each discovered file
+
+                    **Be thorough.** A system doc covers an entire domain concern.
+                    Follow class hierarchies, interface implementations, DI registrations,
+                    and cross-references until you have the complete picture.
+                </variant>
+            </substep>
+
+            <substep order="3.3" name="analyze-system">
+                For every source file found, understand:
+
+                - Class hierarchies and interface implementations
+                - Entry points (API endpoints, event handlers, user actions)
+                - Data flow through all layers (trace E2E for sequence diagrams)
+                - State management (Redux, local state, database)
+                - Constants, enums, and configuration
+                - Integration points (imports from other systems, events)
+                - Error handling and propagation
+                - DI registrations, factory/registry entries
+
+                Build a mental model of the complete system.
+            </substep>
+
+            Continue to step 4.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 4: WRITE THE SYSTEM DOC                                      -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="write-doc" order="4">
+
+            Read ALL existing wiki docs under `.docs/wiki/subsystems/[subsystem_name]/`
+            for cross-referencing in the Related Systems section.
+
+            Follow the system template structure exactly.
+
+            <substep order="4.1" name="write-overview-and-file-tree">
+                - Overview: ONE paragraph — what the system DOES, why it exists
+                - File Tree: ALL files belonging to this system with purpose annotations (ASCII only)
+            </substep>
+
+            <substep order="4.2" name="write-system-boundary">
+                Build a mermaid graph diagram showing what is INSIDE vs OUTSIDE this system.
+            </substep>
+
+            <substep order="4.3" name="write-class-hierarchy">
+                Build a mermaid classDiagram for inheritance chains and interface implementations.
+                Include key contracts inline (interfaces/types only).
+                Omit if hierarchy is trivial (1 class, no inheritance).
+            </substep>
+
+            <substep order="4.4" name="write-entry-points">
+                List every "front door" into this system with `file:ClassName.method` references.
+            </substep>
+
+            <substep order="4.5" name="write-data-flow">
+                **MANDATORY — never skip.**
+                Write at least one mermaid sequenceDiagram showing complete E2E data flow.
+                One diagram per key behavior (1-5 behaviors typically).
+                Show COMPLETE flow from entry point through all layers to data store and back.
+            </substep>
+
+            <substep order="4.6" name="write-remaining-sections">
+                Write all remaining applicable sections from the template:
+                - Components (location, purpose, key interface)
+                - Key Behaviors (trigger, logic, effect)
+                - State Management (where, what shape, transitions)
+                - Error Propagation (throw/catch chain)
+                - Constants and Enums (exact file paths — agents must never hardcode)
+                - Related Systems (cross-reference with markdown links)
+                - Integration Points
+                - Configuration and Options
+                - Database (only if applicable)
+                - Gotchas
+
+                Omit sections that genuinely don't apply. NEVER omit Data Flow.
+            </substep>
+
+            <substep order="4.7" name="write-or-update">
+                **If MODE = create:** Write the complete document to TARGET_FILE.
+                **If MODE = update:** Read the existing doc, ADD/expand sections,
+                preserve unchanged content, match existing style, write to TARGET_FILE.
+            </substep>
+
+            Continue to step 5.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 5: VERIFY, COMMIT, AND REPORT                               -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="verify-and-report" order="5">
+
+            <substep order="5.1" name="quality-check">
+                Re-read TARGET_FILE and verify:
+
+                <verification-checklist>
+                    <check>50+ lines of substantial content</check>
+                    <check>Overview present (ONE paragraph)</check>
+                    <check>File Tree present with purpose annotations (ASCII only)</check>
+                    <check>System Boundary mermaid diagram present</check>
+                    <check>At least one mermaid sequenceDiagram in Data Flow section (MANDATORY)</check>
+                    <check>Entry Points listed with file:Symbol references</check>
+                    <check>Components listed with location, purpose, key interface</check>
+                    <check>Constants and Enums locations documented</check>
+                    <check>Code references use `file:Symbol` format, not line numbers</check>
+                    <check>No pseudocode, no fabricated code, no filler phrases</check>
+                    <check>No ASCII arrows for architecture/flows (all mermaid)</check>
+                    <check>Related Systems cross-referenced with markdown links</check>
+                </verification-checklist>
+
+                Fix any failures by editing the document directly.
+            </substep>
+
+            <substep order="5.2" name="security-scan">
+                ```
+                Grep(
+                    pattern="(sk-[a-zA-Z0-9]{20,}|sk_live_|sk_test_|ghp_[a-zA-Z0-9]{36}|AKIA[A-Z0-9]{16}|-----BEGIN.*PRIVATE KEY)",
+                    path="[TARGET_FILE]",
+                    output_mode="content"
+                )
+                ```
+
+                <variant condition="matches found">SECRETS_FOUND — alert user, do NOT commit.</variant>
+                <variant condition="no matches">CLEAN.</variant>
+            </substep>
+
+            <substep order="5.3" name="commit">
+                ```bash
+                git add [TARGET_FILE]
+                git commit -m "docs([subsystem_name]): add system doc — [system-name]"
+                ```
+            </substep>
+
+            <substep order="5.4" name="report">
+                Display:
+
+                ```
+                ╔══════════════════════════════════════════════════╗
+                ║  ACE > Map System Doc > Complete                   ║
+                ╚══════════════════════════════════════════════════╝
+
+                  +  [TARGET_FILE] ([line count] lines)
+
+                     System: [text description]
+                     Sections: [list of sections written]
+                     Sequence diagrams: [count]
+
+                  Next > /clear first for a fresh context window, then:
+
+                         /ace:map-sys-doc — create another system document
+                         /ace:map-pattern — document a pattern used by this system
+                         /ace:map-guide — create a how-to guide for this system
+                         Review file at [TARGET_FILE]
+                ```
+            </substep>
+
+            End workflow.
+        </step>
+
+    </process>
+
+    <success_criteria>
+        <criterion>System description parsed and subsystem validated</criterion>
+        <criterion>Relevant source files discovered (from commits or codebase search)</criterion>
+        <criterion>All source files read and analyzed for components, flows, state, errors</criterion>
+        <criterion>Existing docs checked to avoid duplication (create vs update decision)</criterion>
+        <criterion>System doc follows template structure from system.xml</criterion>
+        <criterion>At least one mermaid sequenceDiagram present (E2E flow mandatory)</criterion>
+        <criterion>System boundary mermaid diagram present</criterion>
+        <criterion>File tree uses ASCII only, no Unicode box-drawing</criterion>
+        <criterion>All diagrams use mermaid, no ASCII arrows for architecture/flows</criterion>
+        <criterion>Code references use file:Symbol format, no line numbers</criterion>
+        <criterion>Constants and enums locations documented</criterion>
+        <criterion>Related systems cross-referenced with markdown links</criterion>
+        <criterion>No filler, no pseudocode, no fabricated code</criterion>
+        <criterion>Security scan passed, document committed</criterion>
+    </success_criteria>
+
+</workflow>

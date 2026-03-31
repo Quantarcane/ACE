@@ -1,5 +1,17 @@
 # ACE Deployment Guide
 
+## Architecture
+
+ACE is distributed as a **Claude Code plugin** via a local marketplace. The installer:
+
+1. Registers the ACE package directory as a local marketplace (`claude plugin marketplace add`)
+2. Installs the `ace` plugin from that marketplace (`claude plugin install ace@ace-marketplace`)
+3. Skills are then available as `/ace:help`, `/ace:plan-story`, etc.
+
+For Crush (OpenCode), files are still copied directly (no plugin system).
+
+---
+
 ## Local Development & Testing
 
 ### Test the installer locally (without npm)
@@ -15,35 +27,61 @@ node bin/install.js --all --global
 node bin/install.js --help
 ```
 
+### Install from npm
+
+```bash
+npx agile-context-engineering --claude --global
+```
+
+Both paths use the same marketplace mechanism for Claude Code.
+
 ### Where files get installed
 
-| Scope | Runtime | Location |
-|-------|---------|----------|
-| Global | Claude Code | `~/.claude/` |
-| Global | Crush (formerly OpenCode) | `~/.opencode/` |
-| Local | Claude Code | `./.claude/` |
-| Local | Crush (formerly OpenCode) | `./.opencode/` |
+**Claude Code (plugin system):**
 
-Each location gets the following structure:
+The installer registers ACE as a local marketplace. Claude Code copies the plugin to its internal cache at `~/.claude/plugins/cache/`. The plugin structure includes:
 
 ```
-commands/ace/                  # Slash commands
-agents/                        # Agent definitions
-agile-context-engineering/     # Reference material
-  templates/                   # Project & artifact templates
+skills/                        # Skill directories (SKILL.md + workflow + templates + script.js)
+shared/                        # Shared libraries and utils
+  lib/                         # ace-core.js, ace-story.js, ace-github.js
   utils/                       # Formatting & utility guides
-  workflows/                   # Workflow definitions
+agents/                        # Agent definitions
+hooks/                         # Plugin hooks (hooks.json + ace-check-update.js + ace-statusline.js)
+.claude-plugin/                # Plugin manifest (plugin.json + marketplace.json)
 ```
+
+Additionally, a statusline wrapper is written to `~/.claude/hooks/ace-statusline-wrapper.js`.
+
+**Crush (legacy copy):**
+
+| Scope | Location |
+|-------|----------|
+| Global | `~/.opencode/` |
+| Local | `./.opencode/` |
 
 ### Remove installed files (clean slate)
 
 ```bash
-# Global installations
-rm -rf ~/.claude/commands/ace* ~/.claude/agents/* ~/.claude/agile-context-engineering
-rm -rf ~/.opencode/commands/ace* ~/.opencode/agents/* ~/.opencode/agile-context-engineering
+# Claude Code: uninstall via plugin system
+claude plugin uninstall ace@ace-marketplace
+claude plugin marketplace remove ace-marketplace
 
-# Local installations (from project root)
-rm -rf .claude .opencode
+# Also clean statusline wrapper
+rm -f ~/.claude/hooks/ace-statusline-wrapper.js
+
+# Crush: remove directly
+rm -rf ~/.opencode/skills ~/.opencode/shared ~/.opencode/agents/ace-* ~/.opencode/.claude-plugin
+```
+
+### After making source code changes
+
+```bash
+# Re-run the installer to update the marketplace + plugin
+node bin/install.js --claude --global
+
+# Then in Claude Code, run:
+# /reload-plugins
 ```
 
 ---
@@ -70,7 +108,7 @@ rm -rf .claude .opencode
 
 ```bash
 # 1. Navigate to project
-cd C:\Users\razva\WebstormProjects\ACE
+cd C:\Coding\repos\ACE
 
 # 2. Update version in package.json
 npm version patch   # 0.1.0 → 0.1.1 (bug fixes)
@@ -84,7 +122,7 @@ npm publish
 ### First-time publish
 
 ```bash
-cd C:\Users\razva\WebstormProjects\ACE
+cd C:\Coding\repos\ACE
 npm publish
 ```
 
@@ -159,9 +197,11 @@ npm unpublish agile-context-engineering@0.1.0 --otp=YOUR_CODE
 
 | Task | Command |
 |------|---------|
-| Test locally | `node bin/install.js` |
+| Test locally | `node bin/install.js --claude --global` |
 | Bump patch version | `npm version patch` |
 | Bump minor version | `npm version minor` |
 | Publish | `npm publish --otp=CODE` |
 | Test from npm | `npx agile-context-engineering@latest` |
 | View published version | `npm view agile-context-engineering version` |
+| Reload after install | `/reload-plugins` (in Claude Code) |
+| Uninstall | `claude plugin uninstall ace@ace-marketplace` |

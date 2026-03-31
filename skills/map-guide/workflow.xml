@@ -1,0 +1,320 @@
+<workflow>
+
+    <purpose>
+        Create or update a guide document in
+        `.docs/wiki/subsystems/[subsystem-name]/guides/`.
+
+        A guide is a step-by-step recipe for a common implementation task. It combines
+        knowledge from multiple systems, patterns, and cross-cutting concerns into one
+        actionable recipe. The document an AI agent follows when performing a recurring
+        task end-to-end.
+
+        This workflow is executed directly — NO sub-agents are spawned.
+        The executing agent does everything: finding reference implementations, reading code,
+        deriving the recipe, and writing the document.
+    </purpose>
+
+    <mandatory-context>
+        Read all files referenced by the invoking command's execution-context before starting.
+        Also read any document or text passed as parameter ($ARGUMENTS) in the invoking command.
+    </mandatory-context>
+
+    <process>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 1: SETUP AND VALIDATE                                        -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="setup" order="1">
+
+            <substep order="1.1" name="display-banner">
+                Display stage banner:
+
+                ```
+                ╔══════════════════════════════════════════════════╗
+                ║  ACE > Map Guide                                   ║
+                ╚══════════════════════════════════════════════════╝
+                ```
+            </substep>
+
+            <substep order="1.2" name="parse-and-validate">
+                Parse $ARGUMENTS for: `text`, `subsystem`, `story-context`, `commits`.
+
+                **If `text` is missing:** Ask the user:
+                - header: "Guide"
+                - question: "Describe the recurring task this guide should teach.\nE.g., 'How to add a new drawing tool' or 'How to add a new CRUD endpoint'"
+
+                **If `subsystem` is missing:** Ask the user:
+                - header: "Guide"
+                - question: "Which subsystem does this guide belong to?"
+            </substep>
+
+            <substep order="1.3" name="resolve-subsystem">
+                Resolve the subsystem. Check if `.docs/wiki/subsystems/[subsystem-name]/` exists.
+
+                **If not found:**
+                ```
+                  !  No wiki found for subsystem "[subsystem]".
+                     Run /ace:map-subsystem first to create the subsystem wiki.
+                ```
+                Exit.
+
+                Ensure guides directory exists:
+                ```bash
+                mkdir -p .docs/wiki/subsystems/[subsystem_name]/guides
+                ```
+            </substep>
+
+            Display:
+            ```
+              i  Guide: [text description]
+                 Subsystem: [subsystem-name]
+                 Story context: [path/issue, or "none"]
+                 Commits: [value, or "search codebase directly"]
+            ```
+
+            Continue to step 2.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 2: CHECK FOR EXISTING GUIDE                                  -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="check-existing" order="2">
+
+            Scan for existing guides:
+
+            ```
+            Glob(pattern='*.md', path='.docs/wiki/subsystems/[subsystem_name]/guides')
+            ```
+
+            **If existing guides found:**
+            Read their titles. Check if any covers the same or overlapping task.
+
+            **If overlap detected:**
+            Use AskUserQuestion:
+            - header: "Guide"
+            - question: "An existing guide may cover a similar task:\n\n- `[existing-file]`: [title]\n\nShould I update the existing guide or create a new one?"
+            - options:
+              - "Update existing" — set MODE = update, set TARGET_FILE = existing path
+              - "Create new" — set MODE = create
+
+            **If no overlap or no existing guides:** Set MODE = create.
+
+            **If MODE = create:**
+            Derive file name from task description in kebab-case (e.g., "how-to-add-drawing-tool.md").
+            Set TARGET_FILE = `.docs/wiki/subsystems/[subsystem_name]/guides/[guide-name].md`
+
+            Continue to step 3.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 3: GATHER CODE CONTEXT AND DERIVE RECIPE                     -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="gather-context" order="3">
+
+            <substep order="3.1" name="read-story-context">
+                <variant condition="story-context is a path">
+                    Read all markdown files in the story artifacts folder.
+                    Extract: what was built, which files were touched, which registrations were added.
+                </variant>
+
+                <variant condition="story-context is a GitHub issue">
+                    ```bash
+                    gh issue view [issue-number] --json title,body,labels,comments
+                    ```
+                    Extract context about the task and implementation.
+                </variant>
+
+                <variant condition="no story-context">
+                    Skip — derive recipe from codebase patterns only.
+                </variant>
+            </substep>
+
+            <substep order="3.2" name="find-reference-implementations">
+                <variant condition="commits provided as number N">
+                    ```bash
+                    git diff --name-only HEAD~[N]..HEAD
+                    ```
+                    Filter to files within the subsystem. These are the most recent example.
+                    Read each file to understand the implementation steps taken.
+                </variant>
+
+                <variant condition="commits provided as SHAs">
+                    ```bash
+                    git diff --name-only [first-sha]^..[last-sha]
+                    ```
+                    Filter to files within the subsystem. Read each file.
+                </variant>
+
+                <variant condition="no commits — search codebase directly">
+                    Use the `text` description to find existing implementations of this task:
+
+                    1. Read the subsystem's structure.md and architecture.md for orientation
+                    2. Read existing system/pattern/cross-cutting docs for this subsystem
+                    3. Grep for keywords related to the task (class names, registrations, etc.)
+                    4. Find 2-3 existing implementations that followed the same recipe
+                    5. Read each implementation to extract the common steps
+                </variant>
+            </substep>
+
+            <substep order="3.3" name="derive-recipe">
+                From the reference implementations, derive the step-by-step recipe:
+
+                1. What files need to be created? In what order?
+                2. What existing files need to be modified (registrations, configurations)?
+                3. What patterns must be followed (from patterns/ docs)?
+                4. What cross-cutting registrations are needed (from cross-cutting/ docs)?
+                5. What is the closest existing implementation to copy from?
+                6. What commonly goes wrong?
+
+                Build an ordered list of steps with "copy from" references.
+            </substep>
+
+            Continue to step 4.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 4: WRITE THE GUIDE                                           -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="write-doc" order="4">
+
+            Read ALL existing wiki docs under `.docs/wiki/subsystems/[subsystem_name]/`
+            for cross-referencing in Prerequisites and linking to patterns/systems.
+
+            Follow the guide template structure exactly.
+
+            <substep order="4.1" name="write-title-and-prerequisites">
+                - Title: "# How to [Task]"
+                - Prerequisites: links to pattern docs, system docs, cross-cutting docs
+                  that an agent should read BEFORE starting
+            </substep>
+
+            <substep order="4.2" name="write-steps">
+                Write NUMBERED, ORDERED steps. Each step must have:
+                - WHAT to do
+                - WHERE to do it (exact file path)
+                - WHAT to copy from (reference implementation)
+                - Key changes from the reference
+
+                Include ALL steps: file creation, registration, configuration, wiring.
+                Don't skip "obvious" steps — agents don't infer implicit requirements.
+            </substep>
+
+            <substep order="4.3" name="write-verification">
+                Write a verification checklist:
+                - Compilation check
+                - Runtime check
+                - Behavioral check
+                Reference specific files or commands.
+            </substep>
+
+            <substep order="4.4" name="write-common-mistakes">
+                List things that commonly go wrong:
+                - WHY each mistake happens
+                - HOW to avoid it
+                Drawn from actual gotchas in pattern/system docs and codebase analysis.
+            </substep>
+
+            <substep order="4.5" name="write-or-update">
+                **If MODE = create:** Write the complete document to TARGET_FILE.
+                **If MODE = update:** Read the existing guide, update steps, add new
+                mistakes, update "copy from" references. Write to TARGET_FILE.
+            </substep>
+
+            Continue to step 5.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 5: VERIFY, COMMIT, AND REPORT                               -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="verify-and-report" order="5">
+
+            <substep order="5.1" name="quality-check">
+                Re-read TARGET_FILE and verify:
+
+                <verification-checklist>
+                    <check>Title follows "# How to [Task]" format</check>
+                    <check>Prerequisites section links to relevant docs</check>
+                    <check>Steps are NUMBERED and ORDERED</check>
+                    <check>Every step has WHAT, WHERE, and WHAT to copy from</check>
+                    <check>All registrations and configurations included (no implicit steps)</check>
+                    <check>Verification checklist present with compilation, runtime, behavioral checks</check>
+                    <check>Common Mistakes section present with WHY and HOW</check>
+                    <check>Code references use `file:Symbol` format, not line numbers</check>
+                    <check>No filler phrases, no generic advice</check>
+                    <check>An agent could follow this guide end-to-end without guessing</check>
+                </verification-checklist>
+
+                Fix any failures by editing the document directly.
+            </substep>
+
+            <substep order="5.2" name="security-scan">
+                ```
+                Grep(
+                    pattern="(sk-[a-zA-Z0-9]{20,}|sk_live_|sk_test_|ghp_[a-zA-Z0-9]{36}|AKIA[A-Z0-9]{16}|-----BEGIN.*PRIVATE KEY)",
+                    path="[TARGET_FILE]",
+                    output_mode="content"
+                )
+                ```
+
+                <variant condition="matches found">SECRETS_FOUND — alert user, do NOT commit.</variant>
+                <variant condition="no matches">CLEAN.</variant>
+            </substep>
+
+            <substep order="5.3" name="commit">
+                ```bash
+                git add [TARGET_FILE]
+                git commit -m "docs([subsystem_name]): add guide — [guide-name]"
+                ```
+            </substep>
+
+            <substep order="5.4" name="report">
+                Display:
+
+                ```
+                ╔══════════════════════════════════════════════════╗
+                ║  ACE > Map Guide > Complete                        ║
+                ╚══════════════════════════════════════════════════╝
+
+                  +  [TARGET_FILE] ([line count] lines)
+
+                     Guide: [text description]
+                     Steps: [step count]
+                     Prerequisites: [count] docs linked
+                     Common Mistakes: [count]
+
+                  Next > /clear first for a fresh context window, then:
+
+                         /ace:map-guide — create another guide
+                         /ace:map-pattern — document a pattern referenced by this guide
+                         /ace:map-sys-doc — document a system referenced by this guide
+                         Review file at [TARGET_FILE]
+                ```
+            </substep>
+
+            End workflow.
+        </step>
+
+    </process>
+
+    <success_criteria>
+        <criterion>Task description parsed and subsystem validated</criterion>
+        <criterion>Reference implementations found (from commits or codebase search)</criterion>
+        <criterion>Recipe derived from actual code — not invented from generic knowledge</criterion>
+        <criterion>Existing guides checked to avoid duplication (create vs update decision)</criterion>
+        <criterion>Guide follows template structure from guide.xml</criterion>
+        <criterion>Prerequisites link to relevant pattern/system/cross-cutting docs</criterion>
+        <criterion>Steps are numbered, ordered, and each has WHAT/WHERE/copy-from</criterion>
+        <criterion>ALL steps included — no implicit requirements</criterion>
+        <criterion>Verification checklist covers compilation, runtime, and behavior</criterion>
+        <criterion>Common Mistakes section includes WHY and HOW for each</criterion>
+        <criterion>Code references use file:Symbol format, no line numbers</criterion>
+        <criterion>No filler, no generic advice, no pseudocode</criterion>
+        <criterion>Security scan passed, document committed</criterion>
+    </success_criteria>
+
+</workflow>

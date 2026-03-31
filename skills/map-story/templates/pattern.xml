@@ -1,0 +1,159 @@
+<pattern>
+    <purpose>
+        Template for `.docs/wiki/subsystems/[subsystem-name]/patterns/<pattern-name>.md` — a reusable
+        implementation pattern within a codebase subsystem. Answers "HOW do I implement something
+        that follows this pattern?"
+
+        Each pattern doc describes a structural template that appears across multiple implementations.
+        It is the document an AI agent reads to ensure new code follows established conventions.
+
+        A "pattern" is a recurring structural approach used by 2+ implementations:
+        e.g., Template Method (Path base class with 5 factory methods), Repository Pattern,
+        Mapper Pattern, Factory/Registry, CQRS Command/Query handlers.
+
+        Complements:
+        - systems/ docs (WHAT exists — the domain subsystems that USE these patterns)
+        - guides/ docs (step-by-step recipes that COMBINE multiple patterns into a task)
+        - cross-cutting/ docs (shared infrastructure that patterns depend on)
+    </purpose>
+
+    <template>
+        <the-pattern>
+            # [Pattern Name]
+
+            ## The Pattern
+            What it is, when to use it. One paragraph max.
+        </the-pattern>
+
+        <structure>
+            ## Structure
+
+            Class/interface diagram showing the pattern's structure.
+
+            ```mermaid
+            classDiagram
+                class IContract {
+                    &lt;&lt;interface&gt;&gt;
+                    +method() ReturnType
+                }
+                class AbstractBase {
+                    &lt;&lt;abstract&gt;&gt;
+                    +templateMethod()
+                    #factoryMethod()* ReturnType
+                }
+                IContract &lt;|.. AbstractBase
+                AbstractBase &lt;|-- ConcreteA
+                AbstractBase &lt;|-- ConcreteB
+            ```
+        </structure>
+
+        <how-it-works>
+            ## How It Works
+
+            Step-by-step of the pattern mechanics. Reference actual code locations.
+
+            1. **Step**: Description at `file:ClassName.method`
+            2. **Step**: Description at `file:ClassName.method`
+            3. **Step**: Description at `file:ClassName.method`
+        </how-it-works>
+
+        <how-to-apply>
+            ## How to Apply
+
+            When implementing something new that uses this pattern:
+
+            1. [First step] (reference: `file:ClassName.method`)
+            2. [Second step]
+            3. [Third step]
+            ...
+        </how-to-apply>
+
+        <current-implementations>
+            ## Current Implementations
+
+            Where this pattern is currently used:
+            - `TrendLine` at `src/infrastructure/primitives/trend-line/TrendLine.ts`
+            - `ParallelChannel` at `src/infrastructure/primitives/parallel-channel/ParallelChannel.ts`
+            - ...
+        </current-implementations>
+
+        <gotchas>
+            ## Gotchas
+
+            Things that commonly go wrong or are easy to forget when applying this pattern.
+            - [Common mistake 1]
+            - [Common mistake 2]
+        </gotchas>
+    </template>
+
+    <guidelines>
+
+        **Documentation Style:**
+        - EXTREMELY SUCCINCT — every word must add value
+        - NO FLUFF — direct, actionable information only
+        - Bullet points over paragraphs
+        - Code references as `file-path:ClassName.methodName` (not line numbers)
+        - Inline snippets ONLY for interface contracts and pattern structure definitions
+        - **ALL visual representations of architecture, dependencies, flows, or relationships MUST be ```mermaid fenced code blocks (use `classDiagram` for structure). NO ASCII arrows (->), NO dependency trees, NO PlantUML. Only mermaid. The ONLY ASCII exception is file trees.**
+
+        **The Pattern:**
+        - ONE paragraph. Name the GoF/industry pattern if applicable, then explain how it
+          manifests in THIS codebase. Not a textbook definition — the codebase-specific version.
+
+        **Structure:**
+        - Mermaid classDiagram showing the abstract/interface hierarchy.
+        - Show the pattern skeleton only — not every concrete implementation.
+        - Include key method signatures that define the contract.
+
+        **How It Works:**
+        - Numbered steps tracing the pattern's execution flow.
+        - Every step references actual code with `file:ClassName.method`.
+        - Focus on the mechanics an agent needs to understand to add a new implementation.
+
+        **How to Apply:**
+        - The MOST ACTIONABLE section. An agent follows these steps to create a new instance.
+        - Reference existing implementations as "copy from" targets.
+        - Include which files to create, which registrations to add, which factories to update.
+
+        **Current Implementations:**
+        - Complete list of all known implementations with file paths.
+        - Agent uses this as a reference gallery — "pick the closest one and copy its structure."
+        - Update when new implementations are added.
+
+        **Gotchas:**
+        - Timing issues, naming conventions, registration requirements, common mistakes.
+        - Anything an agent would get wrong on first attempt without being told.
+
+        **What does NOT belong here:**
+        - System-specific domain logic (that's in systems/ docs)
+        - Step-by-step task recipes that combine multiple patterns (that's in guides/)
+        - Cross-cutting infrastructure details (that's in cross-cutting/)
+        - Story numbers, sprint context, revision history
+        - Testing instructions, performance benchmarks
+
+    </guidelines>
+
+    <evolution>
+
+        This is a LIVING document — updated when the pattern itself evolves.
+
+        **Update triggers:**
+        - New implementation added (update Current Implementations list)
+        - Pattern structure changed (new factory method, new interface method)
+        - How to Apply steps changed (new registration requirement, new file to create)
+        - New gotcha discovered during implementation
+
+        **NOT an update trigger:**
+        - New feature that follows the existing pattern without changing it
+        - Bug fix in one implementation
+        - Internal refactoring that doesn't change the pattern contract
+
+        **Update rules:**
+        - ADD new implementations to the list
+        - UPDATE How to Apply if the recipe changed
+        - ADD new gotchas as they are discovered
+        - Do NOT remove historical gotchas unless they are no longer relevant
+
+    </evolution>
+
+</pattern>

@@ -15,6 +15,10 @@ You are spawned by:
 - `/ace:map-subsystem` — create/refresh a single subsystem's documents
 - `/ace:map-story` — update wiki after a story is implemented
 - `/ace:map-walkthrough` — create deep tutorial-style flow walkthroughs
+- `/ace:map-sys-doc` — create/update a system document (systems/)
+- `/ace:map-guide` — create/update a step-by-step guide (guides/)
+- `/ace:map-pattern` — create/update a pattern document (patterns/)
+- `/ace:map-cross-cutting` — create/update a cross-cutting concern doc (cross-cutting/)
 - Any command that needs wiki documents created or updated
 
 Your output lives in `.docs/wiki/` and is structured as:
@@ -44,7 +48,7 @@ Your output lives in `.docs/wiki/` and is structured as:
             `-- ADR-NNN-[slug].md
 ```
 
-**Templates live in:** `~/.claude/agile-context-engineering/templates/wiki/` — follow their structure, but fill with real codebase data.
+**Templates:** Each skill provides its templates in the Supporting Resources section of the task prompt. Read templates from there — follow their structure, but fill with real codebase data.
 </role>
 
 <prime-directive>
@@ -168,7 +172,7 @@ When spawned, you receive a **focus** parameter that determines which documents 
 
 ### Focus: `system-architecture`
 **Produces:** `.docs/wiki/system-wide/system-architecture.md`
-**Template:** `~/.claude/agile-context-engineering/templates/wiki/system-architecture.xml`
+**Template:** `${CLAUDE_SKILL_DIR}/templates/system-architecture.xml`
 **Analysis:**
 - Identify all subsystems, external integrations, data stores
 - Map communication patterns (sync/async, protocols)
@@ -178,7 +182,7 @@ When spawned, you receive a **focus** parameter that determines which documents 
 
 ### Focus: `system-structure`
 **Produces:** `.docs/wiki/system-wide/system-structure.md`
-**Template:** `~/.claude/agile-context-engineering/templates/wiki/system-structure.xml`
+**Template:** `${CLAUDE_SKILL_DIR}/templates/system-structure.xml`
 **Analysis:**
 - Map directory tree to subsystem boundaries
 - Identify shared code directories (used by 2+ subsystems)
@@ -187,7 +191,7 @@ When spawned, you receive a **focus** parameter that determines which documents 
 
 ### Focus: `subsystem-structure`
 **Produces:** `.docs/wiki/subsystems/[name]/structure.md`
-**Template:** `~/.claude/agile-context-engineering/templates/wiki/subsystem-structure.xml`
+**Template:** `${CLAUDE_SKILL_DIR}/templates/subsystem-structure.xml`
 **Requires:** `subsystem` parameter (path or name)
 **Analysis:**
 - Complete file tree of the subsystem (every file, every directory)
@@ -197,7 +201,7 @@ When spawned, you receive a **focus** parameter that determines which documents 
 
 ### Focus: `system`
 **Produces:** `.docs/wiki/subsystems/[name]/systems/[system-name].md`
-**Template:** `~/.claude/agile-context-engineering/templates/wiki/system.xml`
+**Template:** `${CLAUDE_SKILL_DIR}/templates/system.xml`
 **Requires:** `subsystem` parameter, list of source files belonging to the system
 **Analysis:**
 - File tree of system files with purpose annotations
@@ -210,7 +214,7 @@ When spawned, you receive a **focus** parameter that determines which documents 
 
 ### Focus: `pattern`
 **Produces:** `.docs/wiki/subsystems/[name]/patterns/[pattern-name].md`
-**Template:** `~/.claude/agile-context-engineering/templates/wiki/pattern.xml`
+**Template:** `${CLAUDE_SKILL_DIR}/templates/pattern.xml`
 **Requires:** `subsystem` parameter, pattern identified across 2+ implementations
 **Analysis:**
 - Structure diagram (mermaid classDiagram)
@@ -228,7 +232,7 @@ When spawned, you receive a **focus** parameter that determines which documents 
 
 ### Focus: `guide`
 **Produces:** `.docs/wiki/subsystems/[name]/guides/[task-name].md`
-**Template:** `~/.claude/agile-context-engineering/templates/wiki/guide.xml`
+**Template:** `${CLAUDE_SKILL_DIR}/templates/guide.xml`
 **Requires:** `subsystem` parameter, recurring task identified
 **Analysis:**
 - Prerequisites (docs to read first)
@@ -238,7 +242,7 @@ When spawned, you receive a **focus** parameter that determines which documents 
 
 ### Focus: `walkthrough`
 **Produces:** `.docs/wiki/subsystems/[name]/walkthroughs/[flow-name].md`
-**Template:** `~/.claude/agile-context-engineering/templates/wiki/walkthrough.xml`
+**Template:** `${CLAUDE_SKILL_DIR}/templates/walkthrough.xml`
 **Requires:** `subsystem` parameter, source files involved in the flow
 **Optional:** emphasis-frameworks (list of frameworks requiring deep explanation), framework research context (provided by orchestrator)
 **Analysis:**
@@ -263,7 +267,7 @@ When spawned, you receive a **focus** parameter that determines which documents 
 
 ### Focus: `decision`
 **Produces:** `.docs/wiki/subsystems/[name]/decisions/ADR-NNN-[slug].md`
-**Template:** `~/.claude/agile-context-engineering/templates/wiki/decizions.xml`
+**Template:** `${CLAUDE_SKILL_DIR}/templates/decizions.xml`
 **Requires:** `subsystem` parameter, decision context
 **Analysis:**
 - Context (what prompted the decision)
@@ -274,7 +278,7 @@ When spawned, you receive a **focus** parameter that determines which documents 
 
 ### Focus: `coding-standards`
 **Produces:** `.docs/wiki/system-wide/coding-standards.md`
-**Template:** `~/.claude/agile-context-engineering/templates/wiki/coding-standards.xml`
+**Template:** `${CLAUDE_SKILL_DIR}/templates/coding-standards.xml`
 **Analysis:**
 - Detect language(s) and paradigm(s) (OOP, FP, systems)
 - Read linter/formatter configs for enforced rules
@@ -284,7 +288,7 @@ When spawned, you receive a **focus** parameter that determines which documents 
 
 ### Focus: `testing-framework`
 **Produces:** `.docs/wiki/system-wide/testing-framework.md`
-**Template:** `~/.claude/agile-context-engineering/templates/wiki/testing-framework.xml`
+**Template:** `${CLAUDE_SKILL_DIR}/templates/testing-framework.xml`
 **Analysis:**
 - Identify test runner and assertion library from config/deps
 - Read 3-5 existing test files for structure and patterns
@@ -294,7 +298,7 @@ When spawned, you receive a **focus** parameter that determines which documents 
 
 ### Focus: `tech-debt`
 **Produces:** `.docs/wiki/system-wide/tech-debt.md`
-**Template:** `~/.claude/agile-context-engineering/templates/wiki/tech-debt.xml`
+**Template:** `${CLAUDE_SKILL_DIR}/templates/tech-debt.xml`
 **Analysis:**
 - Grep for TODO, FIXME, HACK, XXX comments
 - Identify deprecated dependencies

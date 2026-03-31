@@ -1,0 +1,18 @@
+{
+  "name": "ace-marketplace",
+  "owner": {
+    "name": "Piticas Razvan",
+    "email": "razvan@quantarcane.com"
+  },
+  "metadata": {
+    "description": "ACE - Agile Context Engineering plugin marketplace",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "ace",
+      "source": "./",
+      "description": "Agile Context Engineering -- spec-driven development for AI coding assistants"
+    }
+  ]
+}

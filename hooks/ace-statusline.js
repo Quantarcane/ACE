@@ -43,7 +43,7 @@ process.stdin.on('end', () => {
       }
     }
 
-    // Current task from todos
+    // Current task from todos (Claude Code internal directory — always ~/.claude/)
     let task = '';
     const homeDir = os.homedir();
     const todosDir = path.join(homeDir, '.claude', 'todos');
@@ -64,16 +64,24 @@ process.stdin.on('end', () => {
       } catch (e) {}
     }
 
-    // ACE update available?
+    // ACE update available? Check plugin data dir first, then legacy location
     let aceUpdate = '';
-    const cacheFile = path.join(homeDir, '.claude', 'cache', 'ace-update-check.json');
-    if (fs.existsSync(cacheFile)) {
-      try {
-        const cache = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
-        if (cache.update_available) {
-          aceUpdate = '\x1b[33m\u2B06 /ace:update\x1b[0m \u2502 ';
-        }
-      } catch (e) {}
+    const pluginData = process.env.CLAUDE_PLUGIN_DATA;
+    const cacheLocations = [
+      pluginData ? path.join(pluginData, 'ace-update-check.json') : null,
+      path.join(homeDir, '.claude', 'cache', 'ace-update-check.json'),
+    ].filter(Boolean);
+
+    for (const cacheFile of cacheLocations) {
+      if (fs.existsSync(cacheFile)) {
+        try {
+          const cache = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
+          if (cache.update_available) {
+            aceUpdate = '\x1b[33m\u2B06 /ace:update\x1b[0m \u2502 ';
+          }
+          break;
+        } catch (e) {}
+      }
     }
 
     // Output

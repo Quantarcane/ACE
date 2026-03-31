@@ -1,0 +1,330 @@
+<workflow>
+
+    <purpose>
+        Create or update a cross-cutting concern document in
+        `.docs/wiki/subsystems/[subsystem-name]/cross-cutting/`.
+
+        A cross-cutting doc describes shared infrastructure or mechanisms that multiple
+        domain systems depend on — DI registration, event systems, factory/registry,
+        serialization, error handling, auth middleware, caching.
+
+        The document an AI agent reads to understand how to register with or plug into
+        shared concerns.
+
+        This workflow is executed directly — NO sub-agents are spawned.
+        The executing agent does everything: finding registration points, tracing
+        usages, and writing the document.
+    </purpose>
+
+    <mandatory-context>
+        Read all files referenced by the invoking command's execution-context before starting.
+        Also read any document or text passed as parameter ($ARGUMENTS) in the invoking command.
+    </mandatory-context>
+
+    <process>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 1: SETUP AND VALIDATE                                        -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="setup" order="1">
+
+            <substep order="1.1" name="display-banner">
+                Display stage banner:
+
+                ```
+                ╔══════════════════════════════════════════════════╗
+                ║  ACE > Map Cross-Cutting                           ║
+                ╚══════════════════════════════════════════════════╝
+                ```
+            </substep>
+
+            <substep order="1.2" name="parse-and-validate">
+                Parse $ARGUMENTS for: `text`, `subsystem`, `story-context`, `commits`.
+
+                **If `text` is missing:** Ask the user:
+                - header: "Cross-Cutting"
+                - question: "Describe the cross-cutting concern to document — what shared infrastructure spans multiple systems?\nE.g., 'Event system used across all drawing components'"
+
+                **If `subsystem` is missing:** Ask the user:
+                - header: "Cross-Cutting"
+                - question: "Which subsystem does this concern belong to?"
+            </substep>
+
+            <substep order="1.3" name="resolve-subsystem">
+                Resolve the subsystem. Check if `.docs/wiki/subsystems/[subsystem-name]/` exists.
+
+                **If not found:**
+                ```
+                  !  No wiki found for subsystem "[subsystem]".
+                     Run /ace:map-subsystem first to create the subsystem wiki.
+                ```
+                Exit.
+
+                Ensure cross-cutting directory exists:
+                ```bash
+                mkdir -p .docs/wiki/subsystems/[subsystem_name]/cross-cutting
+                ```
+            </substep>
+
+            Display:
+            ```
+              i  Concern: [text description]
+                 Subsystem: [subsystem-name]
+                 Story context: [path/issue, or "none"]
+                 Commits: [value, or "search codebase directly"]
+            ```
+
+            Continue to step 2.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 2: CHECK FOR EXISTING CROSS-CUTTING DOC                      -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="check-existing" order="2">
+
+            Scan for existing cross-cutting docs:
+
+            ```
+            Glob(pattern='*.md', path='.docs/wiki/subsystems/[subsystem_name]/cross-cutting')
+            ```
+
+            **If existing cross-cutting docs found:**
+            Read their titles and overview sections. Check if any covers the same
+            or overlapping concern.
+
+            **If overlap detected:**
+            Use AskUserQuestion:
+            - header: "Cross-Cutting"
+            - question: "An existing cross-cutting doc may cover a similar concern:\n\n- `[existing-file]`: [title]\n\nShould I update the existing doc or create a new one?"
+            - options:
+              - "Update existing" — set MODE = update, set TARGET_FILE = existing path
+              - "Create new" — set MODE = create
+
+            **If no overlap or no existing docs:** Set MODE = create.
+
+            **If MODE = create:**
+            Derive file name from concern name in kebab-case.
+            Set TARGET_FILE = `.docs/wiki/subsystems/[subsystem_name]/cross-cutting/[concern-name].md`
+
+            Continue to step 3.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 3: GATHER CODE CONTEXT                                       -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="gather-context" order="3">
+
+            <substep order="3.1" name="read-story-context">
+                <variant condition="story-context is a path">
+                    Read all markdown files in the story artifacts folder.
+                    Extract: what shared infrastructure was built/changed.
+                </variant>
+
+                <variant condition="story-context is a GitHub issue">
+                    ```bash
+                    gh issue view [issue-number] --json title,body,labels,comments
+                    ```
+                    Extract context about the cross-cutting concern.
+                </variant>
+
+                <variant condition="no story-context">
+                    Skip — discover concern from codebase only.
+                </variant>
+            </substep>
+
+            <substep order="3.2" name="find-concern-code">
+                <variant condition="commits provided as number N">
+                    ```bash
+                    git diff --name-only HEAD~[N]..HEAD
+                    ```
+                    Filter to files within the subsystem. Read each file.
+                    Then search for all other usages/registrations of this concern.
+                </variant>
+
+                <variant condition="commits provided as SHAs">
+                    ```bash
+                    git diff --name-only [first-sha]^..[last-sha]
+                    ```
+                    Filter to files within the subsystem. Read each file.
+                    Then search for all other usages/registrations.
+                </variant>
+
+                <variant condition="no commits — search codebase directly">
+                    Use the `text` description to find the cross-cutting concern:
+
+                    1. Read the subsystem's structure.md and architecture.md for orientation
+                    2. Grep for keywords from the text description (event, registry, factory,
+                       container, middleware, etc.)
+                    3. Find the core infrastructure files (the concern itself)
+                    4. Find ALL registration points (where systems plug in)
+                    5. Find ALL usages (how consuming code interacts)
+                    6. Read each file to understand the mechanism
+                </variant>
+            </substep>
+
+            <substep order="3.3" name="analyze-concern">
+                From the code, understand:
+
+                1. **How It Works**: The mechanism/pattern (event dispatch, DI resolution, etc.)
+                2. **Registration / Setup**: WHERE and HOW components register
+                3. **Usage**: How consuming code interacts with this concern
+                4. **Current Registrations**: Complete list of everything registered
+                5. **Integration Points**: Which systems depend on this concern
+                6. **Gotchas**: Registration order, naming conventions, timing issues
+
+                Build a complete mental model of the concern.
+            </substep>
+
+            Continue to step 4.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 4: WRITE THE CROSS-CUTTING DOC                               -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="write-doc" order="4">
+
+            Read ALL existing wiki docs under `.docs/wiki/subsystems/[subsystem_name]/`
+            for cross-referencing in Integration Points.
+
+            Follow the system-cross-cutting template structure exactly.
+
+            <substep order="4.1" name="write-overview">
+                - Title: "# [Cross-Cutting Concern]"
+                - Overview: ONE paragraph — what the concern addresses, why it exists
+            </substep>
+
+            <substep order="4.2" name="write-how-it-works">
+                Numbered steps explaining the mechanism.
+                Reference actual code locations — not theoretical descriptions.
+                If the mechanism has a flow (event dispatching, DI resolution),
+                show a mermaid sequence diagram.
+            </substep>
+
+            <substep order="4.3" name="write-registration">
+                The MOST CRITICAL section for AI agents.
+                List every registration point with exact file paths.
+                Show the registration pattern (inline code only if non-obvious).
+            </substep>
+
+            <substep order="4.4" name="write-usage">
+                How consuming code interacts with this concern.
+                Inline code snippet ONLY if usage pattern is non-obvious.
+                If straightforward (inject via constructor), a one-liner suffices.
+            </substep>
+
+            <substep order="4.5" name="write-current-registrations">
+                Complete list of everything currently registered/using this concern.
+                Agent uses this to verify consistency of new registrations.
+            </substep>
+
+            <substep order="4.6" name="write-integration-and-gotchas">
+                - Integration Points: cross-reference with markdown links to system docs
+                - Gotchas: registration order, naming conventions, initialization timing,
+                  anything that silently fails if done wrong
+            </substep>
+
+            <substep order="4.7" name="write-or-update">
+                **If MODE = create:** Write the complete document to TARGET_FILE.
+                **If MODE = update:** Read the existing doc, add new registrations,
+                update mechanism if changed, add new gotchas. Write to TARGET_FILE.
+            </substep>
+
+            Continue to step 5.
+        </step>
+
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- STEP 5: VERIFY, COMMIT, AND REPORT                               -->
+        <!-- ══════════════════════════════════════════════════════════════════ -->
+
+        <step name="verify-and-report" order="5">
+
+            <substep order="5.1" name="quality-check">
+                Re-read TARGET_FILE and verify:
+
+                <verification-checklist>
+                    <check>50+ lines of substantial content</check>
+                    <check>Overview present (ONE paragraph)</check>
+                    <check>"How It Works" has numbered steps with code references</check>
+                    <check>"Registration / Setup" lists ALL registration points with exact file paths</check>
+                    <check>"Current Registrations" lists ALL known registrations</check>
+                    <check>"Integration Points" cross-references system docs with markdown links</check>
+                    <check>"Gotchas" section present with practical warnings</check>
+                    <check>Code references use `file:Symbol` format, not line numbers</check>
+                    <check>If mechanism has a flow, mermaid diagram present</check>
+                    <check>No filler phrases, no generic advice</check>
+                    <check>No ASCII arrows for flows (all mermaid)</check>
+                </verification-checklist>
+
+                Fix any failures by editing the document directly.
+            </substep>
+
+            <substep order="5.2" name="security-scan">
+                ```
+                Grep(
+                    pattern="(sk-[a-zA-Z0-9]{20,}|sk_live_|sk_test_|ghp_[a-zA-Z0-9]{36}|AKIA[A-Z0-9]{16}|-----BEGIN.*PRIVATE KEY)",
+                    path="[TARGET_FILE]",
+                    output_mode="content"
+                )
+                ```
+
+                <variant condition="matches found">SECRETS_FOUND — alert user, do NOT commit.</variant>
+                <variant condition="no matches">CLEAN.</variant>
+            </substep>
+
+            <substep order="5.3" name="commit">
+                ```bash
+                git add [TARGET_FILE]
+                git commit -m "docs([subsystem_name]): add cross-cutting — [concern-name]"
+                ```
+            </substep>
+
+            <substep order="5.4" name="report">
+                Display:
+
+                ```
+                ╔══════════════════════════════════════════════════╗
+                ║  ACE > Map Cross-Cutting > Complete                ║
+                ╚══════════════════════════════════════════════════╝
+
+                  +  [TARGET_FILE] ([line count] lines)
+
+                     Concern: [text description]
+                     Registrations found: [count]
+                     Integration points: [count]
+                     Gotchas: [count]
+
+                  Next > /clear first for a fresh context window, then:
+
+                         /ace:map-cross-cutting — create another cross-cutting doc
+                         /ace:map-sys-doc — document a system that uses this concern
+                         /ace:map-guide — create a guide with registration steps
+                         Review file at [TARGET_FILE]
+                ```
+            </substep>
+
+            End workflow.
+        </step>
+
+    </process>
+
+    <success_criteria>
+        <criterion>Concern description parsed and subsystem validated</criterion>
+        <criterion>Core infrastructure files discovered (from commits or codebase search)</criterion>
+        <criterion>All registration points found and documented</criterion>
+        <criterion>All current registrations listed</criterion>
+        <criterion>Existing cross-cutting docs checked to avoid duplication (create vs update)</criterion>
+        <criterion>Cross-cutting doc follows template structure from system-cross-cutting.xml</criterion>
+        <criterion>Registration / Setup section lists exact file paths</criterion>
+        <criterion>Integration Points cross-reference system docs with markdown links</criterion>
+        <criterion>Gotchas section present with practical warnings</criterion>
+        <criterion>Code references use file:Symbol format, no line numbers</criterion>
+        <criterion>If mechanism has a flow, mermaid diagram present</criterion>
+        <criterion>No filler, no generic advice, no pseudocode</criterion>
+        <criterion>Security scan passed, document committed</criterion>
+    </success_criteria>
+
+</workflow>
