@@ -8,6 +8,14 @@ model: sonnet
 effort: medium
 ---
 
+## Supporting Resources (auto-loaded)
+
+!`cat "${CLAUDE_SKILL_DIR}/workflow.xml"`
+
+!`cat "${CLAUDE_SKILL_DIR}/../../shared/utils/questioning.xml"`
+
+!`cat "${CLAUDE_SKILL_DIR}/../../shared/utils/ui-formatting.md"`
+
 ```xml
 <command>
 
@@ -37,9 +45,8 @@ effort: medium
     </input>
 
     <execution-context>
-        <help-workflow>workflow.xml</help-workflow>
-        <questioning>${CLAUDE_SKILL_DIR}/../../shared/utils/questioning.xml</questioning>
-        <ui-formatting>${CLAUDE_SKILL_DIR}/../../shared/utils/ui-formatting.md</ui-formatting>
+        <!-- All supporting files are auto-loaded in the Supporting Resources section above.
+             The model does NOT need to Read these files — they are already in context. -->
     </execution-context>
 
     <output>

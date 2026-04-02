@@ -14,6 +14,14 @@ agent: ace-wiki-mapper
 
 !`node "${CLAUDE_SKILL_DIR}/script.js" init "$ARGUMENTS" 2>/dev/null`
 
+## Supporting Resources (auto-loaded)
+
+!`cat "${CLAUDE_SKILL_DIR}/workflow.xml"`
+
+!`cat "${CLAUDE_SKILL_DIR}/story-wiki-template.xml"`
+
+!`cat "${CLAUDE_SKILL_DIR}/../../shared/utils/ui-formatting.md"`
+
 ```xml
 <command>
 
@@ -49,9 +57,8 @@ agent: ace-wiki-mapper
     </input>
 
     <execution-context>
-        <research-story-wiki-workflow>workflow.xml</research-story-wiki-workflow>
-        <story-wiki-template>story-wiki-template.xml</story-wiki-template>
-        <ui-formatting>${CLAUDE_SKILL_DIR}/../../shared/utils/ui-formatting.md</ui-formatting>
+        <!-- All supporting files are auto-loaded in the Supporting Resources section above.
+             The model does NOT need to Read these files — they are already in context. -->
     </execution-context>
 
     <output>

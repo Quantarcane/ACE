@@ -17,6 +17,28 @@ model: opus
 effort: max
 ---
 
+## Supporting Resources (auto-loaded)
+
+!`cat "${CLAUDE_SKILL_DIR}/workflow.xml"`
+
+!`cat "${CLAUDE_SKILL_DIR}/templates/system.xml"`
+
+!`cat "${CLAUDE_SKILL_DIR}/templates/system-cross-cutting.xml"`
+
+!`cat "${CLAUDE_SKILL_DIR}/templates/pattern.xml"`
+
+!`cat "${CLAUDE_SKILL_DIR}/templates/guide.xml"`
+
+!`cat "${CLAUDE_SKILL_DIR}/templates/walkthrough.xml"`
+
+!`cat "${CLAUDE_SKILL_DIR}/templates/decizions.xml"`
+
+!`cat "${CLAUDE_SKILL_DIR}/templates/tech-debt-index.xml"`
+
+!`cat "${CLAUDE_SKILL_DIR}/../../shared/utils/questioning.xml"`
+
+!`cat "${CLAUDE_SKILL_DIR}/../../shared/utils/ui-formatting.md"`
+
 ```xml
 <command>
 
@@ -109,18 +131,8 @@ effort: max
     </input>
 
     <execution-context>
-        <map-story-workflow>workflow.xml</map-story-workflow>
-
-        <system>system.xml</system>
-        <system-cross-cutting>system-cross-cutting.xml</system-cross-cutting>
-        <pattern>pattern.xml</pattern>
-        <guide>guide.xml</guide>
-        <walkthrough>walkthrough-template.xml</walkthrough>
-        <decizions>decizions.xml</decizions>
-        <tech-debt-index>tech-debt-index.xml</tech-debt-index>
-
-        <questioning>${CLAUDE_SKILL_DIR}/../../shared/utils/questioning.xml</questioning>
-        <ui-formatting>${CLAUDE_SKILL_DIR}/../../shared/utils/ui-formatting.md</ui-formatting>
+        <!-- All supporting files are auto-loaded in the Supporting Resources section above.
+             The model does NOT need to Read these files — they are already in context. -->
     </execution-context>
 
     <output>

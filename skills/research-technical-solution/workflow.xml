@@ -20,7 +20,7 @@
     </purpose>
 
     <mandatory-context>
-        Read all files referenced by the invoking command's execution-context before starting.
+        All supporting resource files are auto-loaded in the skill prompt above. Do NOT re-read them.
         Also read any document or text passed as parameter ($ARGUMENTS) in the invoking command.
     </mandatory-context>
 

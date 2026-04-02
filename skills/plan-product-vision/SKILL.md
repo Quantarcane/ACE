@@ -12,6 +12,16 @@ effort: high
 
 !`node "${CLAUDE_SKILL_DIR}/script.js" init "$ARGUMENTS" 2>/dev/null`
 
+## Supporting Resources (auto-loaded)
+
+!`cat "${CLAUDE_SKILL_DIR}/workflow.xml"`
+
+!`cat "${CLAUDE_SKILL_DIR}/product-vision-template.xml"`
+
+!`cat "${CLAUDE_SKILL_DIR}/../../shared/utils/questioning.xml"`
+
+!`cat "${CLAUDE_SKILL_DIR}/../../shared/utils/ui-formatting.md"`
+
 ```xml
 <command>
 
@@ -47,10 +57,8 @@ effort: high
     </input>
 
     <execution-context>
-        <plan-product-vision-workflow>workflow.xml</plan-product-vision-workflow>
-        <product-vision-template>product-vision-template.xml</product-vision-template>
-        <questioning>${CLAUDE_SKILL_DIR}/../../shared/utils/questioning.xml</questioning>
-        <ui-formatting>${CLAUDE_SKILL_DIR}/../../shared/utils/ui-formatting.md</ui-formatting>
+        <!-- All supporting files are auto-loaded in the Supporting Resources section above.
+             The model does NOT need to Read these files — they are already in context. -->
     </execution-context>
 
     <output>

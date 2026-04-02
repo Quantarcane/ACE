@@ -17,6 +17,16 @@ context: fork
 agent: ace-wiki-mapper
 ---
 
+## Supporting Resources (auto-loaded)
+
+!`cat "${CLAUDE_SKILL_DIR}/workflow.xml"`
+
+!`cat "${CLAUDE_SKILL_DIR}/system.xml"`
+
+!`cat "${CLAUDE_SKILL_DIR}/../../shared/utils/questioning.xml"`
+
+!`cat "${CLAUDE_SKILL_DIR}/../../shared/utils/ui-formatting.md"`
+
 ```xml
 <command>
 
@@ -74,10 +84,8 @@ agent: ace-wiki-mapper
     </input>
 
     <execution-context>
-        <map-sys-doc-workflow>workflow.xml</map-sys-doc-workflow>
-        <system-template>system.xml</system-template>
-        <questioning>${CLAUDE_SKILL_DIR}/../../shared/utils/questioning.xml</questioning>
-        <ui-formatting>${CLAUDE_SKILL_DIR}/../../shared/utils/ui-formatting.md</ui-formatting>
+        <!-- All supporting files are auto-loaded in the Supporting Resources section above.
+             The model does NOT need to Read these files — they are already in context. -->
     </execution-context>
 
     <output>

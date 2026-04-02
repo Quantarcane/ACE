@@ -8,7 +8,7 @@
     </purpose>
 
     <mandatory-context>
-        Read all files referenced by the invoking prompt's execution-context before starting.
+        All supporting resource files are auto-loaded in the skill prompt above. Do NOT re-read them.
     </mandatory-context>
 
     <process>

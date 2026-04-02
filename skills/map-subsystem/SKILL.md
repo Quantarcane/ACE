@@ -12,6 +12,32 @@ effort: max
 
 !`node "${CLAUDE_SKILL_DIR}/script.js" init "$ARGUMENTS" 2>/dev/null`
 
+## Supporting Resources (auto-loaded)
+
+!`cat "${CLAUDE_SKILL_DIR}/workflow.xml"`
+
+!`cat "${CLAUDE_SKILL_DIR}/templates/subsystem-structure.xml"`
+
+!`cat "${CLAUDE_SKILL_DIR}/templates/subsystem-architecture.xml"`
+
+!`cat "${CLAUDE_SKILL_DIR}/templates/module-discovery.xml"`
+
+!`cat "${CLAUDE_SKILL_DIR}/templates/system.xml"`
+
+!`cat "${CLAUDE_SKILL_DIR}/templates/system-cross-cutting.xml"`
+
+!`cat "${CLAUDE_SKILL_DIR}/templates/pattern.xml"`
+
+!`cat "${CLAUDE_SKILL_DIR}/templates/guide.xml"`
+
+!`cat "${CLAUDE_SKILL_DIR}/templates/walkthrough.xml"`
+
+!`cat "${CLAUDE_SKILL_DIR}/templates/decizions.xml"`
+
+!`cat "${CLAUDE_SKILL_DIR}/../../shared/utils/questioning.xml"`
+
+!`cat "${CLAUDE_SKILL_DIR}/../../shared/utils/ui-formatting.md"`
+
 ```xml
 <command>
 
@@ -56,19 +82,8 @@ effort: max
     </input>
 
     <execution-context>
-        <map-subsystem-workflow>workflow.xml</map-subsystem-workflow>
-        <subsystem-structure-template>subsystem-structure.xml</subsystem-structure-template>
-        <subsystem-architecture-template>subsystem-architecture.xml</subsystem-architecture-template>
-        <module-discovery-template>module-discovery.xml</module-discovery-template>
-        <map-story-workflow>workflow.xml</map-story-workflow>
-        <system-template>system.xml</system-template>
-        <pattern-template>pattern.xml</pattern-template>
-        <cross-cutting-template>system-cross-cutting.xml</cross-cutting-template>
-        <guide-template>guide.xml</guide-template>
-        <walkthrough-template>walkthrough-template.xml</walkthrough-template>
-        <decisions-template>decizions.xml</decisions-template>
-        <questioning>${CLAUDE_SKILL_DIR}/../../shared/utils/questioning.xml</questioning>
-        <ui-formatting>${CLAUDE_SKILL_DIR}/../../shared/utils/ui-formatting.md</ui-formatting>
+        <!-- All supporting files are auto-loaded in the Supporting Resources section above.
+             The model does NOT need to Read these files — they are already in context. -->
     </execution-context>
 
     <output>

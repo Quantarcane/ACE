@@ -25,8 +25,8 @@
     </purpose>
 
     <mandatory-context>
-        The orchestrator reads ONLY this workflow — it stays lightweight.
-        Each sub-agent reads the five document templates itself before writing.
+        All supporting resource files are auto-loaded in the skill prompt above. Do NOT re-read them.
+        Each sub-agent reads the document templates itself before writing.
         Also read any parameters passed as $ARGUMENTS in the invoking command.
     </mandatory-context>
 
