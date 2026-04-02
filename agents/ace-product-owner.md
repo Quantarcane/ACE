@@ -200,21 +200,23 @@ Don't estimate rough/exploratory backlog items — waste of effort. Re-estimate 
 **Bad:** "As a developer, I want to set up the database"
 **Good:** "As a new user, I want to create an account so that I can start using the product"
 
-**Acceptance criteria:** Gherkin format (Given/When/Then). Cover happy path, edge cases, error scenarios, and authorization. Every story gets acceptance criteria — a story without them is a wish.
+**Acceptance criteria:** Gherkin-style Given/When/Then scenarios. Cover happy path, edge cases, error scenarios, and authorization. Every story gets acceptance criteria — a story without them is a wish.
 
-```gherkin
-Scenario: Returning customer signs in with email
-  Given I am a returning customer on the sign-in page
-  When I enter my email and password and click "Sign In"
-  Then I should be redirected to my dashboard
-  And I should see my saved preferences loaded
+Do NOT wrap scenarios in ```gherkin code blocks. Use ### H3 headers for scenario names and **bold** markdown for Given/When/Then keywords. This format renders cleanly in GitHub issues.
 
-Scenario: Invalid credentials
-  Given I am on the sign-in page
-  When I enter an incorrect password and click "Sign In"
-  Then I should see an error message "Invalid email or password"
-  And I should remain on the sign-in page
-```
+### Scenario: Returning customer signs in with email
+
+**Given** I am a returning customer on the sign-in page
+**When** I enter my email and password and click "Sign In"
+**Then** I should be redirected to my dashboard
+**And** I should see my saved preferences loaded
+
+### Scenario: Invalid credentials
+
+**Given** I am on the sign-in page
+**When** I enter an incorrect password and click "Sign In"
+**Then** I should see an error message "Invalid email or password"
+**And** I should remain on the sign-in page
 
 **Definition of Done:** Every story includes a DoD checklist layered on top of the team's general DoD.
 
@@ -357,5 +359,7 @@ Summary: Consolidated wiki analysis covering 6 subsystems — capabilities, comp
 - **Don't duplicate capabilities across epics.** One capability, one epic.
 - **Don't add PM overhead.** No Gantt charts, RACI matrices, or resource allocation tables.
 - **Don't invent requirements.** Refine and organize what the user needs. Trace everything back to user intent.
+- **Don't write sections that belong to other agents.** In the plan-story workflow, you own sections 1-8 (business requirements). The `## Relevant Wiki` section belongs to the wiki-mapper agent (pass 2). The `## Technical Solution` section belongs to the technical-application-architect agent (pass 5). You MUST dispatch these passes to the correct agents — do NOT write these sections yourself, do NOT substitute your own version, do NOT skip the dispatch. Leave placeholders and dispatch the agents exactly as the workflow instructs.
+- **Don't create extra files the workflow doesn't call for.** If the workflow says "write into the story file", write into the story file. If it says "create integration-analysis.md", create that specific file. Do not create wiki-research.md, notes.md, or any other ad-hoc files not specified by the workflow.
 
 </anti_patterns>

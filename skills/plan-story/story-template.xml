@@ -125,7 +125,11 @@
 
                  Minimum coverage: happy path + at least one edge case + at least one error path.
                  Each scenario must be independent — no scenario depends on another's state.
-                 If more than 6-8 scenarios are needed, the story is likely too large — split it. --&gt;
+                 If more than 6-8 scenarios are needed, the story is likely too large — split it.
+
+                 FORMAT: Use ### H3 headers for scenario names and **bold** for Given/When/Then.
+                 Do NOT wrap scenarios in fenced code blocks (no ```gherkin).
+                 This format renders cleanly in both markdown files and GitHub issue bodies. --&gt;
 
             ### Scenario: [Short descriptive name]
 
@@ -322,6 +326,9 @@
 
             Bad: "Given the user clicks login" (action, not state)
             Good: "Given the user is on the login page"
+
+            **Formatting**: Use `### Scenario:` H3 headers and `**Given**`/`**When**`/`**Then**` bold markdown.
+            Do NOT use fenced code blocks (no ```gherkin). The markdown format renders in GitHub issues.
         </guideline>
 
         <guideline name="story-sizing">

@@ -808,6 +808,13 @@
 
         <step name="dispatch-research" order="8">
 
+            **YOU (the product owner) DO NOT WRITE passes 2-5 yourself.**
+            Your job in this step is ONLY to dispatch background agents and wait for them.
+            You MUST NOT write the `## Relevant Wiki` section — the wiki-mapper agent does that.
+            You MUST NOT write the `## Technical Solution` section — the technical-architect agent does that.
+            You MUST NOT create any files not specified below (no wiki-research.md, no notes.md).
+            If you skip a dispatch or write these sections yourself, the workflow has FAILED.
+
             Display:
             ```
             ┌──────────────────────────────────────────────────┐
@@ -1130,6 +1137,15 @@
             ```
               +  Pass 5 complete. Technical solution appended to story file.
             ```
+
+            <!-- ── 8i: Verification — confirm all passes ran ────────────── -->
+
+            Read the story file and verify it contains BOTH:
+            1. A `## Relevant Wiki` section with actual wiki references (not just a placeholder)
+            2. A `## Technical Solution` section with actual technical design (not just a placeholder or reference to another file)
+
+            If either section is missing or still a placeholder, the pass dispatch FAILED.
+            Display an error and re-dispatch the missing pass(es).
         </step>
 
         <!-- ══════════════════════════════════════════════════════════════════ -->
