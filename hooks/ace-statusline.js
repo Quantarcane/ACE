@@ -5,6 +5,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { execSync } = require('child_process');
 
 // Read JSON from stdin
 let input = '';
@@ -84,12 +85,21 @@ process.stdin.on('end', () => {
       }
     }
 
+    // Git branch
+    let branch = '';
+    try {
+      const raw = execSync('git rev-parse --abbrev-ref HEAD', { cwd: dir, encoding: 'utf8', timeout: 2000, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true }).trim();
+      if (raw && raw !== 'HEAD') {
+        branch = ` \x1b[36m\u2387 ${raw}\x1b[0m`;
+      }
+    } catch {}
+
     // Output
     const dirname = path.basename(dir);
     if (task) {
-      process.stdout.write(`${aceUpdate}\x1b[2m${model}\x1b[0m \u2502 \x1b[1m${task}\x1b[0m \u2502 \x1b[2m${dirname}\x1b[0m${ctx}`);
+      process.stdout.write(`${aceUpdate}\x1b[2m${model}\x1b[0m \u2502 \x1b[1m${task}\x1b[0m \u2502 \x1b[2m${dirname}\x1b[0m${branch}${ctx}`);
     } else {
-      process.stdout.write(`${aceUpdate}\x1b[2m${model}\x1b[0m \u2502 \x1b[2m${dirname}\x1b[0m${ctx}`);
+      process.stdout.write(`${aceUpdate}\x1b[2m${model}\x1b[0m \u2502 \x1b[2m${dirname}\x1b[0m${branch}${ctx}`);
     }
   } catch (e) {
     // Silent fail - don't break statusline on parse errors
