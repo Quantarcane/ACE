@@ -10,7 +10,7 @@ effort: high
 
 ## Environment Context (preprocessed)
 
-!`node "${CLAUDE_SKILL_DIR}/script.js" init "$ARGUMENTS" 2>/dev/null`
+!`node "${CLAUDE_SKILL_DIR}/script.js" init 2>/dev/null`
 
 ## Supporting Resources (auto-loaded)
 

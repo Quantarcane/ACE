@@ -2,7 +2,7 @@
 name: map-sys-doc
 description: Create or update a system document in .docs/wiki/subsystems/[name]/systems/ — describes WHAT exists, HOW it works, WHERE things live
 argument-hint: "text='Drawing system - manages all drawing tools on chart' subsystem='qarc-charts-v2' commits=3"
-disable-model-invocation: true
+disable-model-invocation: false
 allowed-tools:
   - Read
   - Bash

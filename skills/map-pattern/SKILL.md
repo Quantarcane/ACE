@@ -2,7 +2,7 @@
 name: map-pattern
 description: Create or update a pattern document in .docs/wiki/subsystems/[name]/patterns/ — reusable implementation patterns
 argument-hint: "text='Template Method pattern used by all drawing paths' subsystem='qarc-charts-v2' commits=3"
-disable-model-invocation: true
+disable-model-invocation: false
 allowed-tools:
   - Read
   - Bash

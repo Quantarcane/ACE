@@ -556,6 +556,8 @@
                     - Follow the plan step by step — do NOT skip steps or reorder
                     - After each significant step: run build check + test check
                     - NO commits — all changes stay as working tree changes
+                    - NEVER use node -e with Windows backslash paths in bash — backslashes
+                      get eaten as escape characters. Use the Read tool to read files.
                     - Auto-fix bugs, missing critical code, and blocking issues (Rules 1-3)
                     - For architectural changes beyond story scope (Rule 4): STOP and include
                       in your return report — main will ask the user

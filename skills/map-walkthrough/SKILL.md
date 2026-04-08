@@ -2,7 +2,7 @@
 name: map-walkthrough
 description: Create deep tutorial-style flow walkthroughs in .docs/wiki/subsystems/[name]/walkthroughs/
 argument-hint: "flow='tick data from bybit websocket to timescaledb' subsystem='data-ingestion' emphasis-frameworks='SignalR,Redis Streams'"
-disable-model-invocation: true
+disable-model-invocation: false
 allowed-tools:
   - Read
   - Bash

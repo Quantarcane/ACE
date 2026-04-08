@@ -2,7 +2,7 @@
 name: map-cross-cutting
 description: Create or update a cross-cutting concern doc in .docs/wiki/subsystems/[name]/cross-cutting/ — shared infrastructure spanning multiple systems
 argument-hint: "text='Event system used across all drawing components' subsystem='qarc-charts-v2' commits=3"
-disable-model-invocation: true
+disable-model-invocation: false
 allowed-tools:
   - Read
   - Bash
