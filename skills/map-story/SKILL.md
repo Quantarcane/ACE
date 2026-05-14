@@ -15,6 +15,8 @@ allowed-tools:
   - Agent
 model: opus
 effort: max
+context: fork
+agent: ace-wiki-mapper
 ---
 
 ## Supporting Resources (auto-loaded)

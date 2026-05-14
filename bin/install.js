@@ -52,10 +52,13 @@ const CODEX_AGENT_SANDBOX = {
   'ace-code-reviewer': 'read-only',
   'ace-code-discovery-analyst': 'read-only',
   'ace-code-integration-analyst': 'read-only',
+  'code-discovery-analyst': 'read-only',
+  'code-integration-analyst': 'read-only',
   'ace-project-researcher': 'read-only',
   'ace-research-synthesizer': 'workspace-write',
   'ace-product-owner': 'workspace-write',
   'ace-technical-application-architect': 'workspace-write',
+  'technical-application-architect': 'workspace-write',
   'ace-wiki-mapper': 'workspace-write',
 };
 
@@ -268,8 +271,15 @@ function transformCodexSkillContent(content, skillName, skillDir) {
   return transformed;
 }
 
-function codexSkillAdapter(skillName, skillDir) {
+function codexSkillAdapter(skillName, skillDir, sourceContent = '') {
   const posixSkillDir = toPosixPath(skillDir);
+  const declaredAgent = (sourceContent.match(/^agent:\s*([^\r\n]+)/m)?.[1] || '').trim();
+  const agentExecutionContract = declaredAgent ? `
+## Codex Agent Execution Context
+- This skill declares \`agent: ${declaredAgent}\`. When invoked from a parent/orchestrator session and \`spawn_agent\` is available, run this skill by spawning \`spawn_agent(agent_type="${declaredAgent}", message="Execute $ace-${skillName} with the provided arguments by reading ${posixSkillDir}/SKILL.md and its supporting resources. Do not spawn another agent just to satisfy the frontmatter agent field.")\`.
+- If this skill is already running inside \`${declaredAgent}\`, execute the workflow inline and write the required artifacts directly.
+- If this skill is running inside a delegated Codex pass agent where \`spawn_agent\` is not exposed, execute inline instead of failing solely because nested delegation is unavailable.
+` : '';
   const planStorySubagentContract = skillName === 'plan-story' ? `
 ## ACE Plan Story Subagent Contract
 - Invocation of \`$ace-plan-story\` is an explicit user request to run the full ACE story-planning orchestration, including the Phase 2 research subagents.
@@ -291,14 +301,48 @@ function codexSkillAdapter(skillName, skillDir) {
 - Claude's \`!\` resource expansion does not run in Codex. Before following the workflow, manually read the supporting files referenced near the top of this SKILL.md.
 - When a workflow says \`AskUserQuestion\`, use Codex \`request_user_input\` if available; otherwise ask the user directly and continue with a reasonable default only when the choice is low risk.
 - Invocation of \`$ace-${skillName}\` is an explicit user request to run this ACE skill's full workflow.
-- When a workflow says \`Agent(...)\` or \`Task(...)\` and Codex exposes \`spawn_agent\` in the current session, call \`spawn_agent(...)\` for that pass. Map \`subagent_type="X"\` to \`agent_type="X"\`; if no subagent type is provided, use \`agent_type="default"\`.
+- When a workflow says \`Agent(...)\`, \`Task(...)\`, or a task block with \`subagent_type\`, and Codex exposes \`spawn_agent\` in the current session, call \`spawn_agent(...)\` for that pass.
+- Map Claude subagent names to Codex agent types as follows: \`general-purpose\` -> \`default\`, \`Explore\` or \`explore\` -> \`explorer\`, \`ace-code-discovery-analyst\` -> \`code-discovery-analyst\`, \`ace-code-integration-analyst\` -> \`code-integration-analyst\`, \`ace-technical-application-architect\` -> \`technical-application-architect\`. Other \`ace-*\` agent names that exist in Codex remain unchanged.
+- If the workflow marks an agent as \`run_in_background=true\`, save the returned \`spawn_agent\` id and use \`wait_agent\` when the workflow needs completion. Codex has no \`TaskGet\` or \`TaskOutput\`.
 - Codex delegated pass agents may not expose \`spawn_agent\`. If this skill is already running inside the agent that owns the artifact, execute the workflow inline instead of failing solely because nested delegation is unavailable.
 - A skill frontmatter \`agent:\` field or a process line like "For this command use the X agent" identifies the preferred execution context. It is not a nested delegation requirement when the skill is already executing inside that pass agent.
 - Prefer commands that use the absolute skill path above. It keeps Windows and Linux shells from depending on a runtime-specific skill directory environment variable.
+${agentExecutionContract}
 ${planStorySubagentContract}
 </codex_skill_adapter>
 
 `;
+}
+
+const CODEX_STRIPPED_SKILL_FIELDS = new Set([
+  'allowed-tools',
+  'argument-hint',
+  'disable-model-invocation',
+  'model',
+  'effort',
+]);
+
+function filterCodexSkillFrontmatter(body) {
+  const filtered = [];
+  let skippingStrippedBlock = false;
+
+  for (const line of body.split(/\r?\n/)) {
+    const keyMatch = line.match(/^([A-Za-z0-9_-]+):/);
+    if (keyMatch) {
+      skippingStrippedBlock = CODEX_STRIPPED_SKILL_FIELDS.has(keyMatch[1]);
+      if (!skippingStrippedBlock) filtered.push(line);
+      continue;
+    }
+
+    if (skippingStrippedBlock && (/^\s/.test(line) || line.trim() === '')) {
+      continue;
+    }
+
+    skippingStrippedBlock = false;
+    filtered.push(line);
+  }
+
+  return filtered;
 }
 
 function copySkillsForCodex(srcSkills, destSkills) {
@@ -339,10 +383,7 @@ function copyCodexSkillDir(src, dest, skillName) {
       content = transformCodexSkillContent(content, skillName, dest);
       if (entry.name === 'SKILL.md') {
         content = content.replace(/^---\r?\n([\s\S]*?)\r?\n---\r?\n/, (match, body) => {
-          const lines = body.split(/\r?\n/);
-          const filtered = lines.filter(line =>
-            !/^(allowed-tools|argument-hint|disable-model-invocation|model|effort):/.test(line.trim())
-          );
+          const filtered = filterCodexSkillFrontmatter(body);
           const nameIndex = filtered.findIndex(line => /^name:/.test(line));
           if (nameIndex >= 0) {
             filtered[nameIndex] = `name: ace-${skillName}`;
@@ -351,7 +392,7 @@ function copyCodexSkillDir(src, dest, skillName) {
           }
           return `---\n${filtered.join('\n')}\n---\n\n`;
         });
-        content = content.replace(/^(---\r?\n[\s\S]*?\r?\n---\r?\n)/, `$1\n${codexSkillAdapter(skillName, dest)}`);
+        content = content.replace(/^(---\r?\n[\s\S]*?\r?\n---\r?\n)/, `$1\n${codexSkillAdapter(skillName, dest, fs.readFileSync(srcPath, 'utf-8'))}`);
       }
       fs.writeFileSync(destPath, content, 'utf-8');
     } else {
