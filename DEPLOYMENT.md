@@ -2,13 +2,13 @@
 
 ## Architecture
 
-ACE is distributed as a **Claude Code plugin** via a local marketplace. The installer:
+ACE is distributed as a **Claude Code plugin** via a local marketplace, and as native skills for Codex and Crush. The Claude installer:
 
 1. Registers the ACE package directory as a local marketplace (`claude plugin marketplace add`)
 2. Installs the `ace` plugin from that marketplace (`claude plugin install ace@ace-marketplace`)
 3. Skills are then available as `/ace:help`, `/ace:plan-story`, etc.
 
-For Crush (OpenCode), files are still copied directly (no plugin system).
+For Codex and Crush (OpenCode), files are copied directly into the runtime config directory.
 
 ---
 
@@ -23,6 +23,8 @@ node bin/install.js
 # With flags
 node bin/install.js --claude --local
 node bin/install.js --claude --global
+node bin/install.js --codex --local
+node bin/install.js --codex --global
 node bin/install.js --all --global
 node bin/install.js --help
 ```
@@ -60,6 +62,22 @@ Additionally, a statusline wrapper is written to `~/.claude/hooks/ace-statusline
 | Global | `~/.opencode/` |
 | Local | `./.opencode/` |
 
+**Codex (native skills):**
+
+| Scope | Location |
+|-------|----------|
+| Global | `~/.codex/` or `$CODEX_HOME` |
+| Local | `./.codex/` |
+
+Codex gets:
+
+```
+skills/ace-*/                  # Codex skills, invoked as $ace-help, $ace-plan-story, etc.
+shared/                        # Shared ACE libraries and utils
+agents/ace-*.toml              # Codex agent configs
+config.toml                    # Managed [agents.ace-*] block appended/updated by installer
+```
+
 ### Remove installed files (clean slate)
 
 ```bash
@@ -69,6 +87,10 @@ claude plugin marketplace remove ace-marketplace
 
 # Also clean statusline wrapper
 rm -f ~/.claude/hooks/ace-statusline-wrapper.js
+
+# Codex: remove direct install files
+rm -rf ~/.codex/skills/ace-* ~/.codex/shared ~/.codex/agents/ace-*
+# Then remove the managed ACE block from ~/.codex/config.toml
 
 # Crush: remove directly
 rm -rf ~/.opencode/skills ~/.opencode/shared ~/.opencode/agents/ace-* ~/.opencode/.claude-plugin
@@ -197,11 +219,11 @@ npm unpublish agile-context-engineering@0.1.0 --otp=YOUR_CODE
 
 | Task | Command |
 |------|---------|
-| Test locally | `node bin/install.js --claude --global` |
+| Test locally | `node bin/install.js --claude --global` or `node bin/install.js --codex --global` |
 | Bump patch version | `npm version patch` |
 | Bump minor version | `npm version minor` |
 | Publish | `npm publish --otp=CODE` |
 | Test from npm | `npx agile-context-engineering@latest` |
 | View published version | `npm view agile-context-engineering version` |
-| Reload after install | `/reload-plugins` (in Claude Code) |
+| Reload after install | `/reload-plugins` (Claude Code) or restart Codex |
 | Uninstall | `claude plugin uninstall ace@ace-marketplace` |

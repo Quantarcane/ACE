@@ -11,7 +11,8 @@
 
         Two execution modes:
         - **Solo Mode** (default): Main plans → executor subagent implements (fresh 200k context)
-        - **Agent Teams Mode** (when enabled + assessment recommends it): Lead + teammates for parallel work
+        - **Agent Teams Mode** (Claude Code only, when enabled + assessment recommends it): Lead + teammates for parallel work
+          Codex and OpenCode do not support Agent Teams and must always use Solo Mode.
 
         NO intermediary commits during implementation. Only ONE commit after user approval.
     </purpose>
@@ -55,6 +56,7 @@
                 Parse INIT JSON for:
                 - `executor_model`, `reviewer_model`
                 - `commit_docs`, `has_git`, `has_gh_cli`, `github_project`
+                - `runtime`, `runtime_config_dir`, `supports_agent_teams`
                 - `agent_teams`
                 - `story_source`, `story_valid`, `story_error`, `story_content`
                 - `story` (id, title, status, size), `feature` (id, title), `epic` (id, title)
@@ -200,7 +202,8 @@
 
             <substep order="1.6" name="resolve-agent-teams">
                 <rule condition="--agent-teams-off flag present">Set `USE_AGENT_TEAMS = false` regardless of setting.</rule>
-                <rule condition="flag not present">Set `USE_AGENT_TEAMS = INIT.agent_teams`.</rule>
+                <rule condition="INIT.supports_agent_teams is false">Set `USE_AGENT_TEAMS = false` regardless of setting. Agent Teams are Claude Code-only and must not be used in Codex or OpenCode.</rule>
+                <rule condition="flag not present AND INIT.supports_agent_teams is true">Set `USE_AGENT_TEAMS = INIT.agent_teams`.</rule>
             </substep>
 
             <substep order="1.7" name="display-context">
@@ -210,6 +213,7 @@
                      Status: {INIT.story.status} | Size: {INIT.story.size}
                      AC scenarios: {INIT.acceptance_criteria_count}
                      Technical solution: present
+                     Runtime: {INIT.runtime}
                      Agent teams: {USE_AGENT_TEAMS ? "enabled" : "disabled"}
                 ```
             </substep>
@@ -285,6 +289,19 @@
 
                 Present your complexity assessment summary, then ask:
 
+                <variant condition="INIT.supports_agent_teams is false">
+                    Agent Teams are not supported in this runtime (`{INIT.runtime}`).
+                    Codex and OpenCode must always use solo execution.
+
+                    Use AskUserQuestion:
+                    - header: "Execution"
+                    - question: "Agent Teams are Claude Code-only and are not available in {INIT.runtime}.\n\nComplexity: {count signals hit}\n{list the signals that matched}\n\nExecute in solo mode?"
+                    - options:
+                      - "Solo (Confirmed)" â€” proceed with solo execution
+
+                    Set `EXECUTION_MODE = solo`. Do NOT offer an Agent Teams override.
+                </variant>
+
                 <variant condition="USE_AGENT_TEAMS is true">
                     Use AskUserQuestion:
                     - header: "Execution"
@@ -295,7 +312,7 @@
                     - The recommended option goes first with "(Recommended)" suffix
                 </variant>
 
-                <variant condition="USE_AGENT_TEAMS is false">
+                <variant condition="USE_AGENT_TEAMS is false AND INIT.supports_agent_teams is true">
                     Agent teams are disabled by configuration. Use AskUserQuestion:
                     - header: "Execution"
                     - question: "Agent teams are disabled.\n\nComplexity: {count signals hit}\n{list the signals that matched}\n\nExecute in solo mode?"
@@ -1201,7 +1218,7 @@
         <criterion>Technical solution present — STOPPED if missing</criterion>
         <criterion>Plan Mode entered and execution plan created</criterion>
         <criterion>User approved execution plan</criterion>
-        <criterion>Agent teams vs solo decision correctly made</criterion>
+        <criterion>Agent teams vs solo decision correctly made; Agent Teams skipped outside Claude Code</criterion>
         <criterion>Implementation executed following technical solution</criterion>
         <criterion>Deviation rules applied correctly (Rules 1-3 auto, Rule 4 asks)</criterion>
         <criterion>Self-verification passed (build, tests, file existence, imports)</criterion>

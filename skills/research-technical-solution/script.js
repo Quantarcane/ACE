@@ -19,7 +19,7 @@ const {
 
 const {
   classifyStoryParam, extractStoryMetadata, extractStoryRequirements,
-  extractWikiReferences,
+  extractTechnicalDirection, extractWikiReferences,
   computeStoryPaths,
 } = require('../../shared/lib/ace-story');
 
@@ -78,7 +78,7 @@ function cmdInit(cwd, raw, args, parsed) {
       story: { id: null, title: null, status: null, size: null },
       feature: { id: null, title: null },
       epic: { id: null, title: null },
-      user_story: null, description: null, acceptance_criteria_count: 0,
+      user_story: null, description: null, technical_direction: null, acceptance_criteria_count: 0,
       paths: null,
       has_external_analysis: false, has_integration_analysis: false, has_feature_file: false,
       wiki_references: { system_wide: [], subsystem_docs: [], total_count: 0 },
@@ -137,6 +137,7 @@ function cmdInit(cwd, raw, args, parsed) {
   // ── Extract metadata & requirements ──
   const metadata = extractStoryMetadata(storyContent);
   const requirements = extractStoryRequirements(storyContent);
+  const technicalDirection = extractTechnicalDirection(storyContent);
   const wikiRefs = extractWikiReferences(storyContent);
 
   // ── Compute paths ──
@@ -207,6 +208,7 @@ function cmdInit(cwd, raw, args, parsed) {
     epic: metadata.epic,
     user_story: requirements.user_story,
     description: requirements.description,
+    technical_direction: technicalDirection,
     acceptance_criteria_count: requirements.acceptance_criteria_count,
     paths,
     has_external_analysis,

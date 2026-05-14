@@ -31,7 +31,7 @@ const {
  * Detect the runtime config directory name.
  * In the plugin context, the script lives at:
  *   <base>/<config-dir>/skills/help/script.js
- * Default to '.claude' since the plugin always runs in Claude Code.
+ * Default to '.claude' for backwards compatibility.
  */
 function getRuntimeConfigDirName() {
   try {
@@ -39,7 +39,7 @@ function getRuntimeConfigDirName() {
     const skillsDir = path.dirname(skillDir);  // <base>/<config-dir>/skills
     const configDir = path.dirname(skillsDir); // <base>/<config-dir>
     const dirName = path.basename(configDir);
-    if (dirName === '.opencode' || dirName === '.claude') {
+    if (dirName === '.opencode' || dirName === '.codex' || dirName === '.claude') {
       return dirName;
     }
   } catch {}
@@ -83,6 +83,7 @@ function cmdInit(cwd, raw) {
 
     // Config
     commit_docs: config.commit_docs,
+    runtime_config_dir: RUNTIME_CONFIG_DIR,
 
     // Existing state
     has_product_vision: pathExists(cwd, '.docs/product/product-vision.md'),
@@ -232,6 +233,17 @@ function cmdWriteGithubSettings(cwd, raw, extraArgs) {
 // ─── Sync Agent Teams ───────────────────────────────────────────────────────
 
 function cmdSyncAgentTeams(cwd, raw) {
+  if (RUNTIME_CONFIG_DIR === '.codex') {
+    const settings = loadSettings(cwd);
+    const wasDifferent = settings.agent_teams !== false;
+    if (wasDifferent) {
+      settings.agent_teams = false;
+      writeSettings(cwd, settings);
+    }
+    output({ agent_teams: false, synced: wasDifferent, runtime: 'codex' }, raw);
+    return;
+  }
+
   // Source of truth: runtime settings.json env var (e.g. .claude/settings.json)
   const claudeSettingsPath = path.join(cwd, RUNTIME_CONFIG_DIR, 'settings.json');
   let claudeEnabled = false;
@@ -260,8 +272,13 @@ function cmdSyncAgentTeams(cwd, raw) {
 function cmdWriteAgentTeamsSetting(cwd, raw, extraArgs) {
   const enabled = extraArgs[0] === 'true';
   const settings = loadSettings(cwd);
-  settings.agent_teams = enabled;
+  settings.agent_teams = RUNTIME_CONFIG_DIR === '.codex' ? false : enabled;
   writeSettings(cwd, settings);
+
+  if (RUNTIME_CONFIG_DIR === '.codex') {
+    output({ written: true, agent_teams: false, settings, runtime: 'codex' }, raw);
+    return;
+  }
 
   // Also update the project's runtime settings.json (e.g. .claude/)
   const claudeDir = path.join(cwd, RUNTIME_CONFIG_DIR);

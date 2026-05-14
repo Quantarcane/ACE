@@ -28,6 +28,13 @@ const RUNTIMES = {
     globalDir: '.claude',
     supportsPlugin: true,
   },
+  codex: {
+    name: 'Codex',
+    description: "OpenAI's Codex CLI",
+    globalDir: '.codex',
+    agentsDir: 'agents',
+    supportsPlugin: false,
+  },
   opencode: {
     name: 'Crush',
     description: 'Crush AI coding assistant (formerly OpenCode)',
@@ -38,6 +45,19 @@ const RUNTIMES = {
 };
 
 const MARKETPLACE_NAME = 'ace-marketplace';
+const CODEX_CONFIG_BEGIN = '# ACE Agent Configuration - managed by agile-context-engineering installer';
+const CODEX_CONFIG_END = '# End ACE Agent Configuration';
+
+const CODEX_AGENT_SANDBOX = {
+  'ace-code-reviewer': 'read-only',
+  'ace-code-discovery-analyst': 'read-only',
+  'ace-code-integration-analyst': 'read-only',
+  'ace-project-researcher': 'read-only',
+  'ace-research-synthesizer': 'workspace-write',
+  'ace-product-owner': 'workspace-write',
+  'ace-technical-application-architect': 'workspace-write',
+  'ace-wiki-mapper': 'workspace-write',
+};
 
 function log(message, color = '') {
   console.log(`${color}${message}${colors.reset}`);
@@ -60,6 +80,7 @@ function parseArgs() {
   const args = process.argv.slice(2);
   const flags = {
     claude: args.includes('--claude'),
+    codex: args.includes('--codex'),
     opencode: args.includes('--opencode'),
     all: args.includes('--all'),
     global: args.includes('--global'),
@@ -89,10 +110,11 @@ Usage: npx agile-context-engineering [options]
 
 Options:
   --claude      Install for Claude Code only
+  --codex       Install for Codex only
   --opencode    Install for Crush (formerly OpenCode)
   --all         Install for all supported runtimes
-  --global      Install globally (~/.claude, ~/.opencode)
-  --local             Install locally (.claude, .opencode)
+  --global      Install globally (~/.claude, ~/.codex, ~/.opencode)
+  --local             Install locally (.claude, .codex, .opencode)
   --force-statusline  Replace existing statusline configuration
   -h, --help          Show this help message
   -v, --version       Show version number
@@ -100,6 +122,7 @@ Options:
 Examples:
   npx agile-context-engineering                    # Interactive installation
   npx agile-context-engineering --claude --local   # Claude Code, local install
+  npx agile-context-engineering --codex --global   # Codex, global install
   npx agile-context-engineering --opencode --global # Crush (formerly OpenCode), global install
   npx agile-context-engineering --all --global     # All runtimes, global install
 `);
@@ -169,6 +192,10 @@ function getBasePath(runtime, scope) {
   const cwd = process.cwd();
   const config = RUNTIMES[runtime];
 
+  if (runtime === 'codex' && scope === 'global' && process.env.CODEX_HOME) {
+    return path.resolve(process.env.CODEX_HOME);
+  }
+
   return scope === 'global'
     ? path.join(home, config.globalDir)
     : path.join(cwd, config.globalDir);
@@ -181,7 +208,9 @@ const TRANSFORMABLE_EXTENSIONS = new Set(['.md', '.xml', '.js']);
 function transformForRuntime(content, runtime) {
   if (runtime === 'claude') return content; // Source files already use .claude paths
   const targetDir = RUNTIMES[runtime].globalDir; // e.g. '.opencode'
-  return content.replace(/\.claude\//g, `${targetDir}/`);
+  return content
+    .replace(/\.claude\//g, `${targetDir}/`)
+    .replace(/\.claudeignore\b/g, `${targetDir}ignore`);
 }
 
 // Copy directory recursively, optionally transforming text file content for the target runtime
@@ -208,6 +237,195 @@ function copyDir(src, dest, runtime) {
       }
     }
   }
+}
+
+function toPosixPath(filePath) {
+  return filePath.replace(/\\/g, '/');
+}
+
+function replaceAceInvocations(content, codexStyle) {
+  if (!codexStyle) return content;
+  return content.replace(/\/ace:([a-z0-9-]+)/g, '$ace-$1');
+}
+
+function transformCodexSkillContent(content, skillName, skillDir) {
+  let transformed = content
+    .replace(/\.claude\//g, '.codex/')
+    .replace(/\.claudeignore\b/g, '.codexignore')
+    .replace(/\$\{CLAUDE_SKILL_DIR\}/g, toPosixPath(skillDir))
+    .replace(/"\$CLAUDE_SKILL_DIR\//g, `"${toPosixPath(skillDir)}/`)
+    .replace(/\$CLAUDE_SKILL_DIR\//g, `${toPosixPath(skillDir)}/`)
+    .replace(/CLAUDE_SKILL_DIR/g, 'CODEX_SKILL_DIR');
+
+  transformed = replaceAceInvocations(transformed, true);
+
+  if (path.basename(skillDir) === skillName && content.includes('---')) {
+    transformed = transformed.replace(/^name:\s*.+$/m, `name: ace-${skillName}`);
+  }
+
+  return transformed;
+}
+
+function codexSkillAdapter(skillName, skillDir) {
+  const posixSkillDir = toPosixPath(skillDir);
+  return `<codex_skill_adapter>
+## Codex Invocation
+- Invoke this skill by mentioning \`$ace-${skillName}\`.
+- Treat any user text after \`$ace-${skillName}\` as the command arguments.
+- In examples copied from Claude Code, \`/ace:${skillName}\` means \`$ace-${skillName}\`.
+
+## Runtime Compatibility
+- This repository is authored as a Claude Code plugin. In Codex, the installer copies it to \`${posixSkillDir}\`.
+- Claude's \`!\` resource expansion does not run in Codex. Before following the workflow, manually read the supporting files referenced near the top of this SKILL.md.
+- When a workflow says \`AskUserQuestion\`, use Codex \`request_user_input\` if available; otherwise ask the user directly and continue with a reasonable default only when the choice is low risk.
+- When a workflow says \`Task(..., subagent_type="X")\`, use \`spawn_agent(agent_type="X", message="...")\` only when the user explicitly requested sub-agents. Otherwise complete the work inline in the current agent.
+- Prefer commands that use the absolute skill path above. It keeps Windows and Linux shells from depending on a runtime-specific skill directory environment variable.
+</codex_skill_adapter>
+
+`;
+}
+
+function copySkillsForCodex(srcSkills, destSkills) {
+  if (!fs.existsSync(srcSkills)) return 0;
+  fs.mkdirSync(destSkills, { recursive: true });
+
+  for (const entry of fs.readdirSync(destSkills, { withFileTypes: true })) {
+    if (entry.isDirectory() && entry.name.startsWith('ace-')) {
+      fs.rmSync(path.join(destSkills, entry.name), { recursive: true });
+    }
+  }
+
+  let count = 0;
+  for (const entry of fs.readdirSync(srcSkills, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const skillName = entry.name;
+    const srcDir = path.join(srcSkills, skillName);
+    const destDir = path.join(destSkills, `ace-${skillName}`);
+    copyCodexSkillDir(srcDir, destDir, skillName);
+    count += 1;
+  }
+  return count;
+}
+
+function copyCodexSkillDir(src, dest, skillName) {
+  fs.mkdirSync(dest, { recursive: true });
+  for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+    const srcPath = path.join(src, entry.name);
+    const destPath = path.join(dest, entry.name);
+    if (entry.isDirectory()) {
+      copyCodexSkillDir(srcPath, destPath, skillName);
+      continue;
+    }
+
+    const ext = path.extname(entry.name).toLowerCase();
+    if (TRANSFORMABLE_EXTENSIONS.has(ext)) {
+      let content = fs.readFileSync(srcPath, 'utf-8');
+      content = transformCodexSkillContent(content, skillName, dest);
+      if (entry.name === 'SKILL.md') {
+        content = content.replace(/^---\r?\n([\s\S]*?)\r?\n---\r?\n/, (match, body) => {
+          const lines = body.split(/\r?\n/);
+          const filtered = lines.filter(line =>
+            !/^(allowed-tools|argument-hint|disable-model-invocation|model|effort):/.test(line.trim())
+          );
+          const nameIndex = filtered.findIndex(line => /^name:/.test(line));
+          if (nameIndex >= 0) {
+            filtered[nameIndex] = `name: ace-${skillName}`;
+          } else {
+            filtered.unshift(`name: ace-${skillName}`);
+          }
+          return `---\n${filtered.join('\n')}\n---\n\n`;
+        });
+        content = content.replace(/^(---\r?\n[\s\S]*?\r?\n---\r?\n)/, `$1\n${codexSkillAdapter(skillName, dest)}`);
+      }
+      fs.writeFileSync(destPath, content, 'utf-8');
+    } else {
+      fs.copyFileSync(srcPath, destPath);
+    }
+  }
+}
+
+function extractFrontmatter(content) {
+  const match = content.match(/^\s*(?:<!--[\s\S]*?-->\s*)*---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
+  if (!match) return { frontmatter: '', body: content };
+  return { frontmatter: match[1], body: content.slice(match[0].length) };
+}
+
+function extractFrontmatterField(frontmatter, field) {
+  const re = new RegExp(`^${field}:\\s*(.*)$`, 'm');
+  const match = frontmatter.match(re);
+  return match ? match[1].trim().replace(/^["']|["']$/g, '') : '';
+}
+
+function generateCodexAgentToml(agentName, sourceContent) {
+  const content = replaceAceInvocations(
+    sourceContent
+      .replace(/\.claude\//g, '.codex/')
+      .replace(/\.claudeignore\b/g, '.codexignore')
+      .replace(/CLAUDE_SKILL_DIR/g, 'CODEX_SKILL_DIR'),
+    true
+  );
+  const { frontmatter, body } = extractFrontmatter(content);
+  const name = extractFrontmatterField(frontmatter, 'name') || agentName;
+  const description = extractFrontmatterField(frontmatter, 'description') || `ACE agent ${name}`;
+  const sandbox = CODEX_AGENT_SANDBOX[name] || 'workspace-write';
+  return [
+    `name = ${JSON.stringify(name)}`,
+    `description = ${JSON.stringify(description)}`,
+    `sandbox_mode = ${JSON.stringify(sandbox)}`,
+    `developer_instructions = '''`,
+    body.trim(),
+    `'''`,
+    '',
+  ].join('\n');
+}
+
+function installCodexAgents(configDir, srcAgents) {
+  if (!fs.existsSync(srcAgents)) return 0;
+  const agentsDir = path.join(configDir, 'agents');
+  fs.mkdirSync(agentsDir, { recursive: true });
+
+  for (const file of fs.readdirSync(agentsDir)) {
+    if (file.startsWith('ace-') && file.endsWith('.toml')) {
+      fs.rmSync(path.join(agentsDir, file), { force: true });
+    }
+  }
+
+  const agents = [];
+  for (const file of fs.readdirSync(srcAgents)) {
+    if (!file.startsWith('ace-') || !file.endsWith('.md')) continue;
+    const agentName = file.slice(0, -3);
+    const content = fs.readFileSync(path.join(srcAgents, file), 'utf-8');
+    const { frontmatter } = extractFrontmatter(content);
+    const description = extractFrontmatterField(frontmatter, 'description') || `ACE agent ${agentName}`;
+    fs.writeFileSync(path.join(agentsDir, `${agentName}.toml`), generateCodexAgentToml(agentName, content), 'utf-8');
+    agents.push({ name: agentName, description });
+  }
+
+  mergeCodexAgentConfig(path.join(configDir, 'config.toml'), agents, agentsDir);
+  return agents.length;
+}
+
+function mergeCodexAgentConfig(configPath, agents, agentsDir) {
+  const eol = os.EOL;
+  let existing = fs.existsSync(configPath) ? fs.readFileSync(configPath, 'utf-8') : '';
+  const blockPattern = new RegExp(`${escapeRegex(CODEX_CONFIG_BEGIN)}[\\s\\S]*?${escapeRegex(CODEX_CONFIG_END)}\\r?\\n?`, 'm');
+  existing = existing.replace(blockPattern, '').trimEnd();
+
+  const lines = [CODEX_CONFIG_BEGIN, ''];
+  for (const agent of agents) {
+    lines.push(`[agents.${agent.name}]`);
+    lines.push(`description = ${JSON.stringify(agent.description)}`);
+    lines.push(`config_file = ${JSON.stringify(`${toPosixPath(agentsDir)}/${agent.name}.toml`)}`);
+    lines.push('');
+  }
+  lines.push(CODEX_CONFIG_END);
+
+  const prefix = existing ? `${existing}${eol}${eol}` : '';
+  fs.writeFileSync(configPath, `${prefix}${lines.join(eol)}${eol}`, 'utf-8');
+}
+
+function escapeRegex(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 // Check if claude CLI is available
@@ -543,6 +761,49 @@ function installForCrush(scope, packageDir) {
   return basePath;
 }
 
+// Install ACE for Codex as native Codex skills + agent TOML config
+function installForCodex(scope, packageDir) {
+  const config = RUNTIMES.codex;
+  const basePath = getBasePath('codex', scope);
+  const skillsPath = path.join(basePath, 'skills');
+  const sharedPath = path.join(basePath, 'shared');
+
+  const srcSkills = path.join(packageDir, 'skills');
+  const srcShared = path.join(packageDir, 'shared');
+  const srcAgents = path.join(packageDir, 'agents');
+
+  log(`\nInstalling ACE for ${config.name} (native skills)...`, colors.cyan);
+  log(`  Target: ${basePath}`, colors.dim);
+
+  fs.mkdirSync(basePath, { recursive: true });
+
+  const skillCount = copySkillsForCodex(srcSkills, skillsPath);
+  log(`  ✓ ${skillCount} skills installed`, colors.green);
+
+  if (fs.existsSync(sharedPath)) {
+    fs.rmSync(sharedPath, { recursive: true });
+  }
+  if (fs.existsSync(srcShared)) {
+    copyDir(srcShared, sharedPath, 'codex');
+    log(`  ✓ Shared libs installed`, colors.green);
+  }
+
+  const agentCount = installCodexAgents(basePath, srcAgents);
+  log(`  ✓ ${agentCount} agents configured`, colors.green);
+
+  const versionFile = path.join(sharedPath, 'VERSION');
+  if (!fs.existsSync(sharedPath)) fs.mkdirSync(sharedPath, { recursive: true });
+  fs.writeFileSync(versionFile, VERSION, 'utf-8');
+
+  const changelogSrc = path.join(packageDir, 'CHANGELOG.md');
+  const changelogDest = path.join(sharedPath, 'CHANGELOG.md');
+  if (fs.existsSync(changelogSrc)) {
+    fs.copyFileSync(changelogSrc, changelogDest);
+  }
+
+  return basePath;
+}
+
 // Main installation logic
 async function main() {
   const flags = parseArgs();
@@ -565,7 +826,7 @@ async function main() {
   let runtimes = [];
   let scope = null;
 
-  const hasRuntimeFlag = flags.claude || flags.opencode || flags.all;
+  const hasRuntimeFlag = flags.claude || flags.codex || flags.opencode || flags.all;
   const hasScopeFlag = flags.global || flags.local;
   const isInteractive = !hasRuntimeFlag && !hasScopeFlag;
 
@@ -574,25 +835,27 @@ async function main() {
 
     runtimes = await askMultiple(rl, '\nWhich runtime(s) do you want to install ACE for?', [
       { label: 'Claude Code', value: 'claude', description: "Anthropic's Claude Code CLI" },
+      { label: 'Codex', value: 'codex', description: "OpenAI's Codex CLI" },
       { label: 'Crush', value: 'opencode', description: 'Crush AI coding assistant (formerly OpenCode)' },
     ]);
 
     scope = await ask(rl, '\nWhere should ACE be installed?', [
-      { label: 'Global', value: 'global', description: 'Install in home directory (~/.claude, ~/.opencode)' },
-      { label: 'Local', value: 'local', description: 'Install in current project (.claude, .opencode)' },
+      { label: 'Global', value: 'global', description: 'Install in home directory (~/.claude, ~/.codex, ~/.opencode)' },
+      { label: 'Local', value: 'local', description: 'Install in current project (.claude, .codex, .opencode)' },
     ]);
 
     rl.close();
   } else {
     if (flags.all) {
-      runtimes = ['claude', 'opencode'];
+      runtimes = ['claude', 'codex', 'opencode'];
     } else {
       if (flags.claude) runtimes.push('claude');
+      if (flags.codex) runtimes.push('codex');
       if (flags.opencode) runtimes.push('opencode');
     }
 
     if (runtimes.length === 0) {
-      log('Error: No runtime specified. Use --claude, --opencode (Crush), or --all', colors.red);
+      log('Error: No runtime specified. Use --claude, --codex, --opencode (Crush), or --all', colors.red);
       process.exit(1);
     }
 
@@ -611,6 +874,9 @@ async function main() {
     if (runtime === 'claude') {
       const result = installForClaude(scope, packageDir, flags);
       installedPaths.push({ runtime, name: 'Claude Code', ...result });
+    } else if (runtime === 'codex') {
+      const p = installForCodex(scope, packageDir);
+      installedPaths.push({ runtime, name: RUNTIMES[runtime].name, path: p, success: true });
     } else {
       const p = installForCrush(scope, packageDir);
       installedPaths.push({ runtime, name: RUNTIMES[runtime].name, path: p, success: true });
@@ -642,11 +908,17 @@ async function main() {
   log(`  /ace:map-system              Map system-wide architecture`, colors.dim);
   log(`  /ace:map-subsystem           Map a subsystem's internals`, colors.dim);
   log(`  /ace:init-coding-standards   Generate coding standards`, colors.dim);
+  if (runtimes.includes('codex')) {
+    log(`\nCodex skill names use $ace-* instead of /ace:*:`, colors.cyan);
+    log(`  $ace-help                    Check project status and next steps`, colors.dim);
+    log(`  $ace-plan-story              Plan a story specification`, colors.dim);
+    log(`  $ace-execute-story           Execute a planned story`, colors.dim);
+  }
 
   log(`\nGet started:`, colors.cyan);
-  log(`  1. Restart Claude Code (or run /reload-plugins)`, colors.dim);
-  log(`  2. Run /ace:help to initialize ACE`, colors.dim);
-  log(`  3. Run /ace:plan-product-vision to define your product\n`, colors.dim);
+  log(`  1. Restart your AI coding assistant`, colors.dim);
+  log(`  2. Run /ace:help in Claude/Crush or $ace-help in Codex`, colors.dim);
+  log(`  3. Run /ace:plan-product-vision or $ace-plan-product-vision to define your product\n`, colors.dim);
 }
 
 main().catch((err) => {

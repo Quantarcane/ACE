@@ -83,6 +83,10 @@ describe('research-technical-solution script', () => {
         '',
         'Adds a login button to the header.',
         '',
+        '## Technical Direction',
+        '',
+        'Prefer reusing the existing header action component.',
+        '',
         '## Acceptance Criteria',
         '',
         '### Scenario: Click login button',
@@ -106,6 +110,7 @@ describe('research-technical-solution script', () => {
       assert.strictEqual(result.story_source, 'file');
       assert.strictEqual(result.story.id, 'S1');
       assert.strictEqual(result.story.title, 'Add Login Button');
+      assert.strictEqual(result.technical_direction, 'Prefer reusing the existing header action component.');
       assert.strictEqual(result.acceptance_criteria_count, 1);
       assert.ok(result.paths, 'should have computed paths');
       assert.ok(result.wiki_references, 'should have wiki_references');

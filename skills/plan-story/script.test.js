@@ -83,6 +83,10 @@ describe('plan-story script', () => {
         '',
         'Adds a login button to the header.',
         '',
+        '## Technical Direction',
+        '',
+        'Prefer reusing the existing header action component.',
+        '',
         '## Acceptance Criteria',
         '',
         '### Scenario: Click login button',
@@ -106,6 +110,7 @@ describe('plan-story script', () => {
       assert.strictEqual(result.story.id, 'S1');
       assert.strictEqual(result.story.title, 'Add Login Button');
       assert.strictEqual(result.story.status, 'Todo');
+      assert.strictEqual(result.technical_direction, 'Prefer reusing the existing header action component.');
       assert.strictEqual(result.acceptance_criteria_count, 1);
       assert.ok(result.paths, 'should have computed paths');
       assert.ok(result.paths.story_file.includes('s1-add-login-button'));

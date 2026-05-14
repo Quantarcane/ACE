@@ -2,7 +2,7 @@
 name: research-external-solution
 description: COMPREHENSIVE, IN-DEPTH, CODE-LEVEL Analysis of User Story Implementation in External Repository
 argument-hint: "story=<file-path|github-url> external-codebase=<source-path|github-url> [external-docs=<weblink|filepath>]"
-disable-model-invocation: true
+disable-model-invocation: false
 allowed-tools: Read, Bash, Write, AskUserQuestion, Glob, Grep, WebFetch
 model: opus
 effort: max

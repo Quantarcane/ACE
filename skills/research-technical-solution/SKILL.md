@@ -2,7 +2,7 @@
 name: research-technical-solution
 description: COMPREHENSIVE Technical Solution Design for a Story -- Architecture, Patterns, Algorithms, Sequence Diagrams, and Implementation Plan
 argument-hint: "story=<file-path|github-url>"
-disable-model-invocation: true
+disable-model-invocation: false
 allowed-tools: Read, Bash, Write, Edit, AskUserQuestion, Glob, Grep, Agent
 model: opus
 effort: max
@@ -56,6 +56,7 @@ agent: ace-technical-application-architect
                     **All context is extracted from the story document:**
                     - Feature file (from story description/metadata)
                     - Story requirements (User Story, Description, AC)
+                    - Technical Direction (OPTIONAL advisory design guidance from the story)
                     - Wiki references (from Relevant Wiki section — pass 2)
                     - External analysis (auto-detected in story directory — OPTIONAL)
                     - Integration analysis (auto-detected in story directory — MANDATORY)
@@ -69,6 +70,7 @@ agent: ace-technical-application-architect
                      All context is extracted from the story document and story directory:
                      - Feature file (from story description/metadata)
                      - Story requirements (User Story, Description, AC)
+                     - Technical Direction (OPTIONAL advisory design guidance from the story)
                      - Wiki references (from Relevant Wiki section — pass 2)
                      - External analysis (auto-detected in story directory)
                      - Integration analysis (auto-detected in story directory)
@@ -84,11 +86,14 @@ agent: ace-technical-application-architect
 
     <output>
         <objective>
-            Use business requirements, integration analysis, and optionally external/industry-standard
+            Use business requirements, optional Technical Direction, integration analysis, and optionally external/industry-standard
             analysis to create a CONCRETE TECHNICAL SOLUTION DESIGN for the story, following Clean
             Architecture principles, SOLID patterns, OOP best practices, considering external analysis
             for approach, algorithms and formulas (when most efficient and performant), while following
             the integration analysis so that we don't break our already complex codebase.
+            Technical Direction is advisory, not binding: consider it, but choose a better approach
+            when codebase evidence, integration analysis, or coding standards justify it, and document
+            any deviation at the end of the technical solution.
 
             **CRITICAL**: The technical solution MUST include detailed sequence diagrams for EVERY
             scenario in the Acceptance Criteria, showing the complete flow of data and control

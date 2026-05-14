@@ -2,7 +2,7 @@
 name: research-integration-solution
 description: COMPREHENSIVE, IN-DEPTH System Integration Analysis for Integrating a New Story into the Existing Codebase
 argument-hint: "story=<file-path|github-url>"
-disable-model-invocation: true
+disable-model-invocation: false
 allowed-tools: Read, Bash, Write, AskUserQuestion, Glob, Grep, Agent
 model: opus
 effort: max

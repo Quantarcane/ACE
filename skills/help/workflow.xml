@@ -241,6 +241,17 @@
             This step syncs and configures the Claude Code Agent Teams experimental feature.
             You MUST run the sync command below and MUST use AskUserQuestion to interact with the user.
 
+            <conditional condition="INIT.runtime_config_dir is '.codex'">
+                Codex does not support Claude Code Agent Teams. Run sync-agent-teams so
+                `.ace/settings.json` records `agent_teams: false`, then skip the user prompt.
+
+                ```bash
+                node "${CLAUDE_SKILL_DIR}/script.js" sync-agent-teams --raw
+                ```
+
+                Continue to step 5.
+            </conditional>
+
             <substep order="4.1" name="sync-agent-teams">
                 **MANDATORY — Run this command before evaluating state:**
 

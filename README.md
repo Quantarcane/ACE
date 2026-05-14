@@ -107,9 +107,9 @@ flowchart TD
 
 ## Installation
 
-ACE supports [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and [Crush](https://github.com/crushai/crush) (formerly [OpenCode](https://github.com/opencode-ai/opencode)) as runtimes.
+ACE supports [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Codex](https://github.com/openai/codex), and [Crush](https://github.com/crushai/crush) (formerly [OpenCode](https://github.com/opencode-ai/opencode)) as runtimes.
 
-> **Note:** ACE has been primarily developed and tested with Claude Code. Crush support is functional (the installer transforms all paths automatically), but has not been thoroughly tested end-to-end. If you encounter issues running ACE in Crush, please [open an issue](https://github.com/agile-context-engineering/ace/issues).
+> **Note:** ACE has been primarily developed and tested with Claude Code. Codex and Crush support are functional (the installer transforms paths and runtime-specific skill wiring automatically), but have not been thoroughly tested end-to-end. If you encounter issues in Codex or Crush, please [open an issue](https://github.com/agile-context-engineering/ace/issues).
 
 ```bash
 npx agile-context-engineering
@@ -120,27 +120,31 @@ This launches an interactive installer. You can also use flags for non-interacti
 ```bash
 npx agile-context-engineering --claude --global   # Claude Code, global install
 npx agile-context-engineering --claude --local    # Claude Code, local (project-only)
+npx agile-context-engineering --codex --global    # Codex, global install
+npx agile-context-engineering --codex --local     # Codex, local (project-only)
 npx agile-context-engineering --opencode --global # Crush (formerly OpenCode), global install
 npx agile-context-engineering --all --global      # All runtimes, global install
 ```
 
+Codex installs ACE as native skills with an `ace-` prefix. Use `$ace-help`, `$ace-plan-story`, `$ace-execute-story`, and so on.
+
 ### Updating
 
-When a new version is available, your status bar will show a yellow `/ace:update` indicator. Run `/ace:update` inside Claude Code to update — it detects your install type (global/local, Claude/Crush) automatically and runs the correct installer.
+When a new version is available, Claude Code's status bar will show a yellow `/ace:update` indicator. Run `/ace:update` in Claude/Crush or `$ace-update` in Codex to update — it detects your install type (global/local, Claude/Codex/Crush) automatically and runs the correct installer.
 
 ### Prerequisites
 
 | Requirement | Purpose |
 |---|---|
 | [Node.js](https://nodejs.org) >= 16.7.0 | Runs the installer and CLI tools |
-| [Claude Code](https://docs.anthropic.com/en/docs/claude-code) or [Crush](https://github.com/crushai/crush) / [OpenCode](https://github.com/opencode-ai/opencode) | AI coding assistant runtime |
+| [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Codex](https://github.com/openai/codex), or [Crush](https://github.com/crushai/crush) / [OpenCode](https://github.com/opencode-ai/opencode) | AI coding assistant runtime |
 | [GitHub CLI (`gh`)](https://cli.github.com/) | Required for GitHub issue tracking and project board integration |
 
 ---
 
 ## Quick Start
 
-Run `/ace:help` first. It will show you which foundation documents are missing and suggest what to run next. Follow its suggestions until the dashboard shows everything complete.
+Run `/ace:help` first in Claude/Crush, or `$ace-help` in Codex. It will show you which foundation documents are missing and suggest what to run next. Follow its suggestions until the dashboard shows everything complete.
 
 Once the dashboard is fully green, you're ready to build:
 
@@ -255,7 +259,7 @@ When planning a new story, the wiki research pass scans all relevant docs and at
 
 ## Skills
 
-ACE is built as a Claude Code plugin with 21 specialized skills, each with its own workflow, templates, and CLI tooling.
+ACE is built as a multi-runtime plugin/skill package with 21 specialized skills, each with its own workflow, templates, and CLI tooling. Claude Code uses `/ace:*` commands; Codex uses `$ace-*` skills.
 
 ### Getting Started
 

@@ -42,7 +42,7 @@
             - **Environment**: `has_git`, `has_gh_cli`, `github_project`, `analyst_model`
             - **Story validation**: `story_valid`, `story_error`, `story_source`
             - **Story metadata**: `story` (id, title, status, size), `feature` (id, title), `epic` (id, title)
-            - **Requirements**: `user_story`, `description`, `acceptance_criteria_count`
+            - **Requirements**: `user_story`, `description`, `technical_direction`, `acceptance_criteria_count`
             - **Paths**: `paths.*` (story_dir, story_file, integration_analysis_file, external_analysis_file, feature_dir, feature_file, etc.)
             - **Wiki**: `wiki_references` (system_wide, subsystem_docs, total_count), `wiki_docs_exist`
             - **Artifacts**: `has_external_analysis`, `has_integration_analysis`, `has_feature_file`
@@ -91,6 +91,14 @@
             design a technical solution for. The wiki references (from `INIT.wiki_references`)
             define WHICH wiki documents to read for codebase context.
 
+            If `INIT.technical_direction` is not empty, store it as TECHNICAL_DIRECTION_CONTENT.
+            Treat it as optional advisory design guidance: consider it seriously, but do not let it
+            constrain the solution when integration analysis, coding standards, or verified codebase
+            evidence support a better approach. Any deviation must be noted at the end of the
+            Technical Solution.
+
+            If `INIT.technical_direction` is empty, set TECHNICAL_DIRECTION_CONTENT = null.
+
             <!-- ── 2b: Load parent feature document ────────────────────────── -->
 
             **If `INIT.has_feature_file` is true:**
@@ -116,6 +124,7 @@
                  Feature: {INIT.feature.id} — {INIT.feature.title}
                  Epic: {INIT.epic.id} — {INIT.epic.title}
                  Requirements: {INIT.acceptance_criteria_count} acceptance criteria scenarios
+                 Technical direction: {present/not provided}
                  Wiki references: {INIT.wiki_references.total_count} documents to load
             ```
         </step>
@@ -314,6 +323,25 @@
                     - The story IS the source of truth for business requirements
                 </item>
 
+                <item name="study-technical-direction" mandatory="false">
+                    **[CONDITIONAL] Study Technical Direction:**
+
+                    **WHEN TO RUN**: Only if TECHNICAL_DIRECTION_CONTENT is available.
+
+                    Technical Direction is advisory implementation guidance from the story.
+                    Use it to understand preferred approaches, architectural hints, libraries,
+                    constraints, patterns to consider, or design ideas the author wanted evaluated.
+
+                    **USE WITH JUDGMENT**:
+                    - Account for the direction in the design when it fits the codebase and standards.
+                    - Do NOT treat it as a constraint or requirement.
+                    - Do NOT expand story scope beyond Acceptance Criteria.
+                    - Prefer a better approach when integration analysis, coding standards, verified
+                      codebase facts, or simpler maintainable architecture justify it.
+                    - Track whether each major direction item was followed, adapted, or rejected.
+                    - Document deviations at the end of the Technical Solution with rationale.
+                </item>
+
                 <item name="study-external-analysis" mandatory="false">
                     **[CONDITIONAL] Study External/Industry-Standard Analysis:**
 
@@ -494,6 +522,7 @@
 
                 After loading all context from phases 1-3, you should have:
                 - Complete understanding of the story and business requirements
+                - Optional Technical Direction considered with judgment
                 - Knowledge of industry standard approaches (if external analysis available)
                 - Full system architecture understanding from wiki
                 - Feature context and story dependencies
@@ -508,6 +537,8 @@
                 - Maintains extensibility
                 - Enables testability
                 - Strictly follows coding standards
+                - Accounts for Technical Direction when present, while documenting any deviations
+                  and rationale at the end of the solution
 
                 **Generate the complete technical solution following the template's `&lt;output-format&gt;`
                 section in story-technical-solution.xml. This includes ALL of the following sections.**
@@ -591,6 +622,7 @@
             **Story File Requirements:**
             - [ ] Technical solution section exists in the story file
             - [ ] Section contains all required subsections from template
+            - [ ] Technical Direction Alignment section exists when story has Technical Direction
 
             **Architecture Requirements:**
             - [ ] Component and Boundary Architecture with Mermaid diagram
@@ -629,10 +661,11 @@
             **Compliance Requirements:**
             - [ ] Coding standards compliance verified throughout
             - [ ] Integration analysis findings incorporated
+            - [ ] Technical Direction considered and any deviations documented
             - [ ] No hardcoded values in any code snippets
             - [ ] All code follows Clean Architecture layers
 
-            **Total: 25 mandatory checklist items**
+            **Total: 27 mandatory checklist items**
 
             If the output is incomplete or missing sections, go back and fill in
             the missing content before proceeding.
@@ -653,9 +686,10 @@
             ```
               Solution Summary:
               ────────
-              Sections: {count}/13 | Checklist: {passed}/25
+              Sections: {count}/16 | Checklist: {passed}/27
               Wiki docs loaded: {N} | Integration analysis: loaded
               External analysis: {loaded/not found}
+              Technical direction: {considered/not provided}
               AC scenarios: {M} | Sequence diagrams: {M}
               New files: {F} | Modified files: {G}
               Design patterns: {P} | Refactoring items: {R}
@@ -722,6 +756,7 @@
               ────────
               Wiki docs loaded: {N} | Integration analysis: incorporated
               External analysis: {incorporated/not available}
+              Technical direction: {considered/not provided}
               AC scenarios covered: {M} sequence diagrams
               New files designed: {F} | Modified files: {G}
 
@@ -739,6 +774,7 @@
 
     <success_criteria>
         - Story loaded and requirements extracted (User Story, Description, Acceptance Criteria)
+        - Technical Direction extracted and considered when present
         - All wiki references extracted from story's Relevant Wiki section
         - All wiki documents loaded (system-wide mandatory, subsystem as referenced)
         - Coding standards read and internalized BEFORE generating solution code
@@ -752,7 +788,8 @@
         - NO hardcoded values in any code snippets
         - All code follows Clean Architecture layers and coding standards
         - Integration analysis findings fully incorporated (refactoring, patterns, hardcoded values)
-        - All 25 validation checklist items verified
+        - Technical Direction deviations documented at the end of the solution when present
+        - All 27 validation checklist items verified
         - GitHub issue updated with technical solution (if applicable)
         - User reviewed and approved the solution
         - Document committed with appropriate message

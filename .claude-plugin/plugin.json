@@ -1,7 +1,7 @@
 {
   "name": "ace",
   "description": "Agile Context Engineering -- spec-driven development for AI coding assistants",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "author": {
     "name": "Piticas Razvan"
   },

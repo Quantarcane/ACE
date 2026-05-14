@@ -2,7 +2,7 @@
 name: research-story-wiki
 description: Research and curate wiki references relevant to a story's technical solution
 argument-hint: "story=<file-path|github-url>"
-disable-model-invocation: true
+disable-model-invocation: false
 allowed-tools: Read, Bash, Write, Edit, AskUserQuestion, Glob, Grep, Agent
 model: opus
 effort: max

@@ -126,6 +126,15 @@
             - Any known constraints or technical considerations
             - How it relates to other stories in this feature
 
+            Optional technical direction:
+            - Include a short `#### Technical Direction` subsection ONLY when there is meaningful
+              implementation guidance for this story.
+            - Use it for preferred approaches, architecture hints, libraries, constraints, or
+              design ideas that should inform `plan-story` and technical solution design.
+            - It is advisory, not binding. Later technical solution design may choose a better
+              approach and should document the deviation.
+            - Do not use it to add scope beyond the story description.
+
             This is NOT a formal user story. It is a thorough description of intent and scope.
             The `plan-story` command will later restructure this into a proper INVEST story
             with Gherkin acceptance criteria, a Definition of Done.]

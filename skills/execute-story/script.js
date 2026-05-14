@@ -35,7 +35,7 @@ const { syncStory } = require('../../shared/lib/ace-github');
  * Detect the runtime config directory name.
  * In the plugin context, the script lives at:
  *   <base>/<config-dir>/skills/execute-story/script.js
- * Default to '.claude' since the plugin always runs in Claude Code.
+ * Default to '.claude' for backwards compatibility.
  */
 function getRuntimeConfigDirName() {
   try {
@@ -43,7 +43,7 @@ function getRuntimeConfigDirName() {
     const skillsDir = path.dirname(skillDir);  // <base>/<config-dir>/skills
     const configDir = path.dirname(skillsDir); // <base>/<config-dir>
     const dirName = path.basename(configDir);
-    if (dirName === '.opencode' || dirName === '.claude') {
+    if (dirName === '.opencode' || dirName === '.codex' || dirName === '.claude') {
       return dirName;
     }
   } catch {}
@@ -51,6 +51,16 @@ function getRuntimeConfigDirName() {
 }
 
 const RUNTIME_CONFIG_DIR = getRuntimeConfigDirName();
+
+function getRuntimeName(configDirName) {
+  if (configDirName === '.claude') return 'claude';
+  if (configDirName === '.codex') return 'codex';
+  if (configDirName === '.opencode') return 'opencode';
+  return 'unknown';
+}
+
+const RUNTIME_NAME = getRuntimeName(RUNTIME_CONFIG_DIR);
+const SUPPORTS_AGENT_TEAMS = RUNTIME_NAME === 'claude';
 
 // ─── CLI Dispatch ────────────────────────────────────────────────────────────
 
@@ -91,12 +101,12 @@ function cmdInit(cwd, raw, args, parsed) {
 
   // ── Agent teams detection (sync from runtime settings) ──
   const claudeSettingsPath = path.join(cwd, RUNTIME_CONFIG_DIR, 'settings.json');
-  let agent_teams = settings.agent_teams || false;
+  let agent_teams = SUPPORTS_AGENT_TEAMS ? (settings.agent_teams || false) : false;
   try {
     const claudeRaw = fs.readFileSync(claudeSettingsPath, 'utf-8');
     const claudeSettings = JSON.parse(claudeRaw);
     const val = claudeSettings?.env?.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS;
-    agent_teams = val === '1' || val === 'true';
+    agent_teams = SUPPORTS_AGENT_TEAMS && (val === '1' || val === 'true');
   } catch {}
 
   // ── Parse story param ──
@@ -111,7 +121,11 @@ function cmdInit(cwd, raw, args, parsed) {
       executor_model: resolveModel(cwd, 'ace-executor'),
       reviewer_model: resolveModel(cwd, 'ace-code-reviewer'),
       commit_docs: config.commit_docs,
-      has_git, has_gh_cli, github_project, agent_teams,
+      has_git, has_gh_cli, github_project,
+      runtime: RUNTIME_NAME,
+      runtime_config_dir: RUNTIME_CONFIG_DIR,
+      supports_agent_teams: SUPPORTS_AGENT_TEAMS,
+      agent_teams,
       story_source: null,
       story_valid: false,
       story_error: classified.reason || 'No story parameter provided',
@@ -249,7 +263,11 @@ function cmdInit(cwd, raw, args, parsed) {
     commit_docs: config.commit_docs,
 
     // Environment
-    has_git, has_gh_cli, github_project, agent_teams,
+    has_git, has_gh_cli, github_project,
+    runtime: RUNTIME_NAME,
+    runtime_config_dir: RUNTIME_CONFIG_DIR,
+    supports_agent_teams: SUPPORTS_AGENT_TEAMS,
+    agent_teams,
 
     // Story source
     story_source: storySource,

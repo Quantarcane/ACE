@@ -2,7 +2,7 @@
 name: review-story
 description: Standalone code review -- performs 3-level artifact verification, anti-pattern detection, coding standards enforcement, and tech debt discovery against a story's implementation
 argument-hint: "story=<file-path|github-url>"
-disable-model-invocation: true
+disable-model-invocation: false
 allowed-tools: Read, Bash, Glob, Grep
 model: sonnet
 effort: high

@@ -24,7 +24,7 @@ const {
 
 const {
   classifyStoryParam, extractStoryMetadata, extractStoryRequirements,
-  extractIssueNumber, extractIssueNumberFromFile, computeStoryPaths,
+  extractTechnicalDirection, extractIssueNumber, extractIssueNumberFromFile, computeStoryPaths,
   updateState,
 } = require('../../shared/lib/ace-story');
 
@@ -123,7 +123,7 @@ function cmdInit(cwd, raw, args, parsed) {
       story: { id: null, title: null, status: null, size: null, issue_number: null },
       feature: { id: null, title: null, issue_number: null },
       epic: { id: null, title: null },
-      user_story: null, description: null, acceptance_criteria_count: 0,
+      user_story: null, description: null, technical_direction: null, acceptance_criteria_count: 0,
       paths: null,
       has_external_analysis: false, has_integration_analysis: false,
       has_feature_file: false, has_story_file: false,
@@ -142,7 +142,7 @@ function cmdInit(cwd, raw, args, parsed) {
       story: { id: null, title: null, status: null, size: null, issue_number: null },
       feature: { id: null, title: null, issue_number: null },
       epic: { id: null, title: null },
-      user_story: null, description: textParam, acceptance_criteria_count: 0,
+      user_story: null, description: textParam, technical_direction: null, acceptance_criteria_count: 0,
       paths: null,
       has_external_analysis: false, has_integration_analysis: false,
       has_feature_file: false, has_story_file: false,
@@ -164,7 +164,7 @@ function cmdInit(cwd, raw, args, parsed) {
       story: { id: null, title: null, status: null, size: null, issue_number: null },
       feature: { id: null, title: null, issue_number: null },
       epic: { id: null, title: null },
-      user_story: null, description: null, acceptance_criteria_count: 0,
+      user_story: null, description: null, technical_direction: null, acceptance_criteria_count: 0,
       paths: null,
       has_external_analysis: false, has_integration_analysis: false,
       has_feature_file: false, has_story_file: false,
@@ -222,6 +222,7 @@ function cmdInit(cwd, raw, args, parsed) {
   // ── Extract metadata & requirements ──
   const metadata = extractStoryMetadata(storyContent);
   const requirements = extractStoryRequirements(storyContent);
+  const technicalDirection = extractTechnicalDirection(storyContent);
 
   // ── Compute paths ──
   let paths = null;
@@ -285,6 +286,7 @@ function cmdInit(cwd, raw, args, parsed) {
     epic: metadata.epic,
     user_story: requirements.user_story,
     description: requirements.description,
+    technical_direction: technicalDirection,
     acceptance_criteria_count: requirements.acceptance_criteria_count,
     paths,
     has_external_analysis,

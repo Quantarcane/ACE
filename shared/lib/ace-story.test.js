@@ -4,7 +4,7 @@ const assert = require('node:assert');
 const {
   classifyStoryParam, extractMarkdownSection, extractStoryMetadata,
   extractIssueNumber, extractStoryRequirements, extractWikiReferences,
-  computeStoryPaths,
+  extractTechnicalDirection, computeStoryPaths,
 } = require('./ace-story');
 
 const SAMPLE_STORY = `# S3: Display OAuth Provider Buttons
@@ -22,6 +22,11 @@ const SAMPLE_STORY = `# S3: Display OAuth Provider Buttons
 
 This story adds OAuth provider buttons to the login page. It builds on the
 auth service foundation (S1) and enables the token exchange flow (S4).
+
+## Technical Direction
+
+Prefer extending the existing OAuth provider strategy abstraction. Do not
+introduce provider-specific branching in presentation components.
 
 ## Acceptance Criteria
 
@@ -193,6 +198,18 @@ describe('extractStoryRequirements', () => {
 });
 
 // ─── extractWikiReferences ───────────────────────────────────────────────────
+
+describe('extractTechnicalDirection', () => {
+  it('extracts optional technical direction', () => {
+    const direction = extractTechnicalDirection(SAMPLE_STORY);
+    assert.ok(direction.includes('OAuth provider strategy abstraction'));
+    assert.ok(direction.includes('Do not'));
+  });
+
+  it('returns null when technical direction is absent', () => {
+    assert.strictEqual(extractTechnicalDirection('# Story\n\n## Description\n\nText'), null);
+  });
+});
 
 describe('extractWikiReferences', () => {
   it('extracts system-wide references', () => {

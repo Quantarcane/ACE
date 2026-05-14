@@ -49,9 +49,11 @@
             - `has_product_vision`, `has_product_backlog`
             - `story_source` (`file`, `github`, `text`, `new`), `story_valid`, `story_error`, `story_content`
             - `story` (id, title, status, size), `feature` (id, title), `epic` (id, title)
-            - `user_story`, `description`, `acceptance_criteria_count`
+            - `user_story`, `description`, `technical_direction`, `acceptance_criteria_count`
             - `paths.*` (story_dir, story_file, feature_dir, feature_file, etc.)
             - `has_external_analysis`, `has_integration_analysis`, `has_feature_file`, `has_story_file`
+
+            PO_MODEL is available from INIT.product_owner_model — do NOT re-run resolve-model.
 
             Also extract from `$ARGUMENTS` (not in INIT):
             - `external-codebase` (OPTIONAL): path or GitHub URL to external system
@@ -432,6 +434,7 @@
             Parse and hold as `STORY_SEED`:
             - Title (from header or first heading)
             - Description (any free-text description of what needs to be done)
+            - Technical Direction (optional `## Technical Direction` section, if present)
             - Any existing AC scenarios (if the story was previously partially refined)
             - Any images referenced (markdown `![](path)` or HTML `&lt;img src="path"&gt;`)
 
@@ -470,7 +473,7 @@
               - "Skip to research" — Keep current AC, skip to passes 2-5
 
             If "Start fresh": set `RUN_MODE = CREATE`, clear existing AC from working copy.
-            If "Skip to research": jump directly to step 8 (dispatch passes 2-5).
+            If "Skip to research": Phase 1 complete. Skip remaining steps, proceed to Phase 2 (Research Passes) in the SKILL.md process section.
             If "Refine it": continue to step 4 with existing content as context.
 
             **If `INIT.acceptance_criteria_count == 0`:**
@@ -535,6 +538,24 @@
         <step name="deep-questioning" order="5">
             Follow the questioning guide from `questioning.xml`. You are a thinking partner,
             not an interviewer.
+
+            **MANDATORY: Use AskUserQuestion for EVERY question round.**
+            Do NOT dump questions as formatted text and wait for free-form response.
+            EVERY time you need input from the user, use the AskUserQuestion tool.
+
+            For topic groups (multiple related questions):
+            - Use one AskUserQuestion per topic group
+            - header: group name (e.g., "Query Input", "Error Handling")
+            - question: present the 2-4 related questions as a numbered list
+            - options: concrete choices + "Let me explain" for free-form
+
+            For specific decisions:
+            - Use AskUserQuestion with 2-4 concrete options
+
+            For confirmations:
+            - Use AskUserQuestion with "Approve" / "Change" / "Add more"
+
+            NEVER output questions as plain text. ALWAYS use AskUserQuestion.
 
             Display:
             ```
@@ -712,6 +733,8 @@
 
             Description: {2-4 sentences}
 
+            Technical Direction: {optional advisory technical guidance, or "None"}
+
             Acceptance Criteria: {N} scenarios
             1. {scenario name} — {one-line summary}
             2. {scenario name} — {one-line summary}
@@ -753,6 +776,8 @@
               Size, Sprint=—, Link
             - **User Story**: As/I want/So that format
             - **Description**: 2-4 sentences of observable behavior and feature context
+            - **Technical Direction**: OPTIONAL. Include only if present in the story seed or
+              explicitly provided by the user. Advisory only; it must not expand scope beyond AC.
             - **Acceptance Criteria**: ALL Gherkin scenarios from questioning
             - **Out of Scope**: Explicit exclusions
             - **Dependencies**: Blocked By, Blocks, External
@@ -765,7 +790,8 @@
 
             **If RUN_MODE is REFINE:**
             Increment the metadata refinement count and update "Last refined" date.
-            Preserve any existing Relevant Wiki or Technical Solution sections.
+            Preserve any existing Technical Direction, Relevant Wiki, or Technical Solution sections
+            unless the user explicitly changed that section during questioning.
 
             Display:
             ```
@@ -799,486 +825,29 @@
             - Hold previous answers as additional context
 
             **If "Approve":**
-            Continue to step 8.
+            Phase 1 complete. Continue to Phase 2 (Research Passes) in the SKILL.md process section.
         </step>
 
-        <!-- ══════════════════════════════════════════════════════════════════ -->
-        <!-- STEP 8: DISPATCH RESEARCH PASSES (2-5)                            -->
-        <!-- ══════════════════════════════════════════════════════════════════ -->
-
-        <step name="dispatch-research" order="8">
-
-            **YOU (the product owner) DO NOT WRITE passes 2-5 yourself.**
-            Your job in this step is ONLY to dispatch background agents and wait for them.
-            You MUST NOT write the `## Relevant Wiki` section — the wiki-mapper agent does that.
-            You MUST NOT write the `## Technical Solution` section — the technical-architect agent does that.
-            You MUST NOT create any files not specified below (no wiki-research.md, no notes.md).
-            If you skip a dispatch or write these sections yourself, the workflow has FAILED.
-
-            Display:
-            ```
-            ┌──────────────────────────────────────────────────┐
-            │  ACE > Plan Story > Research Passes               │
-            └──────────────────────────────────────────────────┘
-
-              i  Story requirements complete. Dispatching research passes...
-            ```
-
-            <!-- ── 8a: Offer external analysis (Pass 3 — OPTIONAL) ──────── -->
-
-            **If `EXTERNAL_CODEBASE` was provided as parameter:**
-            Set `RUN_EXTERNAL = true`.
-
-            **If `EXTERNAL_CODEBASE` was NOT provided:**
-
-            Use AskUserQuestion:
-            - header: "External"
-            - question: "Does this story reference an external system or reference implementation you'd like to analyze?"
-            - options:
-              - "No external system" — Skip external analysis
-              - "Yes, provide path" — I have an external codebase to analyze
-
-            If "Yes, provide path":
-            Ask for the external-codebase path (and optionally external-docs).
-            Set `EXTERNAL_CODEBASE` and `EXTERNAL_DOCS` from user response.
-            Set `RUN_EXTERNAL = true`.
-
-            If "No external system":
-            Set `RUN_EXTERNAL = false`.
-
-            <!-- ── 8b: Dispatch Pass 2 — Wiki Research ──────────────────── -->
-
-            **If `has_wiki` is false:** Skip pass 2. Display:
-            ```
-              i  No wiki found. Skipping pass 2 (wiki research).
-            ```
-
-            **If `has_wiki` is true:**
-
-            Display:
-            ```
-              i  Pass 2: Dispatching wiki research...
-                 Agent will update story file with Relevant Wiki section.
-            ```
-
-            **CRITICAL — Context Window Protection:**
-            The agent writes to the story file and returns ONLY a ~10-line confirmation.
-            This prevents agent output from inflating the main context window.
-
-            **CRITICAL — Do NOT call TaskOutput. NEVER. UNDER NO CIRCUMSTANCES.**
-            After spawning the background agent, do NOT call TaskOutput to read its results.
-            You will be automatically notified when the agent completes — IGNORE those notifications.
-            The agent writes directly to the story file on disk. You do not need the return message.
-            TaskOutput returns the agent's FULL internal transcript (every file read, every search,
-            every tool call) — calling it will inflate the context window by 10-20%. THIS IS FORBIDDEN.
-            After the notification arrives, verify the file with `wc -l`, then READ the file
-            directly from disk using the Read tool if needed. That is how you get the results.
-
-            Spawn background agent:
-            ```
-            Agent(
-                prompt="/ace:research-story-wiki story={INIT.paths.story_file}
-
-                Execute the research-story-wiki workflow end-to-end.
-                Write the Relevant Wiki section directly into the story file.
-
-                **Return format — ONLY this, nothing else:**
-                DONE
-                - Story: {story ID} — {story title}
-                - Wiki refs: {count} total ({system_wide} system-wide + {subsystem} subsystem)
-                - File updated: {story file path}",
-                subagent_type="ace-wiki-mapper",
-                model="{PO_MODEL}",
-                run_in_background=true,
-                description="Pass 2: Wiki research"
-            )
-            ```
-
-            Store the agent task ID as `PASS2_TASK`.
-
-            **After background notification arrives — IGNORE it:**
-
-            Do NOT call TaskOutput. Do NOT call TaskOutput. Do NOT call TaskOutput.
-            Just verify the file and read it directly from disk if needed.
-
-            <!-- ── 8c: Dispatch Pass 3 — External Analysis (OPTIONAL) ───── -->
-
-            **If `RUN_EXTERNAL` is false:** Skip pass 3.
-
-            **If `RUN_EXTERNAL` is true:**
-
-            Display:
-            ```
-              i  Pass 3: Dispatching external analysis...
-                 Agent will create external-analysis.md in story directory.
-            ```
-
-            **CRITICAL — Context Window Protection:**
-            The agent writes to a separate file and returns ONLY a ~10-line confirmation.
-            This prevents agent output from inflating the main context window.
-
-            **CRITICAL — Do NOT call TaskOutput. NEVER. UNDER NO CIRCUMSTANCES.**
-            After spawning the background agent, do NOT call TaskOutput to read its results.
-            You will be automatically notified when the agent completes — IGNORE those notifications.
-            The agent writes to `{INIT.paths.external_analysis_file}` on disk. You do not need the return message.
-            TaskOutput returns the agent's FULL internal transcript (every file read, every search,
-            every tool call) — calling it will inflate the context window by 10-20%. THIS IS FORBIDDEN.
-
-            Spawn background agent:
-            ```
-            Agent(
-                prompt="/ace:research-external-solution story={INIT.paths.story_file} external-codebase={EXTERNAL_CODEBASE} {external-docs={EXTERNAL_DOCS} if provided}
-
-                Execute the research-external-solution workflow end-to-end.
-                Write the output to {INIT.paths.external_analysis_file}.
-
-                **Return format — ONLY this, nothing else:**
-                DONE
-                - Story: {story ID} — {story title}
-                - External files analyzed: {count}
-                - Output: {external analysis file path}",
-                subagent_type="ace-code-discovery-analyst",
-                model="{PO_MODEL}",
-                run_in_background=true,
-                description="Pass 3: External analysis"
-            )
-            ```
-
-            Store the agent task ID as `PASS3_TASK`.
-
-            **After background notification arrives — IGNORE it:**
-
-            Do NOT call TaskOutput. Do NOT call TaskOutput. Do NOT call TaskOutput.
-            Just verify the file and read it directly from disk if needed.
-
-            <!-- ── 8d: Wait for passes 2 (and 3 if running) before pass 4 ── -->
-
-            Display:
-            ```
-              i  Waiting for pass 2{" and pass 3" if RUN_EXTERNAL} to complete
-                 before dispatching integration analysis (pass 4)...
-            ```
-
-            **Wait for PASS2_TASK notification** (and PASS3_TASK if running).
-            Do NOT call TaskOutput. Do NOT call TaskOutput. Do NOT call TaskOutput.
-            Just wait for the background notifications.
-
-            After notifications arrive, verify the outputs exist:
-            ```bash
-            wc -l {INIT.paths.story_file}
-            ```
-            If RUN_EXTERNAL:
-            ```bash
-            wc -l {INIT.paths.external_analysis_file}
-            ```
-
-            Display:
-            ```
-              +  Pass 2 complete. Story file updated with Relevant Wiki section.
-              {+  Pass 3 complete. External analysis written. (if applicable)}
-            ```
-
-            <!-- ── 8d.1: Inject Library Documentation into Relevant Wiki ── -->
-
-            **If `LIB_DOCS` is not null/empty:**
-
-            Append a `### Library Documentation` subsection to the `## Relevant Wiki`
-            section in the story file. This ensures passes 4-5 see these references.
-
-            Read the story file, find the `## Relevant Wiki` section, and append
-            the `### Library Documentation` subsection BEFORE the next `## ` heading
-            (i.e., before `## Technical Solution`).
-
-            Split `LIB_DOCS` by spaces. For each entry, determine if it's a weblink
-            (starts with `http://` or `https://`) or a filepath, and format accordingly:
-
-            ```markdown
-            ### Library Documentation
-
-            <!-- Provided via lib-docs parameter. These are external library/API docs
-                 that inform the technical solution design. Passes 4-5 MUST read/fetch
-                 these when designing the implementation. -->
-
-            - `{entry}` — Library/API documentation reference
-            ```
-
-            Use the Edit tool to insert this subsection into the story file.
-
-            Display:
-            ```
-              +  Library documentation ({count} entries) added to Relevant Wiki section.
-            ```
-
-            <!-- ── 8e: Dispatch Pass 4 — Integration Analysis ───────────── -->
-
-            Display:
-            ```
-              i  Pass 4: Dispatching integration analysis...
-                 Agent will create integration-analysis.md in story directory.
-            ```
-
-            **CRITICAL — Context Window Protection:**
-            The agent writes to a separate file and returns ONLY a ~10-line confirmation.
-            This prevents agent output from inflating the main context window.
-
-            **CRITICAL — Do NOT call TaskOutput. NEVER. UNDER NO CIRCUMSTANCES.**
-            After spawning the background agent, do NOT call TaskOutput to read its results.
-            You will be automatically notified when the agent completes — IGNORE those notifications.
-            The agent writes to `{INIT.paths.integration_analysis_file}` on disk. You do not need the return message.
-            TaskOutput returns the agent's FULL internal transcript (every file read, every search,
-            every tool call) — calling it will inflate the context window by 10-20%. THIS IS FORBIDDEN.
-
-            Spawn background agent:
-            ```
-            Agent(
-                prompt="/ace:research-integration-solution story={INIT.paths.story_file}
-
-                Execute the research-integration-solution workflow end-to-end.
-                Write the output to {INIT.paths.integration_analysis_file}.
-                The story file now has the Relevant Wiki section (pass 2 complete).
-                {If external analysis exists: The external-analysis.md file exists in the story directory.}
-
-                **Return format — ONLY this, nothing else:**
-                DONE
-                - Story: {story ID} — {story title}
-                - Integration points found: {count}
-                - Output: {integration analysis file path}",
-                subagent_type="ace-code-integration-analyst",
-                model="{PO_MODEL}",
-                run_in_background=true,
-                description="Pass 4: Integration analysis"
-            )
-            ```
-
-            Store the agent task ID as `PASS4_TASK`.
-
-            **After background notification arrives — IGNORE it:**
-
-            Do NOT call TaskOutput. Do NOT call TaskOutput. Do NOT call TaskOutput.
-            Just verify the file and read it directly from disk if needed.
-
-            <!-- ── 8f: Wait for pass 4 before pass 5 ────────────────────── -->
-
-            **Wait for PASS4_TASK notification.**
-            Do NOT call TaskOutput. Do NOT call TaskOutput. Do NOT call TaskOutput.
-
-            After notification arrives, verify:
-            ```bash
-            wc -l {INIT.paths.integration_analysis_file}
-            ```
-
-            Display:
-            ```
-              +  Pass 4 complete. Integration analysis written.
-            ```
-
-            <!-- ── 8g: Dispatch Pass 5 — Technical Solution ─────────────── -->
-
-            Display:
-            ```
-              i  Pass 5: Dispatching technical solution design...
-                 Agent will append Technical Solution to story file.
-            ```
-
-            **CRITICAL — Context Window Protection:**
-            The agent writes directly into the story file and returns ONLY a ~10-line confirmation.
-            This prevents agent output from inflating the main context window.
-
-            **CRITICAL — Do NOT call TaskOutput. NEVER. UNDER NO CIRCUMSTANCES.**
-            After spawning the background agent, do NOT call TaskOutput to read its results.
-            You will be automatically notified when the agent completes — IGNORE those notifications.
-            The agent writes directly to the story file on disk. You do not need the return message.
-            TaskOutput returns the agent's FULL internal transcript (every file read, every search,
-            every tool call) — calling it will inflate the context window by 10-20%. THIS IS FORBIDDEN.
-
-            Spawn background agent:
-            ```
-            Agent(
-                prompt="/ace:research-technical-solution story={INIT.paths.story_file}
-
-                Execute the research-technical-solution workflow end-to-end.
-                The story file has the full requirements + Relevant Wiki section.
-                {If LIB_DOCS provided: The Relevant Wiki section includes a '### Library Documentation' subsection with external library/API doc references — READ/FETCH these as primary design input.}
-                The integration-analysis.md exists in the story directory.
-                {If external analysis exists: The external-analysis.md exists in the story directory.}
-                Append the Technical Solution section to the story file.
-
-                **Return format — ONLY this, nothing else:**
-                DONE
-                - Story: {story ID} — {story title}
-                - Components designed: {count}
-                - Sequence diagrams: {count}
-                - Story file updated: {story file path}",
-                subagent_type="ace-technical-application-architect",
-                model="{PO_MODEL}",
-                run_in_background=true,
-                description="Pass 5: Technical solution"
-            )
-            ```
-
-            Store the agent task ID as `PASS5_TASK`.
-
-            **After background notification arrives — IGNORE it:**
-
-            Do NOT call TaskOutput. Do NOT call TaskOutput. Do NOT call TaskOutput.
-            Just verify the file and read it directly from disk if needed.
-
-            <!-- ── 8h: Wait for pass 5 ──────────────────────────────────── -->
-
-            **Wait for PASS5_TASK notification.**
-            Do NOT call TaskOutput. Do NOT call TaskOutput. Do NOT call TaskOutput.
-
-            After notification arrives, verify:
-            ```bash
-            wc -l {INIT.paths.story_file}
-            ```
-
-            Display:
-            ```
-              +  Pass 5 complete. Technical solution appended to story file.
-            ```
-
-            <!-- ── 8i: Verification — confirm all passes ran ────────────── -->
-
-            Read the story file and verify it contains BOTH:
-            1. A `## Relevant Wiki` section with actual wiki references (not just a placeholder)
-            2. A `## Technical Solution` section with actual technical design (not just a placeholder or reference to another file)
-
-            If either section is missing or still a placeholder, the pass dispatch FAILED.
-            Display an error and re-dispatch the missing pass(es).
-        </step>
 
         <!-- ══════════════════════════════════════════════════════════════════ -->
-        <!-- STEP 9: STATE UPDATES                                             -->
+        <!-- PHASE 1 ENDS HERE                                                 -->
+        <!-- Steps 8-11 (research dispatch, state updates, GitHub, commit)     -->
+        <!-- are handled by the SKILL ORCHESTRATOR in SKILL.md <process>.      -->
         <!-- ══════════════════════════════════════════════════════════════════ -->
-
-        <step name="state-updates" order="9">
-
-            <substep order="9.1" name="update-state-via-tools">
-                ```bash
-                node ${CLAUDE_SKILL_DIR}/script.js update-state \
-                  story={INIT.paths.story_file} \
-                  status=Refined
-                ```
-
-                Parse result for: `story_updated`, `feature_updated`, `backlog_updated`.
-
-                ```
-                  +  Story status updated to Refined
-                  {+  Feature file updated (if feature_updated)}
-                  {+  Product backlog updated (if backlog_updated)}
-                ```
-            </substep>
-
-            Continue to step 10.
-        </step>
-
-        <!-- ══════════════════════════════════════════════════════════════════ -->
-        <!-- STEP 10: GITHUB SYNC                                              -->
-        <!-- ══════════════════════════════════════════════════════════════════ -->
-
-        <step name="github-sync" order="10">
-
-            <variant condition="INIT.github_project.enabled is false OR INIT.has_gh_cli is false">
-                ```
-                  —  GitHub sync skipped (not configured or gh CLI unavailable).
-                ```
-                Continue to step 11.
-            </variant>
-
-            <variant condition="INIT.github_project.enabled is true AND INIT.has_gh_cli is true">
-                Sync story and feature GitHub issues in a single call.
-                This command prints status lines directly to the console (stderr)
-                so the user ALWAYS sees whether each issue was updated or not.
-
-                ```bash
-                node ${CLAUDE_SKILL_DIR}/script.js sync-github \
-                  repo={INIT.github_project.repo} \
-                  story_file={INIT.paths.story_file} \
-                  feature_file={INIT.paths.feature_file} \
-                  owner={INIT.github_project.owner} \
-                  project={INIT.github_project.project_number}
-                ```
-
-                The command handles all cases:
-                - Story/feature has no GitHub issue linked → prints skip message
-                - Update succeeds → prints success message with issue number
-                - Update fails → prints error message with details
-
-                Continue to step 11.
-            </variant>
-        </step>
-
-        <!-- ══════════════════════════════════════════════════════════════════ -->
-        <!-- STEP 11: COMMIT                                                   -->
-        <!-- ══════════════════════════════════════════════════════════════════ -->
-
-        <step name="commit" order="11">
-
-            **If `commit_docs` is false:** Skip commit.
-
-            Stage all changed/created files:
-            ```bash
-            git add {INIT.paths.story_dir}/
-            git add {INIT.paths.feature_file} .ace/artifacts/product/product-backlog.md
-            ```
-
-            Commit with descriptive message:
-            - CREATE mode: `git commit -m "docs: plan story {Story ID} — {Story Title}"`
-            - REFINE mode: `git commit -m "docs: refine story {Story ID} — {brief summary of changes}"`
-
-            Display completion:
-
-            ```
-            ╔══════════════════════════════════════════════════╗
-            ║  ACE > Story [Planned | Refined]                 ║
-            ║  {Story ID} "{Story Title}"                      ║
-            ╚══════════════════════════════════════════════════╝
-
-              +  Story specification complete. All passes finished.
-
-              Artifacts:
-              ────────
-              Story file:            {INIT.paths.story_file}
-              {External analysis:    {INIT.paths.external_analysis_file} (if created)}
-              Integration analysis:  {INIT.paths.integration_analysis_file}
-
-              Summary:
-              ────────
-              Acceptance criteria: {N} scenarios
-              Size: {estimate}
-              Passes completed: {2-5 count}
-
-              Next > /ace:execute-story story={INIT.paths.story_file}
-                     Execute the story implementation.
-                   > /ace:plan-story story={next story}
-                     Plan the next story in the feature.
-            ```
-        </step>
 
     </process>
 
     <success_criteria>
         - Init function executed (environment detected, story validated or env-only init for new stories)
-        - IS_NEW_STORY correctly determined: true when no story param, story has no ACE structure, or file has no feature reference
-        - Step 2 (backlog-check-placement) executed when IS_NEW_STORY is true:
-          - Product backlog read and features presented for selection
-          - Story title extracted from STORY_CONTENT or asked via AskUserQuestion
-          - Feature placement confirmed (TARGET_FEATURE set)
-          - Story ID assigned as next S[N] in the selected feature
-          - Story ordering within feature confirmed (INSERT_AFTER set)
-          - Dependencies asked and recorded (BLOCKED_BY, BLOCKS)
-          - Story stub file created at correct ACE path with proper header (Feature/Epic/Status/Link)
-          - Feature file updated: story row added to breakdown table, detail section appended, blocking story's Dependencies section updated if applicable
-          - GitHub issue created (if enabled): issue linked as parent of feature issue, file header updated with link, directory and file renamed to #{issue_number}-{slug}
-          - INIT re-run with final story file path; story_valid confirmed true
-        - Step 2 skipped when IS_NEW_STORY is false (story is a proper ACE file with feature reference)
+        - IS_NEW_STORY correctly determined: true when no story param, no ACE structure, or no feature reference
+        - Step 2 (backlog-check-placement) executed when IS_NEW_STORY is true
         - Story seed loaded and parsed (title, description, images validated)
-        - CREATE vs REFINE mode correctly determined
+        - CREATE vs REFINE mode correctly determined (SKIP_TO_RESEARCH for existing stories with AC)
         - Feature context loaded (parent feature document, if available)
         - Deep questioning conducted with ZERO-ASSUMPTION mandate
+        - ALL questions asked via AskUserQuestion tool — no plain-text question dumps
         - Every acceptance criterion has EXACT trigger, precondition, outcome, data, error handling
-        - No vague terms remain ("it works", "shows error", "updates data" — all must be specific)
+        - No vague terms remain — all must be specific and observable
         - All Gherkin scenarios follow Given/When/Then format correctly
         - Scenarios are independent — no scenario depends on another's state
         - Minimum coverage: happy path + edge case + error path
@@ -1286,16 +855,6 @@
         - Story size is Fibonacci (1, 2, 3, 5, 8) — split if > 8 or > 6-8 scenarios
         - Story document written following story.xml template exactly (sections 1-8)
         - User reviewed and approved pass 1 output
-        - Pass 2 (wiki research) dispatched as background agent, wrote to story file
-        - Pass 3 (external analysis) offered/dispatched if external-codebase provided
-        - Library documentation entries injected into Relevant Wiki section after pass 2 (if lib-docs provided)
-        - Pass 4 (integration analysis) dispatched AFTER passes 2-3 complete
-        - Pass 5 (technical solution) dispatched AFTER pass 4 complete
-        - NO TaskOutput called on ANY background agent — context window stays clean
-        - Each background agent wrote output directly to disk (story file or separate artifact)
-        - Story status updated to Refined via ace-tools (story file, feature file, product backlog)
-        - GitHub issue synced (if applicable): updated with full story body and project status
-        - All artifacts committed with descriptive message (story dir + feature file + backlog)
     </success_criteria>
 
 </workflow>

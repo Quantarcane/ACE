@@ -27,6 +27,18 @@
               echo "SCOPE=global"
               echo "RUNTIME=claude"
               echo "VERSION=$(cat $HOME/.claude/shared/VERSION)"
+            elif [ -f "./.codex/shared/VERSION" ]; then
+              echo "SCOPE=local"
+              echo "RUNTIME=codex"
+              echo "VERSION=$(cat ./.codex/shared/VERSION)"
+            elif [ -n "$CODEX_HOME" ] && [ -f "$CODEX_HOME/shared/VERSION" ]; then
+              echo "SCOPE=global"
+              echo "RUNTIME=codex"
+              echo "VERSION=$(cat $CODEX_HOME/shared/VERSION)"
+            elif [ -f "$HOME/.codex/shared/VERSION" ]; then
+              echo "SCOPE=global"
+              echo "RUNTIME=codex"
+              echo "VERSION=$(cat $HOME/.codex/shared/VERSION)"
             elif [ -f "./.opencode/shared/VERSION" ]; then
               echo "SCOPE=local"
               echo "RUNTIME=opencode"
@@ -118,7 +130,7 @@
 
                For SCOPE=local: `./.claude/shared/CHANGELOG.md`
                For SCOPE=global: `~/.claude/shared/CHANGELOG.md`
-               (substitute `.opencode` for Crush runtime)
+               (substitute `.codex` for Codex or `.opencode` for Crush runtime)
 
                If found, read it directly.
 
@@ -150,12 +162,14 @@
 
             The installer performs a clean install of ACE folders:
             - `skills/`, `shared/`, `.claude-plugin/` will be wiped and replaced
+            - In Codex, `skills/ace-*`, `shared/`, and `agents/ace-*` will be replaced
             - `agents/ace-*` files will be replaced
 
             Your custom files are preserved:
             - Custom skills not in the ACE plugin
             - Custom agents not prefixed with `ace-`
             - Your CLAUDE.md files
+            - Your Codex config outside the managed ACE block
             - Your .ace/ project artifacts
             ```
 
@@ -180,6 +194,8 @@
             Examples:
             - Global Claude:  `npx agile-context-engineering --claude --global`
             - Local Claude:   `npx agile-context-engineering --claude --local`
+            - Global Codex:   `npx agile-context-engineering --codex --global`
+            - Local Codex:    `npx agile-context-engineering --codex --local`
             - Global Crush:   `npx agile-context-engineering --opencode --global`
             - Local Crush:    `npx agile-context-engineering --opencode --local`
 
@@ -199,7 +215,7 @@
             rm -f "$HOME/.claude/cache/ace-update-check.json"
             ```
 
-            For Crush runtime, substitute `.opencode` for `.claude` in the cache path.
+            For Codex runtime, use `.codex` (or `$CODEX_HOME`) instead of `.claude`. For Crush runtime, substitute `.opencode` for `.claude` in the cache path.
         </step>
 
         <!-- ══════════════════════════════════════════════════════════════════ -->
@@ -214,7 +230,7 @@
               ACE Updated: v{old} -> v{new}
             ============================================================
 
-            Restart Claude Code to pick up the new commands.
+            Restart your AI coding assistant to pick up the new commands.
 
             View full changelog: https://github.com/Quantarcane/ACE/blob/main/CHANGELOG.md
             ```
@@ -223,7 +239,7 @@
     </process>
 
     <success_criteria>
-        <check>Installed version detected correctly (local/global, claude/crush)</check>
+        <check>Installed version detected correctly (local/global, claude/codex/crush)</check>
         <check>Latest version checked via npm</check>
         <check>Update skipped if already current</check>
         <check>Changelog fetched and displayed BEFORE update</check>

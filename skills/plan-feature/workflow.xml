@@ -791,6 +791,8 @@
                  The `plan-story` command handles formal specification later.)
                - Key behaviors and edge cases to consider
                - Relationship to other stories in the feature
+               - Optional Technical Direction ONLY when the user has implementation guidance
+                 for this story. Treat it as advisory design input, not scope.
                - **Rough Fibonacci estimate** (1, 2, 3, 5, 8) — aim for 8sp and 5sp.
                  `plan-story` can refine later after detailed specification.
 
@@ -867,6 +869,7 @@
             - Acceptance Criteria (3-7 items)
             - Existing Implementation (brownfield only — from RELEVANT_CODE, confirmed by user)
             - Story Breakdown: index table with rough Fibonacci estimates + rich descriptions for each story
+              + optional per-story Technical Direction where explicitly captured
             - Technical Context: System Boundaries, Integration Points, Cross-Cutting Concerns, NFRs
             - Dependencies: Requires, Enables, External
             - Metadata: current date, refinement count
@@ -897,26 +900,30 @@
                    relationships to other stories.
                    These are NOT formal user stories — they are thorough descriptions of intent
                    and scope. The `plan-story` command handles formal specification later.
-                5. Story index table:
+                5. If a story has explicit technical guidance, include it under that story as:
+                   `#### Technical Direction`
+                   The subsection is OPTIONAL and advisory. Include it only when meaningful.
+                   Do not use technical direction to expand scope beyond the story description.
+                6. Story index table:
                    - ID = S[N], sequential within this feature
                    - Size = rough Fibonacci estimate (1, 2, 3, 5, 8) from the questioning session
                    - Status = Todo
                    - Sprint = —
                    - Link = —
-                6. Follow all field definitions from the template:
+                7. Follow all field definitions from the template:
                    - Feature Status: Refined (stories well-defined) or Todo (if still rough)
                    - Feature Size: Fibonacci x10 values only (10, 20, 30, 50, 80)
                    - Priority: Critical | High | Medium | Low
-                7. Benefit Hypothesis MUST follow SAFe format exactly:
+                8. Benefit Hypothesis MUST follow SAFe format exactly:
                    'We believe [outcome] will be achieved if [users] successfully [action] with [feature].'
                    The outcome must be measurable and falsifiable.
-                8. Acceptance Criteria are HIGH-LEVEL business validation — NOT Gherkin scenarios.
+                9. Acceptance Criteria are HIGH-LEVEL business validation — NOT Gherkin scenarios.
                    3-7 criteria, each independently verifiable.
-                9. Table formatting (CRITICAL): pad ALL cells with spaces so | separators align
+                10. Table formatting (CRITICAL): pad ALL cells with spaces so | separators align
                    vertically across all rows. Follow the table-formatting guideline from the
                    template for minimum column widths.
-                10. GitHub identity: use #[issue_number] for GitHub-linked items, S[N] for local stories
-                11. Metadata: Created={today}, Last refined={today}, Refinements=1
+                11. GitHub identity: use #[issue_number] for GitHub-linked items, S[N] for local stories
+                12. Metadata: Created={today}, Last refined={today}, Refinements=1
                     Research artifacts: include paths to relevant-wiki.md and relevant-code.md if they exist,
                     otherwise use '—'
 
@@ -1032,7 +1039,14 @@
 
                 ## Description
 
-                {Copy the rich plain-text description from the feature document's story detail section verbatim.}
+                {Copy the rich plain-text description from the feature document's story detail section verbatim,
+                excluding any `#### Technical Direction` subsection.}
+
+                {If the feature story detail has a `#### Technical Direction` subsection, include:}
+
+                ## Technical Direction
+
+                {Copy the story's Technical Direction subsection content verbatim.}
 
                 ---
                 *Stub created by plan-feature. Run `/ace:plan-story {Story ID}` for formal specification with INVEST criteria and Gherkin acceptance scenarios.*

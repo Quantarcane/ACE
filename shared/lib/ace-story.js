@@ -167,6 +167,17 @@ function extractStoryRequirements(content) {
 }
 
 /**
+ * Extract optional technical direction from a story.
+ *
+ * This section is advisory only: it guides technical solution design when present,
+ * but downstream solution design may deviate when codebase evidence suggests a
+ * better approach.
+ */
+function extractTechnicalDirection(content) {
+  return extractMarkdownSection(content, 'Technical Direction', 2);
+}
+
+/**
  * Parse the "## Relevant Wiki" section to extract structured wiki file references.
  */
 function extractWikiReferences(content) {
@@ -394,6 +405,7 @@ module.exports = {
   extractIssueNumber,
   extractIssueNumberFromFile,
   extractStoryRequirements,
+  extractTechnicalDirection,
   extractWikiReferences,
   computeStoryPaths,
   updateState,

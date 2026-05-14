@@ -60,7 +60,7 @@
         </pass>
         <pass order="5" template="story-technical-solution.xml" output="story-file" required="true">
             Technical Solution — design the implementation approach.
-            Input: ALL prior passes (story file + external artifacts).
+            Input: ALL prior passes (story file + optional Technical Direction + external artifacts).
             Produces the technical-solution section appended to the story file.
         </pass>
 
@@ -114,6 +114,22 @@
             Describe observable user behavior — what the user can do when this story is done.
             How this story relates to adjacent stories in the feature (what it builds on, what it enables).
             Focus on WHAT and WHY, not HOW.]
+        </section>
+
+        <section name="technical-direction" optional="true">
+            ## Technical Direction
+
+            &lt;!-- OPTIONAL. Include only when the story has meaningful implementation guidance.
+                 This section may include preferred approaches, architectural hints, libraries,
+                 constraints, patterns to consider, or design ideas that should inform pass 5.
+
+                 Technical Direction is advisory, not binding:
+                 - It must NOT expand scope beyond Acceptance Criteria.
+                 - It must NOT override coding standards, integration analysis, or verified codebase facts.
+                 - The technical solution should consider it and may choose a better approach.
+                 - If pass 5 deviates from it, the Technical Solution must note the deviation at the end. --&gt;
+
+            [Optional technical design guidance for this story.]
         </section>
 
         <section name="acceptance-criteria">
@@ -211,7 +227,7 @@
 
             &lt;!-- Pass 5. Populated by story-technical-solution.xml template.
                  Consumes ALL prior passes as input:
-                 - Story file (sections 1-8 + relevant wiki)
+                 - Story file (sections 1-8 + optional Technical Direction + relevant wiki)
                  - external-analysis.md (if it exists in story directory)
                  - integration-analysis.md (from story directory)
                  See story-technical-solution.xml for full section structure. --&gt;
@@ -382,7 +398,8 @@
 
         <guideline name="completeness">
             Every run of plan-story should produce a COMPLETE story specification —
-            user story, description, all AC scenarios, out-of-scope, dependencies, DoD.
+            user story, description, optional technical direction, all AC scenarios,
+            out-of-scope, dependencies, DoD.
             Do not defer sections to "later passes."
 
             Re-running plan-story on the same story is supported for scope changes
@@ -418,8 +435,9 @@
         Output is a separate artifact in the story directory — NOT part of the story file.
 
         **Pass 5 — Technical Solution (story-technical-solution.xml → story file):**
-        Consumes ALL prior outputs: story file (requirements + wiki) plus the external
-        artifacts (external-analysis.md and integration-analysis.md from story directory).
+        Consumes ALL prior outputs: story file (requirements + optional Technical Direction
+        + wiki) plus the external artifacts (external-analysis.md and integration-analysis.md
+        from story directory).
         Designs the implementation approach and appends the Technical Solution section
         to the story file.
         Story status moves from "Todo" to "Refined" in the parent feature's story index.

@@ -79,7 +79,8 @@ effort: max
 
             Two execution modes:
             - **Solo Mode** (default or --agent-teams-off): Single context, plan mode → execute
-            - **Agent Teams Mode** (when enabled + plan recommends): Lead + teammates for parallel work
+            - **Agent Teams Mode** (Claude Code only, when enabled + plan recommends): Lead + teammates for parallel work
+              Codex and OpenCode do not support Agent Teams and must always use Solo Mode.
         </objective>
 
         <artifacts>

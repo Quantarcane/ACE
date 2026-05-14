@@ -6,6 +6,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-04-30
+
+### Added
+- Codex runtime installation via `--codex`, including `$ace-*` skills, shared ACE libraries, and managed Codex agent TOML configuration.
+
 ## [0.3.0] - 2026-03-20
 
 ### Added
@@ -72,7 +77,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Installer (`bin/install.js`) with support for Claude Code and Crush runtimes
 - Local and global installation modes
 
-[Unreleased]: https://github.com/Quantarcane/ACE/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/Quantarcane/ACE/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/Quantarcane/ACE/releases/tag/v0.5.1
 [0.3.0]: https://github.com/Quantarcane/ACE/releases/tag/v0.3.0
 [0.2.2]: https://github.com/Quantarcane/ACE/releases/tag/v0.2.2
 [0.2.1]: https://github.com/Quantarcane/ACE/releases/tag/v0.2.1

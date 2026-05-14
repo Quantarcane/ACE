@@ -128,7 +128,10 @@ describe('execute-story script', () => {
       assert.strictEqual(result.has_story_file, true);
       assert.strictEqual(typeof result.commit_docs, 'boolean');
       assert.strictEqual(typeof result.has_git, 'boolean');
+      assert.ok(['claude', 'codex', 'opencode', 'unknown'].includes(result.runtime));
+      assert.strictEqual(typeof result.supports_agent_teams, 'boolean');
       assert.strictEqual(typeof result.agent_teams, 'boolean');
+      assert.strictEqual(result.agent_teams, result.supports_agent_teams && result.agent_teams);
     });
 
     it('returns invalid when story has no AC', () => {

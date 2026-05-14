@@ -11,6 +11,7 @@
 
         The technical solution uses:
         - Business requirements from the story (User Story, Description, AC — passes 1-2)
+        - Optional Technical Direction from the story (advisory design guidance)
         - Wiki references from the story's Relevant Wiki section (pass 2)
         - Integration analysis from the story directory (pass 4 — MANDATORY)
         - External analysis from the story directory (pass 3 — OPTIONAL)
@@ -53,6 +54,7 @@
             - **Wiki Documents Loaded**: [N] files
             - **Integration Analysis**: Incorporated
             - **External Analysis**: [Incorporated / Not available]
+            - **Technical Direction**: [Considered / Not provided]
             - **AC Scenarios**: [N] (each with sequence diagram)
             - **New Files**: [N] | **Modified Files**: [N]
         </section>
@@ -788,6 +790,33 @@
             For complete technical design details, see the sections above.
         </section>
 
+        <section name="technical-direction-alignment">
+            ### V.14. Technical Direction Alignment
+
+            &lt;!-- Include this section at the END of the technical solution.
+                 If the story has no Technical Direction, write "No Technical Direction was provided."
+
+                 Technical Direction is advisory, not binding. The solution should account for it,
+                 but may choose a better approach when codebase evidence, integration analysis,
+                 coding standards, or simpler maintainable architecture justify the deviation. --&gt;
+
+            #### Direction Considered
+            - [Technical direction item from the story, or "No Technical Direction was provided."]
+
+            #### Followed
+            - [Direction item followed and where it appears in this solution]
+
+            #### Adapted
+            - [Direction item adapted, how it changed, and why]
+
+            #### Deviations
+            - [Direction item intentionally not followed]
+              - **Chosen approach:** [Better approach selected]
+              - **Rationale:** [Why this is better based on integration analysis, coding standards,
+                verified codebase facts, maintainability, performance, or testability]
+              - **Impact:** [Any implementation or testing implications]
+        </section>
+
     </output-format>
 
     <analysis-process>
@@ -797,18 +826,19 @@
              instructions for each analysis phase.
 
              MANDATORY COMPLETION REQUIREMENTS:
-             - Phase 1: ALL 4 items (Initial Discovery) — MANDATORY
+             - Phase 1: 4 mandatory items + 1 conditional item (Initial Discovery)
              - Phase 2: ALL 3 items (System Architecture Understanding) — MANDATORY
              - Phase 3: ALL 2 items (Codebase Analysis) — MANDATORY
              - Phase 4: Solution Design (generate ALL output sections) — MANDATORY
-             - Total: 9 mandatory analysis items + 13 output sections — SKIP NONE --&gt;
+             - Total: 9 mandatory analysis items + 1 conditional analysis item + 16 output sections — SKIP NONE --&gt;
 
         <phase name="initial-discovery" order="1">
-            &lt;!-- ALL 4 items are MANDATORY --&gt;
+            &lt;!-- 4 items are mandatory; Technical Direction study is conditional. --&gt;
 
             <item name="understand-story" mandatory="true">
                 **[MANDATORY] Understand the Story:**
                 - Read the story thoroughly: User Story, Description, all AC scenarios
+                - Read optional Technical Direction when present
                 - These define WHAT functionality needs to be implemented
                 - Extract key behaviors, components, and patterns needed
                 - The story's acceptance criteria define the SCOPE of the solution
@@ -821,6 +851,15 @@
                 - The story IS the source of truth for business requirements
                 - Extract all constraints, behaviors, and expected outcomes
                 - Map each AC scenario to the technical components needed
+            </item>
+
+            <item name="study-technical-direction" mandatory="false">
+                **[CONDITIONAL] Study Technical Direction:**
+                - Only if the story contains `## Technical Direction`
+                - Treat it as advisory design input, not a constraint
+                - Account for it when it fits verified codebase facts, integration analysis, and coding standards
+                - Prefer a better approach when justified
+                - Track followed, adapted, and deviated items for the final alignment section
             </item>
 
             <item name="study-external-analysis" mandatory="false">
@@ -888,7 +927,7 @@
         </phase>
 
         <phase name="solution-design" order="4">
-            &lt;!-- Generate ALL 13 output sections --&gt;
+            &lt;!-- Generate ALL 16 output sections --&gt;
 
             <item name="generate-all-sections" mandatory="true">
                 **[MANDATORY] Generate Complete Technical Solution:**
@@ -908,6 +947,7 @@
                 13. V.11. Testing Strategy (unit, integration, e2e)
                 14. V.12. Implementation Order with dependencies
                 15. V.13. Implementation Checklist
+                16. V.14. Technical Direction Alignment (final section)
             </item>
         </phase>
 
@@ -916,11 +956,12 @@
     <validation-checklist>
 
         &lt;!-- The workflow uses this checklist to validate completeness.
-             ALL 25 items MUST pass before the solution is considered complete. --&gt;
+             ALL 27 items MUST pass before the solution is considered complete. --&gt;
 
         **Story File Requirements:**
         - [ ] Technical solution section exists in the story file
         - [ ] Section contains all required subsections from template
+        - [ ] Technical Direction Alignment is present as the final section
 
         **Architecture Requirements:**
         - [ ] Component &amp; Boundary Architecture with Mermaid diagram
@@ -959,10 +1000,11 @@
         **Compliance Requirements:**
         - [ ] Coding standards compliance verified throughout
         - [ ] Integration analysis findings incorporated
+        - [ ] Technical Direction considered when present and deviations documented
         - [ ] No hardcoded values in any code snippets
         - [ ] All code follows Clean Architecture layers
 
-        **Total: 25 mandatory checklist items**
+        **Total: 27 mandatory checklist items**
 
     </validation-checklist>
 

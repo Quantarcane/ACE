@@ -2,7 +2,7 @@
 name: map-guide
 description: Create or update a step-by-step guide in .docs/wiki/subsystems/[name]/guides/ — recipes for common implementation tasks
 argument-hint: "text='How to add a new drawing tool' subsystem='qarc-charts-v2' commits=3"
-disable-model-invocation: true
+disable-model-invocation: false
 allowed-tools:
   - Read
   - Bash

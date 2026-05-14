@@ -142,13 +142,13 @@ On every Claude Code session start, `hooks/ace-check-update.js` runs in a detach
 
 ### Statusline Indicator
 
-`hooks/ace-statusline.js` reads the cache file and shows a yellow `⬆ /ace:update` indicator when `update_available` is true.
+`hooks/ace-statusline.js` reads the cache file and shows a yellow `⬆ /ace:update` indicator when `update_available` is true in Claude Code. Codex does not use the Claude statusline hook; users can still run `$ace-update` manually.
 
 ### Update Flow
 
 When the user runs `/ace:update`:
 
-1. Detects installation type (local/global, Claude/Crush)
+1. Detects installation type (local/global, Claude/Codex/Crush)
 2. Checks npm for latest version
 3. **Fetches CHANGELOG.md** (local copy first, falls back to GitHub raw URL)
 4. **Extracts and displays "What's New"** — all entries between installed and latest versions
@@ -165,7 +165,7 @@ When the user runs `/ace:update`:
 | `CHANGELOG.md` | Source of truth for release notes |
 | `package.json` | Version field, npm metadata, files list |
 | `.github/workflows/release.yml` | Automated release + npm publish on tag push |
-| `bin/install.js` | Copies CHANGELOG.md to install directory |
+| `bin/install.js` | Copies CHANGELOG.md to install directory and installs Claude, Codex, or Crush runtime files |
 | `hooks/ace-check-update.js` | Background update checker (SessionStart hook) |
 | `hooks/ace-statusline.js` | Statusline update indicator |
 | `skills/update/SKILL.md` | User-facing `/ace:update` skill |
@@ -184,6 +184,6 @@ When the user runs `/ace:update`:
 - Ensure `package.json` version matches the tag (npm rejects duplicate versions)
 
 ### Users don't see update
-- The background check runs once per session — user needs to restart Claude Code
+- The background check runs once per Claude Code session — user needs to restart Claude Code
 - Check that `npm view agile-context-engineering version` returns the new version
 - npm registry propagation can take a few minutes

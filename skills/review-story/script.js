@@ -62,9 +62,9 @@ function cmdInit(cwd, raw, args, parsed) {
 
   // ── Agent teams detection (sync from runtime settings) ──
   // RUNTIME_CONFIG_DIR is not in shared libs — detect inline
-  // Try .claude first, then .opencode
+  // Try runtime settings files that can carry ACE agent-team state.
   let agent_teams = settings.agent_teams || false;
-  for (const configDir of ['.claude', '.opencode']) {
+  for (const configDir of ['.claude', '.codex', '.opencode']) {
     const claudeSettingsPath = path.join(cwd, configDir, 'settings.json');
     try {
       const claudeRaw = fs.readFileSync(claudeSettingsPath, 'utf-8');
