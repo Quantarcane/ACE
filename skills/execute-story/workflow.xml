@@ -553,6 +553,7 @@
                 The main session's context is preserved for post-implementation steps (review, state, wiki).
 
                 ```
+                Claude dispatch:
                 Agent(
                     prompt="You are the ACE Story Executor. Implement this story by following
                     the approved execution plan EXACTLY.
@@ -598,6 +599,49 @@
                     subagent_type="general-purpose",
                     model="{INIT.executor_model}",
                     description="Execute {INIT.story.id}"
+                )
+
+                Codex dispatch:
+                spawn_agent(
+                    agent_type="default",
+                    message="You are the ACE Story Executor. Implement this story by following the approved execution plan EXACTLY.
+
+                    STORY: {INIT.story.id} — {INIT.story.title}
+                    STORY FILE: {INIT.paths.story_file}
+
+                    Read the story file to get the full Acceptance Criteria and Technical Solution.
+
+                    {If INIT.has_coding_standards:}
+                    CODING STANDARDS: {INIT.paths.coding_standards}
+                    Read coding standards in full before starting implementation.
+
+                    APPROVED EXECUTION PLAN:
+                    {APPROVED_PLAN}
+
+                    RULES:
+                    - Follow the plan step by step — do NOT skip steps or reorder
+                    - After each significant step: run build check + test check
+                    - NO commits — all changes stay as working tree changes
+                    - NEVER use node -e with Windows backslash paths in bash — backslashes get eaten as escape characters. Use file-reading tools to read files.
+                    - Auto-fix bugs, missing critical code, and blocking issues (Rules 1-3)
+                    - For architectural changes beyond story scope (Rule 4): STOP and include in your return report — main will ask the user
+                    - Respect Out of Scope — do NOT implement anything not in the AC
+
+                    SELF-VERIFICATION (after ALL implementation is complete):
+                    - Verify all key files from the plan exist
+                    - Run full build — must pass
+                    - Run full test suite — must pass
+                    - If verification fails, fix before returning
+
+                    Return format ONLY:
+                    IMPLEMENTATION COMPLETE
+                    - Files created: {list}
+                    - Files modified: {list}
+                    - Build: {pass/fail}
+                    - Tests: {pass/fail — include test command and result}
+                    - Deviations: {list of [Rule N] deviations, or 'None'}
+                    - Rule 4 blockers: {list of architectural issues needing user decision, or 'None'}
+                    - Notes: {anything the main session needs to know}"
                 )
                 ```
 
@@ -689,6 +733,7 @@
                 **Solo mode only.** Dispatch the review-story command:
 
                 ```
+                Claude dispatch:
                 Agent(
                     prompt="/ace:review-story story={INIT.paths.story_file}
 
@@ -710,6 +755,12 @@
                     subagent_type="ace-code-reviewer",
                     model="{INIT.reviewer_model}",
                     description="Code review for {INIT.story.id}"
+                )
+
+                Codex dispatch:
+                spawn_agent(
+                    agent_type="ace-code-reviewer",
+                    message="You are ACE execute-story Step 4: code review. You are already the final `ace-code-reviewer` review agent. Do NOT invoke `$ace-review-story`. Do NOT call `spawn_agent`. Execute the installed review-story workflow inline by reading `${CODEX_SKILL_ROOT}/ace-review-story/SKILL.md`, `workflow.xml`, and `../../shared/utils/ui-formatting.md`. Run `node \"${CODEX_SKILL_ROOT}/ace-review-story/script.js\" init \"story={INIT.paths.story_file}\"` to get fresh INIT JSON, then perform the full review workflow and return only the compact REVIEW COMPLETE report with blockers, warnings, artifact coverage, AC coverage, and tech debt YAML."
                 )
                 ```
             </substep>
@@ -974,10 +1025,12 @@
                 handles all tech debt integration (wiki docs + index).
 
                 **CRITICAL — Context Window Protection:**
-                The agent writes directly to wiki files and returns ONLY a confirmation.
+                The wiki mapper agent writes directly to wiki files and returns ONLY a confirmation.
                 Do NOT call TaskOutput on the background agent — it pollutes the main context.
+                Do NOT perform map-story work in the execute-story orchestrator context.
 
                 ```
+                Claude dispatch:
                 Agent(
                     prompt="/ace:map-story story-context={INIT.paths.story_file} tech-debt=\"{tech_debt_yaml from code review output}\"
 
@@ -996,6 +1049,20 @@
                     run_in_background=true,
                     description="Wiki update for {INIT.story.id}"
                 )
+
+                Codex dispatch:
+                spawn_agent(
+                    agent_type="ace-wiki-mapper",
+                    message="You are ACE execute-story Step 7: wiki update. You are already the final `ace-wiki-mapper` wiki agent. Do NOT invoke `$ace-map-story`. Do NOT call `spawn_agent`. Execute the installed map-story workflow inline by reading `${CODEX_SKILL_ROOT}/ace-map-story/SKILL.md`, `workflow.xml`, all templates under `${CODEX_SKILL_ROOT}/ace-map-story/templates/`, and `../../shared/utils/questioning.xml` plus `../../shared/utils/ui-formatting.md`. Run map-story in story mode with `story-context={INIT.paths.story_file}` and tech debt from this payload: `{tech_debt_yaml from code review output}`. Write wiki docs directly to disk. Return only:
+                    WIKI UPDATE COMPLETE
+                    - Updated: {list of updated wiki docs}
+                    - Created: {list of new wiki docs}
+                    - Tech debt integrated: {count} items across {count} wiki docs
+                    - No change needed: {list}
+                    WALKTHROUGH SUGGESTIONS
+                    - FLOW: {flow description} | SUBSYSTEM: {name} | EMPHASIS: {frameworks or none} | REASON: {why}
+                    [or: WALKTHROUGH SUGGESTIONS: none]"
+                )
                 ```
 
                 Store the agent task ID as `WIKI_TASK`.
@@ -1004,13 +1071,24 @@
             <substep order="7.3" name="wait-for-wiki-completion" condition="FINAL_STATUS is Done">
                 **BLOCKING WAIT — Do NOT proceed to substep 7.4 until the wiki mapper has finished.**
 
-                Poll using TaskGet until the background agent completes:
+                Runtime wait mapping:
+                - Claude: Poll using TaskGet until the background agent completes.
+                - Codex: Use `wait_agent(targets=[WIKI_TASK])` on the `spawn_agent` id until it completes.
+
+                Claude polling:
                 ```
                 Loop (max 60 iterations, 10 second intervals):
                     TaskGet(id=WIKI_TASK)
                     If status is "completed" → break, proceed to 7.4
                     If status is "failed" → log warning, proceed to 7.4 (commit without wiki)
                     Otherwise → continue polling
+                ```
+
+                Codex waiting:
+                ```
+                wait_agent(targets=[WIKI_TASK], timeout_ms=600000)
+                If completed → proceed to 7.4.
+                If failed or timed out → log warning, proceed to 7.4 (commit without wiki).
                 ```
 
                 Once complete, verify wiki files exist:
@@ -1088,6 +1166,7 @@
                 For each selected suggestion, spawn a background agent:
 
                 ```
+                Claude dispatch:
                 Agent(
                     prompt="/ace:map-walkthrough flow=\"{suggestion.flow}\" subsystem=\"{suggestion.subsystem}\" emphasis-frameworks=\"{suggestion.emphasis}\"
 
@@ -1096,6 +1175,12 @@
                     run_in_background=true,
                     description="Walkthrough: {short flow name}"
                 )
+
+                Codex dispatch:
+                spawn_agent(
+                    agent_type="ace-wiki-mapper",
+                    message="You are ACE execute-story Step 7.5.1: walkthrough mapping. You are already the final `ace-wiki-mapper` wiki agent. Do NOT invoke `$ace-map-walkthrough`. Do NOT call `spawn_agent`. Execute the installed map-walkthrough workflow inline by reading `${CODEX_SKILL_ROOT}/ace-map-walkthrough/SKILL.md`, `workflow.xml`, and its supporting resources. Use flow=\"{suggestion.flow}\", subsystem=\"{suggestion.subsystem}\", emphasis-frameworks=\"{suggestion.emphasis}\". Write the walkthrough directly to disk and return only the created path and line count."
+                )
                 ```
 
                 **If "Custom":**
@@ -1103,6 +1188,8 @@
                 Spawn a background agent for that walkthrough too.
 
                 Wait for all walkthrough agents to complete.
+                - Claude: Poll the background Agent task IDs.
+                - Codex: Use `wait_agent(targets=[...])` with the walkthrough `spawn_agent` ids.
 
                 Display:
                 ```
