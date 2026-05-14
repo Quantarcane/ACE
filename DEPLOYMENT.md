@@ -99,11 +99,16 @@ rm -rf ~/.opencode/skills ~/.opencode/shared ~/.opencode/agents/ace-* ~/.opencod
 ### After making source code changes
 
 ```bash
-# Re-run the installer to update the marketplace + plugin
+# Claude Code: re-run the installer to update the marketplace + plugin
 node bin/install.js --claude --global
 
 # Then in Claude Code, run:
 # /reload-plugins
+
+# Codex: re-run the installer to copy native skills and agents
+node bin/install.js --codex --global
+
+# Then restart Codex. Codex does not provide /reload-plugins.
 ```
 
 ---

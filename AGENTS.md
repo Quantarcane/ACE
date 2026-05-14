@@ -10,9 +10,9 @@ This repo is the SOURCE CODE of the ACE framework. It is installed as a **Codex 
 node bin/install.js --Codex --global
 ```
 
-Then in Codex, run `/reload-plugins` to pick up changes.
+Then restart Codex to pick up changes. Codex does not provide `/reload-plugins`.
 
-The installer registers this repo as a local marketplace and installs/updates the `ace` plugin. Codex copies the plugin to its internal cache. Skills are invoked as `/ace:skill-name`.
+The installer installs/updates ACE as native Codex skills. Skills are invoked as `$ace-skill-name`.
 
 ## Project Structure
 

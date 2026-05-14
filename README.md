@@ -128,6 +128,21 @@ npx agile-context-engineering --all --global      # All runtimes, global install
 
 Codex installs ACE as native skills with an `ace-` prefix. Use `$ace-help`, `$ace-plan-story`, `$ace-execute-story`, and so on.
 
+After installing or updating ACE, refresh the runtime:
+
+| Runtime | Refresh procedure |
+|---|---|
+| Claude Code | Run `/reload-plugins` or restart Claude Code |
+| Codex | Restart Codex. Codex does not provide `/reload-plugins` |
+| Crush / OpenCode | Restart the runtime if new or updated skills are not visible |
+
+When developing ACE from a local checkout, rerun the installer after source changes, then refresh the runtime:
+
+```bash
+node bin/install.js --claude --global  # Claude Code, then /reload-plugins or restart
+node bin/install.js --codex --global   # Codex, then restart Codex
+```
+
 ### Updating
 
 When a new version is available, Claude Code's status bar will show a yellow `/ace:update` indicator. Run `/ace:update` in Claude/Crush or `$ace-update` in Codex to update — it detects your install type (global/local, Claude/Codex/Crush) automatically and runs the correct installer.
