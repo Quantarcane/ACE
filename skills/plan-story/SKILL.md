@@ -151,12 +151,27 @@ effort: high
         PHASE 2: RESEARCH PASSES (YOU dispatch agents directly)
         ═══════════════════════════════════════════════════════════
 
-        **YOU dispatch these agents using the Agent tool. This is MANDATORY.**
+        **YOU dispatch these agents using the runtime's agent tool: Agent (Claude) or spawn_agent (Codex). This is MANDATORY.**
         **Do NOT write the Relevant Wiki or Technical Solution sections yourself.**
         **Do NOT skip this phase. Do NOT improvise. Dispatch exactly as specified.**
 
         Each agent writes output directly to files. After each agent completes,
         verify the output files exist before dispatching the next pass.
+
+        **Runtime fail-closed rule:**
+        Invocation of this skill in either runtime is authorization to run the
+        required Phase 2 pass agents. Before starting Pass 2, verify that the
+        runtime's agent dispatch tool is available:
+        `Agent` in Claude, `spawn_agent` in Codex. If agent dispatch is unavailable,
+        stop after Phase 1 and tell the user that ACE Phase 2 requires subagents.
+        Never fall back to inline wiki research, inline integration analysis, or
+        inline technical solution writing.
+
+        **Runtime dispatch mapping:**
+        For each pass below, use exactly one dispatch form for the current runtime:
+        - Claude: call the `Agent(...)` block.
+        - Codex: call the `spawn_agent(...)` block.
+        Do NOT replace either dispatch with inline work.
 
         **2a. Re-run init to get fresh paths:**
         ```bash
@@ -187,10 +202,16 @@ effort: high
         ```
           i  Pass 2: Dispatching wiki research...
         ```
+        Claude dispatch:
         Agent(
             description="Pass 2: Wiki research",
             prompt="Your FIRST and ONLY action: use the Skill tool to invoke skill='ace:research-story-wiki' with args='story={INIT.paths.story_file}'. Do NOT improvise. Do NOT write wiki content yourself. The skill has its own workflow and templates. Just invoke it.",
             model="{PO_MODEL}",
+        )
+        Codex dispatch:
+        spawn_agent(
+            agent_type="default",
+            message="Your FIRST and ONLY action: use the $ace-research-story-wiki skill with args `story={INIT.paths.story_file}`. Do NOT improvise. Do NOT write wiki content yourself. Do NOT write unrelated content. Write only the Relevant Wiki artifact required by that skill."
         )
 
         **2d. Dispatch Pass 3 — External Analysis (if RUN_EXTERNAL):**
@@ -199,10 +220,16 @@ effort: high
         ```
           i  Pass 3: Dispatching external analysis...
         ```
+        Claude dispatch:
         Agent(
             description="Pass 3: External analysis",
             prompt="Your FIRST and ONLY action: use the Skill tool to invoke skill='ace:research-external-solution' with args='story={INIT.paths.story_file} external-codebase={EXTERNAL_CODEBASE} {external-docs={EXTERNAL_DOCS} if provided}'. Do NOT improvise. The skill has its own workflow. Just invoke it.",
             model="{PO_MODEL}"
+        )
+        Codex dispatch:
+        spawn_agent(
+            agent_type="default",
+            message="Your FIRST and ONLY action: use the $ace-research-external-solution skill with args `story={INIT.paths.story_file} external-codebase={EXTERNAL_CODEBASE} {external-docs={EXTERNAL_DOCS} if provided}`. Do NOT improvise. Do NOT write unrelated content. Write only the external-analysis artifact required by that skill."
         )
 
         **2e. Verify passes 2+3 outputs.**
@@ -232,10 +259,16 @@ effort: high
         ```
           i  Pass 4: Dispatching integration analysis...
         ```
+        Claude dispatch:
         Agent(
             description="Pass 4: Integration analysis",
             prompt="Your FIRST and ONLY action: use the Skill tool to invoke skill='ace:research-integration-solution' with args='story={INIT.paths.story_file}'. Do NOT improvise. Do NOT write integration analysis yourself. The skill has its own workflow. Just invoke it.",
             model="{PO_MODEL}"
+        )
+        Codex dispatch:
+        spawn_agent(
+            agent_type="default",
+            message="Your FIRST and ONLY action: use the $ace-research-integration-solution skill with args `story={INIT.paths.story_file}`. Do NOT improvise. Do NOT write integration analysis yourself. Do NOT write unrelated content. Write only the integration-analysis.md artifact required by that skill."
         )
         Verify:
         ```bash
@@ -251,10 +284,16 @@ effort: high
         ```
           i  Pass 5: Dispatching technical solution design...
         ```
+        Claude dispatch:
         Agent(
             description="Pass 5: Technical solution",
             prompt="Your FIRST and ONLY action: use the Skill tool to invoke skill='ace:research-technical-solution' with args='story={INIT.paths.story_file}'. Do NOT improvise. Do NOT write technical solution yourself. The skill has its own workflow. Just invoke it.",
             model="{PO_MODEL}"
+        )
+        Codex dispatch:
+        spawn_agent(
+            agent_type="default",
+            message="Your FIRST and ONLY action: use the $ace-research-technical-solution skill with args `story={INIT.paths.story_file}`. Do NOT improvise. Do NOT write technical solution yourself. Do NOT write unrelated content. Write only the Technical Solution artifact required by that skill."
         )
         Verify:
         ```bash

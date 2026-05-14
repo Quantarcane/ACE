@@ -77,7 +77,7 @@ function banner() {
 
 // Parse command line arguments
 function parseArgs() {
-  const args = process.argv.slice(2);
+  const args = process.argv.slice(2).map(arg => arg.toLowerCase());
   const flags = {
     claude: args.includes('--claude'),
     codex: args.includes('--codex'),
@@ -268,6 +268,14 @@ function transformCodexSkillContent(content, skillName, skillDir) {
 
 function codexSkillAdapter(skillName, skillDir) {
   const posixSkillDir = toPosixPath(skillDir);
+  const planStorySubagentContract = skillName === 'plan-story' ? `
+## ACE Plan Story Subagent Contract
+- Invocation of \`$ace-plan-story\` is an explicit user request to run the full ACE story-planning orchestration, including the Phase 2 research subagents.
+- Pass 2 wiki research, Pass 3 external analysis, Pass 4 integration analysis, and Pass 5 technical solution design are delegated passes. Codex MUST call \`spawn_agent(...)\` for each pass that runs.
+- Do NOT complete Pass 2 wiki research, Pass 4 integration analysis, or Pass 5 technical solution design inline in the current agent.
+- If \`spawn_agent\` is unavailable, blocked, or cannot be used, STOP after Phase 1 and tell the user that ACE Phase 2 requires subagents. Do not write Relevant Wiki, \`integration-analysis.md\`, or \`## Technical Solution\` inline.
+- The orchestrator may edit requirements and acceptance criteria, but research and technical-solution sections must be produced only by the delegated pass agents.
+` : '';
   return `<codex_skill_adapter>
 ## Codex Invocation
 - Invoke this skill by mentioning \`$ace-${skillName}\`.
@@ -278,8 +286,12 @@ function codexSkillAdapter(skillName, skillDir) {
 - This repository is authored as a Claude Code plugin. In Codex, the installer copies it to \`${posixSkillDir}\`.
 - Claude's \`!\` resource expansion does not run in Codex. Before following the workflow, manually read the supporting files referenced near the top of this SKILL.md.
 - When a workflow says \`AskUserQuestion\`, use Codex \`request_user_input\` if available; otherwise ask the user directly and continue with a reasonable default only when the choice is low risk.
-- When a workflow says \`Task(..., subagent_type="X")\`, use \`spawn_agent(agent_type="X", message="...")\` only when the user explicitly requested sub-agents. Otherwise complete the work inline in the current agent.
+- Invocation of \`$ace-${skillName}\` is an explicit user request to run this ACE skill's full workflow, including any workflow-required subagents.
+- When a workflow says \`Agent(...)\` or \`Task(...)\`, Codex MUST call \`spawn_agent(...)\` for that pass. Map \`subagent_type="X"\` to \`agent_type="X"\`; if no subagent type is provided, use \`agent_type="default"\`.
+- Do NOT complete delegated workflow passes inline unless the workflow explicitly assigns that work to the current orchestrator.
+- If \`spawn_agent\` is unavailable, blocked, or cannot be used for a mandatory delegated pass, fail closed: stop at the current phase and tell the user the ACE workflow requires subagents. Do not write delegated research, wiki, integration, review, or technical-solution artifacts inline.
 - Prefer commands that use the absolute skill path above. It keeps Windows and Linux shells from depending on a runtime-specific skill directory environment variable.
+${planStorySubagentContract}
 </codex_skill_adapter>
 
 `;
