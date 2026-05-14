@@ -7,7 +7,7 @@ allowed-tools: Read, Bash, Write, Edit, AskUserQuestion, Glob, Grep, Agent
 model: opus
 effort: max
 context: fork
-agent: ace-technical-application-architect
+agent: technical-application-architect
 ---
 
 ## Environment Context (preprocessed)
@@ -124,7 +124,7 @@ agent: ace-technical-application-architect
     </output>
 
     <process>
-        For this command use the `ace-technical-application-architect` agent
+        For this command use the `technical-application-architect` agent
         that's specialized in application architecture and is intimate with the codebase.
 
         Execute the research-technical-solution workflow from

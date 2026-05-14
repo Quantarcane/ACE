@@ -7,7 +7,7 @@ allowed-tools: Read, Bash, Write, AskUserQuestion, Glob, Grep, WebFetch
 model: opus
 effort: max
 context: fork
-agent: ace-code-discovery-analyst
+agent: code-discovery-analyst
 ---
 
 ## Environment Context (preprocessed)
@@ -108,7 +108,7 @@ agent: ace-code-discovery-analyst
     </output>
 
     <process>
-        For this command use the `ace-code-discovery-analyst` agent
+        For this command use the `code-discovery-analyst` agent
         that's specialized in code discovery.
 
         Execute the research-external-solution workflow from

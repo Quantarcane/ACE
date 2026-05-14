@@ -15,8 +15,8 @@
         - The story file (appended/replaced `## Technical Solution` section)
         - The GitHub issue body (if applicable)
 
-        This workflow is executed by the `ace-technical-application-architect` agent
-        (spawned via `subagent_type="ace-technical-application-architect"`).
+        This workflow is executed by the `technical-application-architect` agent
+        (spawned via `subagent_type="technical-application-architect"`).
     </purpose>
 
     <mandatory-context>

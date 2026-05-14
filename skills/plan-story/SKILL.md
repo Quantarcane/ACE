@@ -170,8 +170,11 @@ effort: high
         **Runtime dispatch mapping:**
         For each pass below, use exactly one dispatch form for the current runtime:
         - Claude: call the `Agent(...)` block.
-        - Codex: call the `spawn_agent(...)` block.
+        - Codex: call the `spawn_agent(...)` block, spawning the final specialized pass agent directly.
         Do NOT replace either dispatch with inline work.
+        Codex pass agents execute their owned workflow inline. Do not spawn a
+        default agent that invokes another ACE research skill; Codex pass agents
+        may not expose nested `spawn_agent`.
 
         **2a. Re-run init to get fresh paths:**
         ```bash
@@ -210,8 +213,8 @@ effort: high
         )
         Codex dispatch:
         spawn_agent(
-            agent_type="default",
-            message="Your FIRST and ONLY action: use the $ace-research-story-wiki skill with args `story={INIT.paths.story_file}`. Do NOT improvise. Do NOT write wiki content yourself. Do NOT write unrelated content. Write only the Relevant Wiki artifact required by that skill."
+            agent_type="ace-wiki-mapper",
+            message="You are ACE plan-story Pass 2: wiki research. You are already the final `ace-wiki-mapper` pass agent. Do NOT invoke `$ace-research-story-wiki`. Do NOT call `spawn_agent`. Execute the installed research-story-wiki workflow inline by reading `${CODEX_SKILL_ROOT}/ace-research-story-wiki/SKILL.md`, `workflow.xml`, `story-wiki-template.xml`, and `../../shared/utils/ui-formatting.md`. Run `node \"${CODEX_SKILL_ROOT}/ace-research-story-wiki/script.js\" init \"story={INIT.paths.story_file}\"` to get fresh INIT JSON, then write only the Relevant Wiki section required by that workflow. If the workflow asks for nested wiki-mapper tasks, perform that wiki scan inline in this pass agent because Codex pass agents may not expose nested `spawn_agent`."
         )
 
         **2d. Dispatch Pass 3 — External Analysis (if RUN_EXTERNAL):**
@@ -228,8 +231,8 @@ effort: high
         )
         Codex dispatch:
         spawn_agent(
-            agent_type="default",
-            message="Your FIRST and ONLY action: use the $ace-research-external-solution skill with args `story={INIT.paths.story_file} external-codebase={EXTERNAL_CODEBASE} {external-docs={EXTERNAL_DOCS} if provided}`. Do NOT improvise. Do NOT write unrelated content. Write only the external-analysis artifact required by that skill."
+            agent_type="code-discovery-analyst",
+            message="You are ACE plan-story Pass 3: external analysis. You are already the final `code-discovery-analyst` pass agent. Do NOT invoke `$ace-research-external-solution`. Do NOT call `spawn_agent`. Execute the installed research-external-solution workflow inline by reading `${CODEX_SKILL_ROOT}/ace-research-external-solution/SKILL.md`, `workflow.xml`, `external-solution-template.xml`, and `../../shared/utils/ui-formatting.md`. Run `node \"${CODEX_SKILL_ROOT}/ace-research-external-solution/script.js\" init \"story={INIT.paths.story_file} external-codebase={EXTERNAL_CODEBASE} {external-docs={EXTERNAL_DOCS} if provided}\"` to get fresh INIT JSON, then write only the external-analysis artifact required by that workflow."
         )
 
         **2e. Verify passes 2+3 outputs.**
@@ -267,8 +270,8 @@ effort: high
         )
         Codex dispatch:
         spawn_agent(
-            agent_type="default",
-            message="Your FIRST and ONLY action: use the $ace-research-integration-solution skill with args `story={INIT.paths.story_file}`. Do NOT improvise. Do NOT write integration analysis yourself. Do NOT write unrelated content. Write only the integration-analysis.md artifact required by that skill."
+            agent_type="code-integration-analyst",
+            message="You are ACE plan-story Pass 4: integration analysis. You are already the final `code-integration-analyst` pass agent. Do NOT invoke `$ace-research-integration-solution`. Do NOT call `spawn_agent`. Execute the installed research-integration-solution workflow inline by reading `${CODEX_SKILL_ROOT}/ace-research-integration-solution/SKILL.md`, `workflow.xml`, `integration-solution-template.xml`, and `../../shared/utils/ui-formatting.md`. Run `node \"${CODEX_SKILL_ROOT}/ace-research-integration-solution/script.js\" init \"story={INIT.paths.story_file}\"` to get fresh INIT JSON, then write only `integration-analysis.md` as required by that workflow."
         )
         Verify:
         ```bash
@@ -292,8 +295,8 @@ effort: high
         )
         Codex dispatch:
         spawn_agent(
-            agent_type="default",
-            message="Your FIRST and ONLY action: use the $ace-research-technical-solution skill with args `story={INIT.paths.story_file}`. Do NOT improvise. Do NOT write technical solution yourself. Do NOT write unrelated content. Write only the Technical Solution artifact required by that skill."
+            agent_type="technical-application-architect",
+            message="You are ACE plan-story Pass 5: technical solution. You are already the final `technical-application-architect` pass agent. Do NOT invoke `$ace-research-technical-solution`. Do NOT call `spawn_agent`. Execute the installed research-technical-solution workflow inline by reading `${CODEX_SKILL_ROOT}/ace-research-technical-solution/SKILL.md`, `workflow.xml`, `technical-solution-template.xml`, and `../../shared/utils/ui-formatting.md`. Run `node \"${CODEX_SKILL_ROOT}/ace-research-technical-solution/script.js\" init \"story={INIT.paths.story_file}\"` to get fresh INIT JSON, then write only the `## Technical Solution` section required by that workflow."
         )
         Verify:
         ```bash

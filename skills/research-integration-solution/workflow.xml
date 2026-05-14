@@ -16,8 +16,8 @@
         All output is written ONLY to the analysis file — no GitHub updates, no modifications
         to the story file.
 
-        This workflow is executed by the `ace-code-integration-analyst` agent
-        (spawned via `subagent_type="ace-code-integration-analyst"`).
+        This workflow is executed by the `code-integration-analyst` agent
+        (spawned via `subagent_type="code-integration-analyst"`).
     </purpose>
 
     <mandatory-context>

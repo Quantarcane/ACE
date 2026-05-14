@@ -249,9 +249,11 @@ function replaceAceInvocations(content, codexStyle) {
 }
 
 function transformCodexSkillContent(content, skillName, skillDir) {
+  const codexSkillRoot = toPosixPath(path.dirname(skillDir));
   let transformed = content
     .replace(/\.claude\//g, '.codex/')
     .replace(/\.claudeignore\b/g, '.codexignore')
+    .replace(/\$\{CODEX_SKILL_ROOT\}/g, codexSkillRoot)
     .replace(/\$\{CLAUDE_SKILL_DIR\}/g, toPosixPath(skillDir))
     .replace(/"\$CLAUDE_SKILL_DIR\//g, `"${toPosixPath(skillDir)}/`)
     .replace(/\$CLAUDE_SKILL_DIR\//g, `${toPosixPath(skillDir)}/`)
@@ -272,8 +274,10 @@ function codexSkillAdapter(skillName, skillDir) {
 ## ACE Plan Story Subagent Contract
 - Invocation of \`$ace-plan-story\` is an explicit user request to run the full ACE story-planning orchestration, including the Phase 2 research subagents.
 - Pass 2 wiki research, Pass 3 external analysis, Pass 4 integration analysis, and Pass 5 technical solution design are delegated passes. Codex MUST call \`spawn_agent(...)\` for each pass that runs.
-- Do NOT complete Pass 2 wiki research, Pass 4 integration analysis, or Pass 5 technical solution design inline in the current agent.
+- The plan-story orchestrator MUST spawn the final pass agent directly: \`ace-wiki-mapper\`, \`code-discovery-analyst\`, \`code-integration-analyst\`, or \`technical-application-architect\`. Do not spawn a default agent that invokes another ACE research skill.
+- Do NOT complete Pass 2 wiki research, Pass 3 external analysis, Pass 4 integration analysis, or Pass 5 technical solution design inline in the plan-story orchestrator.
 - If \`spawn_agent\` is unavailable, blocked, or cannot be used, STOP after Phase 1 and tell the user that ACE Phase 2 requires subagents. Do not write Relevant Wiki, \`integration-analysis.md\`, or \`## Technical Solution\` inline.
+- Once a delegated pass agent is running, it owns that pass artifact and MUST execute its workflow inline. It must not try to spawn another agent just to satisfy the research skill's frontmatter \`agent:\` field.
 - The orchestrator may edit requirements and acceptance criteria, but research and technical-solution sections must be produced only by the delegated pass agents.
 ` : '';
   return `<codex_skill_adapter>
@@ -286,10 +290,10 @@ function codexSkillAdapter(skillName, skillDir) {
 - This repository is authored as a Claude Code plugin. In Codex, the installer copies it to \`${posixSkillDir}\`.
 - Claude's \`!\` resource expansion does not run in Codex. Before following the workflow, manually read the supporting files referenced near the top of this SKILL.md.
 - When a workflow says \`AskUserQuestion\`, use Codex \`request_user_input\` if available; otherwise ask the user directly and continue with a reasonable default only when the choice is low risk.
-- Invocation of \`$ace-${skillName}\` is an explicit user request to run this ACE skill's full workflow, including any workflow-required subagents.
-- When a workflow says \`Agent(...)\` or \`Task(...)\`, Codex MUST call \`spawn_agent(...)\` for that pass. Map \`subagent_type="X"\` to \`agent_type="X"\`; if no subagent type is provided, use \`agent_type="default"\`.
-- Do NOT complete delegated workflow passes inline unless the workflow explicitly assigns that work to the current orchestrator.
-- If \`spawn_agent\` is unavailable, blocked, or cannot be used for a mandatory delegated pass, fail closed: stop at the current phase and tell the user the ACE workflow requires subagents. Do not write delegated research, wiki, integration, review, or technical-solution artifacts inline.
+- Invocation of \`$ace-${skillName}\` is an explicit user request to run this ACE skill's full workflow.
+- When a workflow says \`Agent(...)\` or \`Task(...)\` and Codex exposes \`spawn_agent\` in the current session, call \`spawn_agent(...)\` for that pass. Map \`subagent_type="X"\` to \`agent_type="X"\`; if no subagent type is provided, use \`agent_type="default"\`.
+- Codex delegated pass agents may not expose \`spawn_agent\`. If this skill is already running inside the agent that owns the artifact, execute the workflow inline instead of failing solely because nested delegation is unavailable.
+- A skill frontmatter \`agent:\` field or a process line like "For this command use the X agent" identifies the preferred execution context. It is not a nested delegation requirement when the skill is already executing inside that pass agent.
 - Prefer commands that use the absolute skill path above. It keeps Windows and Linux shells from depending on a runtime-specific skill directory environment variable.
 ${planStorySubagentContract}
 </codex_skill_adapter>

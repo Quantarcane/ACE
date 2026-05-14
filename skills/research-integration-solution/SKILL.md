@@ -7,7 +7,7 @@ allowed-tools: Read, Bash, Write, AskUserQuestion, Glob, Grep, Agent
 model: opus
 effort: max
 context: fork
-agent: ace-code-integration-analyst
+agent: code-integration-analyst
 ---
 
 ## Environment Context (preprocessed)
@@ -109,7 +109,7 @@ agent: ace-code-integration-analyst
     </output>
 
     <process>
-        For this command use the `ace-code-integration-analyst` agent
+        For this command use the `code-integration-analyst` agent
         that's specialized in code integration.
 
         Execute the research-integration-solution workflow from

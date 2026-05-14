@@ -15,8 +15,8 @@
         All output is written ONLY to the analysis file — no GitHub updates, no modifications
         to the story file.
 
-        This workflow is executed by the `ace-code-discovery-analyst` agent
-        (spawned via `subagent_type="ace-code-discovery-analyst"`).
+        This workflow is executed by the `code-discovery-analyst` agent
+        (spawned via `subagent_type="code-discovery-analyst"`).
     </purpose>
 
     <mandatory-context>
