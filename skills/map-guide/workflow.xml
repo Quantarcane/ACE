@@ -2,7 +2,7 @@
 
     <purpose>
         Create or update a guide document in
-        `.docs/wiki/subsystems/[subsystem-name]/guides/`.
+        `{docs_path}/wiki/subsystems/[subsystem-name]/guides/`.
 
         A guide is a step-by-step recipe for a common implementation task. It combines
         knowledge from multiple systems, patterns, and cross-cutting concerns into one
@@ -13,6 +13,28 @@
         The executing agent does everything: finding reference implementations, reading code,
         deriving the recipe, and writing the document.
     </purpose>
+
+    <docs-root>
+        Every `{docs_path}` below is a placeholder, not a literal path. Its value is the
+        `docs_path` field from this skill's init output (read from `.ace/settings.json`,
+        preprocessed into the prompt above). Substitute the real value before you read,
+        write, glob or `mkdir` any documentation path.
+
+        It is `.docs` in a typical single-project repo, but monorepos commonly nest it —
+        `ProcerERP/.docs`, for example. Typing a literal `.docs` in a project that nests
+        its docs creates a second, orphaned documentation tree at the repo root: the files
+        appear to be written successfully, but every other ACE command resolves the
+        configured root and will never find them.
+
+        When you spawn a subagent, state the resolved root explicitly in its prompt
+        (e.g. `Docs root: ProcerERP/.docs`) and substitute it into every path you hand it.
+        A subagent starts with a fresh context — it cannot see the init output you are
+        holding, so an unsubstituted `{docs_path}` reaches it as literal text.
+
+        If `docs_path` is missing from the init output, stop and tell the user to run
+        `/ace:help`, which detects and pins the location — do not guess.
+    </docs-root>
+
 
     <mandatory-context>
         All supporting resource files are auto-loaded in the skill prompt above. Do NOT re-read them.
@@ -50,7 +72,7 @@
             </substep>
 
             <substep order="1.3" name="resolve-subsystem">
-                Resolve the subsystem. Check if `.docs/wiki/subsystems/[subsystem-name]/` exists.
+                Resolve the subsystem. Check if `{docs_path}/wiki/subsystems/[subsystem-name]/` exists.
 
                 **If not found:**
                 ```
@@ -61,7 +83,7 @@
 
                 Ensure guides directory exists:
                 ```bash
-                mkdir -p .docs/wiki/subsystems/[subsystem_name]/guides
+                mkdir -p {docs_path}/wiki/subsystems/[subsystem_name]/guides
                 ```
             </substep>
 
@@ -85,7 +107,7 @@
             Scan for existing guides:
 
             ```
-            Glob(pattern='*.md', path='.docs/wiki/subsystems/[subsystem_name]/guides')
+            Glob(pattern='*.md', path='{docs_path}/wiki/subsystems/[subsystem_name]/guides')
             ```
 
             **If existing guides found:**
@@ -103,7 +125,7 @@
 
             **If MODE = create:**
             Derive file name from task description in kebab-case (e.g., "how-to-add-drawing-tool.md").
-            Set TARGET_FILE = `.docs/wiki/subsystems/[subsystem_name]/guides/[guide-name].md`
+            Set TARGET_FILE = `{docs_path}/wiki/subsystems/[subsystem_name]/guides/[guide-name].md`
 
             Continue to step 3.
         </step>
@@ -181,7 +203,7 @@
 
         <step name="write-doc" order="4">
 
-            Read ALL existing wiki docs under `.docs/wiki/subsystems/[subsystem_name]/`
+            Read ALL existing wiki docs under `{docs_path}/wiki/subsystems/[subsystem_name]/`
             for cross-referencing in Prerequisites and linking to patterns/systems.
 
             Follow the guide template structure exactly.

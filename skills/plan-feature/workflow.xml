@@ -15,6 +15,28 @@
         (new feature) and REFINE (existing feature) modes.
     </purpose>
 
+    <docs-root>
+        Every `{docs_path}` below is a placeholder, not a literal path. Its value is the
+        `docs_path` field from this skill's init output (read from `.ace/settings.json`,
+        preprocessed into the prompt above). Substitute the real value before you read,
+        write, glob or `mkdir` any documentation path.
+
+        It is `.docs` in a typical single-project repo, but monorepos commonly nest it —
+        `ProcerERP/.docs`, for example. Typing a literal `.docs` in a project that nests
+        its docs creates a second, orphaned documentation tree at the repo root: the files
+        appear to be written successfully, but every other ACE command resolves the
+        configured root and will never find them.
+
+        When you spawn a subagent, state the resolved root explicitly in its prompt
+        (e.g. `Docs root: ProcerERP/.docs`) and substitute it into every path you hand it.
+        A subagent starts with a fresh context — it cannot see the init output you are
+        holding, so an unsubstituted `{docs_path}` reaches it as literal text.
+
+        If `docs_path` is missing from the init output, stop and tell the user to run
+        `/ace:help`, which detects and pins the location — do not guess.
+    </docs-root>
+
+
     <mandatory-context>
         All supporting resource files are auto-loaded in the skill prompt above. Do NOT re-read them.
         Also read any document or text passed as parameter ($ARGUMENTS) in the invoking command.
@@ -213,7 +235,7 @@
             **3a. Load product vision (if exists):**
 
             If `has_product_vision` is true:
-            - Read `.docs/product/product-vision.md`
+            - Read `{docs_path}/product/product-vision.md`
             - Extract and hold as VISION context: Vision Statement, Target Audience,
               High-Level Capabilities, Key Objectives, Constraints
 
@@ -227,7 +249,7 @@
             **3c. Load system architecture (if exists):**
 
             If `has_system_architecture` is true:
-            - Read `.docs/wiki/system-wide/system-architecture.md`
+            - Read `{docs_path}/wiki/system-wide/system-architecture.md`
             - Hold as `SYSTEM_ARCHITECTURE` context
 
             If false: set `SYSTEM_ARCHITECTURE = null`
@@ -366,12 +388,12 @@
 
             **Step 3 — Deep-read relevant wiki docs:**
             For each relevant subsystem, read:
-            - .docs/wiki/subsystems/{subsystem_name}/architecture.md
-            - .docs/wiki/subsystems/{subsystem_name}/structure.md
+            - {docs_path}/wiki/subsystems/{subsystem_name}/architecture.md
+            - {docs_path}/wiki/subsystems/{subsystem_name}/structure.md
 
             Also read system-wide docs if relevant:
-            - .docs/wiki/system-wide/system-architecture.md
-            - .docs/wiki/system-wide/system-structure.md
+            - {docs_path}/wiki/system-wide/system-architecture.md
+            - {docs_path}/wiki/system-wide/system-structure.md
 
             **Step 4 — Write structured analysis to `{FEATURE_DIR}/relevant-wiki.md`:**
 
@@ -506,7 +528,7 @@
 
             **Read these context files (if they exist):**
             - {FEATURE_DIR}/relevant-wiki.md (wiki analysis for this feature)
-            - .docs/wiki/system-wide/system-architecture.md (system architecture)
+            - {docs_path}/wiki/system-wide/system-architecture.md (system architecture)
 
             **Your job:** Drill into the actual codebase to discover what is already implemented
             that relates to this feature. Focus on:

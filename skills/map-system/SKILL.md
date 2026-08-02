@@ -1,6 +1,6 @@
 ---
 name: map-system
-description: Map system-wide codebase structure, architecture, and testing framework into .docs/wiki/system-wide/
+description: Map system-wide codebase structure, architecture, and testing framework into the project wiki's system-wide/ docs
 argument-hint: "[optional: references='existing artifacts and documents to be considered alongside the codebase']"
 disable-model-invocation: true
 allowed-tools: Read, Bash, Glob, Grep, Write, Task, AskUserQuestion
@@ -77,10 +77,10 @@ effort: max
         </objective>
 
         <artifacts>
-            - .docs/wiki/wiki-readme.md (created if not already present)
-            - .docs/wiki/system-wide/system-structure.md
-            - .docs/wiki/system-wide/system-architecture.md
-            - .docs/wiki/system-wide/testing-framework.md
+            - {docs_path}/wiki/wiki-readme.md (created if not already present)
+            - {docs_path}/wiki/system-wide/system-structure.md
+            - {docs_path}/wiki/system-wide/system-architecture.md
+            - {docs_path}/wiki/system-wide/testing-framework.md
             - CLAUDE.md (wiki maintenance instructions appended)
         </artifacts>
     </output>
@@ -96,7 +96,7 @@ effort: max
         - `/ace:map-subsystems` — Map individual subsystem internals (structure, dependencies)
         - `/ace:init-coding-standards` — Define prescriptive coding standards
         - `/ace:help` — Check project initialization status and next steps
-        - Review and edit files in `.docs/wiki/system-wide/` anytime
+        - Review and edit files in `{docs_path}/wiki/system-wide/` anytime
     </next-steps>
 
 </command>

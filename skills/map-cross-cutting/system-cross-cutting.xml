@@ -1,6 +1,6 @@
 <system-cross-cutting>
     <purpose>
-        Template for `.docs/wiki/subsystems/[subsystem-name]/cross-cutting/<concern-name>.md` — a
+        Template for `{docs_path}/wiki/subsystems/[subsystem-name]/cross-cutting/<concern-name>.md` — a
         concern that spans multiple systems within a codebase subsystem. Answers "How does this
         shared infrastructure/concern work, and how do I plug into it?"
 

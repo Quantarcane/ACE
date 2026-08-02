@@ -2,13 +2,35 @@
 
     <purpose>
         Orchestrate product vision creation or update through environment detection, architecture-aware
-        questioning, and document writing. Produces `.docs/product/product-vision.md` — the north star
+        questioning, and document writing. Produces `{docs_path}/product/product-vision.md` — the north star
         document that aligns the team on what the product is, who it's for, and why it matters.
 
         Brownfield projects with system architecture: use the Subsystem Responsibility Matrix to
         pre-populate suggested capabilities. Without architecture: suggest /ace:map-system first.
         Greenfield projects: gather everything from user interview directly.
     </purpose>
+
+    <docs-root>
+        Every `{docs_path}` below is a placeholder, not a literal path. Its value is the
+        `docs_path` field from this skill's init output (read from `.ace/settings.json`,
+        preprocessed into the prompt above). Substitute the real value before you read,
+        write, glob or `mkdir` any documentation path.
+
+        It is `.docs` in a typical single-project repo, but monorepos commonly nest it —
+        `ProcerERP/.docs`, for example. Typing a literal `.docs` in a project that nests
+        its docs creates a second, orphaned documentation tree at the repo root: the files
+        appear to be written successfully, but every other ACE command resolves the
+        configured root and will never find them.
+
+        When you spawn a subagent, state the resolved root explicitly in its prompt
+        (e.g. `Docs root: ProcerERP/.docs`) and substitute it into every path you hand it.
+        A subagent starts with a fresh context — it cannot see the init output you are
+        holding, so an unsubstituted `{docs_path}` reaches it as literal text.
+
+        If `docs_path` is missing from the init output, stop and tell the user to run
+        `/ace:help`, which detects and pins the location — do not guess.
+    </docs-root>
+
 
     <mandatory-context>
         All supporting resource files are auto-loaded in the skill prompt above. Do NOT re-read them.
@@ -44,7 +66,7 @@
 
             Use AskUserQuestion:
             - header: "Vision exists"
-            - question: "A product vision already exists at `.docs/product/product-vision.md`. What would you like to do?"
+            - question: "A product vision already exists at `{docs_path}/product/product-vision.md`. What would you like to do?"
             - options:
               - "Update it" — Review and refine the existing vision
               - "Start fresh" — Discard and create a new vision from scratch
@@ -95,7 +117,7 @@
 
             **If `is_brownfield` AND `has_system_architecture` is true:**
 
-            Read `.docs/wiki/system-wide/system-architecture.md`.
+            Read `{docs_path}/wiki/system-wide/system-architecture.md`.
 
             Extract and hold as architecture context:
             - **System Overview** — what the system is and does
@@ -199,7 +221,7 @@
         <step name="write" order="4">
             **Step 1 — Create directory structure:**
             ```bash
-            mkdir -p .docs/product
+            mkdir -p {docs_path}/product
             ```
 
             **Step 2 — Prepare a context brief (200-400 words max) that distills:**
@@ -219,7 +241,7 @@
 
                 **Instructions:**
                 1. Read the product vision template: ${CLAUDE_SKILL_DIR}/product-vision-template.xml
-                2. Write `.docs/product/product-vision.md` following the template structure and guidelines
+                2. Write `{docs_path}/product/product-vision.md` following the template structure and guidelines
                 3. Do not compress — capture everything from the context brief
                 4. Write the file using the Write tool
 
@@ -260,7 +282,7 @@
             Show the agent's returned summary to the user. Then:
 
             - header: "Vision"
-            - question: "Product vision written to `.docs/product/product-vision.md`. Does this summary look right? Review the full file in your editor for details."
+            - question: "Product vision written to `{docs_path}/product/product-vision.md`. Does this summary look right? Review the full file in your editor for details."
             - options:
               - "Approve" — Looks good, commit it
               - "Adjust" — I want to change some things
@@ -271,7 +293,7 @@
             - Spawn a Task agent to edit:
               ```
               Task(
-                  prompt="Read `.docs/product/product-vision.md` and make these changes:
+                  prompt="Read `{docs_path}/product/product-vision.md` and make these changes:
                   {user's requested changes}.
                   Use the Edit tool to modify in place. Return only a confirmation of what changed.",
                   subagent_type="general-purpose",
@@ -297,7 +319,7 @@
             Commit the product vision:
 
             ```bash
-            git add .docs/product/product-vision.md
+            git add {docs_path}/product/product-vision.md
             git commit -m "docs: initialize product vision"
             ```
 
@@ -308,7 +330,7 @@
             ║  ACE > Product Vision Created                    ║
             ╚══════════════════════════════════════════════════╝
 
-              +  .docs/product/product-vision.md committed.
+              +  {docs_path}/product/product-vision.md committed.
 
               i  This vision will be used as context by ACE commands
                  when planning epics, features, and stories.
@@ -331,7 +353,7 @@
         - product-vision.md written following template structure
         - Document captures everything discussed, not compressed
         - User reviewed and approved the document
-        - Document committed to .docs/product/
+        - Document committed to {docs_path}/product/
     </success_criteria>
 
 </workflow>

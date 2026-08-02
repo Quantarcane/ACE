@@ -226,6 +226,22 @@ ACE creates two directories in your project:
 
 **`.docs/`** — Project-facing documents: the living wiki, product vision, and coding standards. These are meant to be committed — they provide valuable context for your team and for the AI across sessions.
 
+### Where `.docs/` lives
+
+`.docs/` sits at the project root by default, but monorepos often keep documentation inside a
+subproject — `ProcerERP/.docs/`, for example. `/ace:help` detects existing `.docs` directories,
+confirms the right one with you, and records it in `.ace/settings.json`:
+
+```json
+{
+  "docs_path": "ProcerERP/.docs"
+}
+```
+
+Every ACE command resolves the documentation root from that setting, so all wiki paths shown
+throughout this README are relative to `docs_path`. Change the location any time by re-running
+`/ace:help` after editing the setting, or by pointing `docs_path` at the new directory.
+
 ```
 .ace/
 ├── config.json           # ACE configuration (GitHub org, project, settings)

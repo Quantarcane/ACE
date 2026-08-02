@@ -1,6 +1,6 @@
 <pattern>
     <purpose>
-        Template for `.docs/wiki/subsystems/[subsystem-name]/patterns/<pattern-name>.md` — a reusable
+        Template for `{docs_path}/wiki/subsystems/[subsystem-name]/patterns/<pattern-name>.md` — a reusable
         implementation pattern within a codebase subsystem. Answers "HOW do I implement something
         that follows this pattern?"
 

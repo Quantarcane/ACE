@@ -1,6 +1,6 @@
 <walkthrough>
     <purpose>
-        Template for `.docs/wiki/subsystems/[subsystem-name]/walkthroughs/<flow-name>.md` — a deep,
+        Template for `{docs_path}/wiki/subsystems/[subsystem-name]/walkthroughs/<flow-name>.md` — a deep,
         tutorial-style explanation of a complex end-to-end flow. Answers "Walk me through EXACTLY
         what happens when X."
 

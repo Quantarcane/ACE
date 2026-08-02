@@ -6,6 +6,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- Configurable documentation root — `.ace/settings.json` now carries `docs_path`, so projects that nest their docs (e.g. `ProcerERP/.docs` in a monorepo) are supported instead of assuming `.docs` at the project root.
+- `/ace:help` detects existing `.docs` directories, confirms the location with you, and pins it via the new `detect-docs-path` and `write-docs-path` subcommands.
+- `resolveDocsPath()`, `docsPath()`, `normalizeDocsPath()` and `detectDocsCandidates()` helpers in `shared/lib/ace-core.js`.
+- `script.js` entry points for `map-guide`, `map-pattern`, `map-sys-doc`, `map-cross-cutting`, `map-walkthrough` and `map-story`, which previously had none.
+
+### Changed
+- All skills, workflows, templates and agents resolve the documentation root from settings — every hardcoded `.docs` path was removed.
+- Every skill's `init` output now includes `docs_path`.
+
+### Fixed
+- `skills/help/SKILL.md` was truncated mid-sentence with an unterminated code fence, which swallowed the rest of the skill prompt.
+
 ## [0.5.1] - 2026-04-30
 
 ### Added

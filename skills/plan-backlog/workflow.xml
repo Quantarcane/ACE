@@ -14,6 +14,28 @@
         existing issues are imported and new items can be synced back to GitHub.
     </purpose>
 
+    <docs-root>
+        Every `{docs_path}` below is a placeholder, not a literal path. Its value is the
+        `docs_path` field from this skill's init output (read from `.ace/settings.json`,
+        preprocessed into the prompt above). Substitute the real value before you read,
+        write, glob or `mkdir` any documentation path.
+
+        It is `.docs` in a typical single-project repo, but monorepos commonly nest it —
+        `ProcerERP/.docs`, for example. Typing a literal `.docs` in a project that nests
+        its docs creates a second, orphaned documentation tree at the repo root: the files
+        appear to be written successfully, but every other ACE command resolves the
+        configured root and will never find them.
+
+        When you spawn a subagent, state the resolved root explicitly in its prompt
+        (e.g. `Docs root: ProcerERP/.docs`) and substitute it into every path you hand it.
+        A subagent starts with a fresh context — it cannot see the init output you are
+        holding, so an unsubstituted `{docs_path}` reaches it as literal text.
+
+        If `docs_path` is missing from the init output, stop and tell the user to run
+        `/ace:help`, which detects and pins the location — do not guess.
+    </docs-root>
+
+
     <mandatory-context>
         All supporting resource files are auto-loaded in the skill prompt above. Do NOT re-read them.
         Also read any document or text passed as parameter ($ARGUMENTS) in the invoking command.
@@ -221,7 +243,7 @@
 
             **If `has_product_vision` is true:**
 
-            Read `.docs/product/product-vision.md`.
+            Read `{docs_path}/product/product-vision.md`.
 
             Extract and hold as VISION context:
             - **Vision Statement** — the north star (1-2 sentences)
@@ -322,8 +344,8 @@
             You are analyzing wiki documentation to extract backlog-relevant information.
 
             **Read these files (if they exist):**
-            - .docs/wiki/system-wide/system-architecture.md
-            - .docs/wiki/system-wide/system-structure.md
+            - {docs_path}/wiki/system-wide/system-architecture.md
+            - {docs_path}/wiki/system-wide/system-structure.md
 
             **APPEND the following structured summary to `.ace/artifacts/wiki/wiki-analysis.md`:**
 
@@ -361,8 +383,8 @@
             **Subsystem to analyze:** {subsystem_name}
 
             **Read these files (if they exist):**
-            - .docs/wiki/subsystems/{subsystem_name}/architecture.md
-            - .docs/wiki/subsystems/{subsystem_name}/structure.md
+            - {docs_path}/wiki/subsystems/{subsystem_name}/architecture.md
+            - {docs_path}/wiki/subsystems/{subsystem_name}/structure.md
 
             **APPEND the following structured summary to `.ace/artifacts/wiki/wiki-analysis.md`:**
 

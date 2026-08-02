@@ -70,7 +70,7 @@ effort: high
         </objective>
 
         <artifacts>
-            .docs/product/product-vision.md
+            {docs_path}/product/product-vision.md
         </artifacts>
     </output>
 

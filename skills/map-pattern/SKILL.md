@@ -1,6 +1,6 @@
 ---
 name: map-pattern
-description: Create or update a pattern document in .docs/wiki/subsystems/[name]/patterns/ — reusable implementation patterns
+description: Create or update a pattern document under the project wiki's subsystems/[name]/patterns/ — reusable implementation patterns
 argument-hint: "text='Template Method pattern used by all drawing paths' subsystem='qarc-charts-v2' commits=3"
 disable-model-invocation: false
 allowed-tools:
@@ -16,6 +16,10 @@ effort: max
 context: fork
 agent: ace-wiki-mapper
 ---
+
+## Environment Context (preprocessed)
+
+!`node "${CLAUDE_SKILL_DIR}/script.js" init 2>/dev/null`
 
 ## Supporting Resources (auto-loaded)
 
@@ -62,7 +66,7 @@ agent: ace-wiki-mapper
                 </param>
                 <param name="subsystem" type="path | text">
                     Subsystem where this pattern doc belongs.
-                    Wiki location: `.docs/wiki/subsystems/[subsystem]/patterns/`.
+                    Wiki location: `{docs_path}/wiki/subsystems/[subsystem]/patterns/`.
                     If not provided, pause and ask the user.
                 </param>
             </required>
@@ -100,7 +104,7 @@ agent: ace-wiki-mapper
         </objective>
 
         <artifacts>
-            .docs/wiki/subsystems/[subsystem-name]/patterns/[pattern-name].md
+            {docs_path}/wiki/subsystems/[subsystem-name]/patterns/[pattern-name].md
         </artifacts>
     </output>
 
@@ -118,7 +122,7 @@ agent: ace-wiki-mapper
         <step>/ace:map-pattern — create another pattern document</step>
         <step>/ace:map-guide — create a guide that uses this pattern</step>
         <step>/ace:map-sys-doc — document a system that uses this pattern</step>
-        <step>Review file at .docs/wiki/subsystems/[subsystem-name]/patterns/</step>
+        <step>Review file at {docs_path}/wiki/subsystems/[subsystem-name]/patterns/</step>
     </next-steps>
 
 </command>

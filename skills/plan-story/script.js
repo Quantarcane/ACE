@@ -20,6 +20,7 @@ const {
   loadConfig, pathExists, safeReadFile, generateSlug, resolveModel,
   detectBrownfieldStatus, loadSettings, execCommand,
   output, error, runSkillScript,
+  docsPath, resolveDocsPath,
 } = require('../../shared/lib/ace-core');
 
 const {
@@ -84,9 +85,9 @@ function cmdInit(cwd, raw, args, parsed) {
   const github_project = loadSettings(cwd).github_project;
 
   // Wiki detection
-  const wikiSystemDir = '.docs/wiki/system-wide';
+  const wikiSystemDir = docsPath(cwd, 'wiki/system-wide');
   const has_wiki_system_wide = pathExists(cwd, wikiSystemDir);
-  const wikiSubsystemsDir = '.docs/wiki/subsystems';
+  const wikiSubsystemsDir = docsPath(cwd, 'wiki/subsystems');
   const has_wiki_subsystems = pathExists(cwd, wikiSubsystemsDir);
   let wiki_subsystem_names = [];
   if (has_wiki_subsystems) {
@@ -105,10 +106,11 @@ function cmdInit(cwd, raw, args, parsed) {
   const baseResult = {
     product_owner_model: resolveModel(cwd, 'ace-product-owner'),
     commit_docs: config.commit_docs,
+    docs_path: resolveDocsPath(cwd),
     has_git, has_gh_cli, github_project,
     ...brownfield,
     has_wiki, has_wiki_system_wide, has_wiki_subsystems, wiki_subsystem_names,
-    has_product_vision: pathExists(cwd, '.docs/product/product-vision.md'),
+    has_product_vision: pathExists(cwd, docsPath(cwd, 'product/product-vision.md')),
     has_product_backlog: pathExists(cwd, '.ace/artifacts/product/product-backlog.md'),
   };
 

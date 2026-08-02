@@ -16,6 +16,7 @@ const path = require('path');
 const {
   loadConfig, pathExists, safeReadFile, loadSettings, resolveModel,
   execCommand, output, error, runSkillScript,
+  docsPath, resolveDocsPath,
 } = require('../../shared/lib/ace-core');
 
 const {
@@ -86,6 +87,7 @@ function cmdInit(cwd, raw, args, parsed) {
       executor_model: resolveModel(cwd, 'ace-executor'),
       reviewer_model: resolveModel(cwd, 'ace-code-reviewer'),
       commit_docs: config.commit_docs,
+      docs_path: resolveDocsPath(cwd),
       has_git, has_gh_cli, github_project, agent_teams,
       story_source: null,
       story_valid: false,
@@ -163,7 +165,7 @@ function cmdInit(cwd, raw, args, parsed) {
   const has_wiki_refs = storyContent
     ? !!extractMarkdownSection(storyContent, 'Relevant Wiki', 2)
     : false;
-  const has_coding_standards = pathExists(cwd, '.docs/wiki/system-wide/coding-standards.md');
+  const has_coding_standards = pathExists(cwd, docsPath(cwd, 'wiki/system-wide/coding-standards.md'));
 
   // ── Compute paths ──
   let paths = null;
@@ -191,7 +193,7 @@ function cmdInit(cwd, raw, args, parsed) {
       feature_dir: relFeatureDir,
       feature_file: `${relFeatureDir}/${featureSlug}.md`,
       product_backlog: '.ace/artifacts/product/product-backlog.md',
-      coding_standards: '.docs/wiki/system-wide/coding-standards.md',
+      coding_standards: docsPath(cwd, 'wiki/system-wide/coding-standards.md'),
     };
     has_story_file = true;
   } else if (metadata.epic.id && metadata.feature.id && metadata.id) {
@@ -204,7 +206,7 @@ function cmdInit(cwd, raw, args, parsed) {
       paths = {
         ...computed,
         product_backlog: '.ace/artifacts/product/product-backlog.md',
-        coding_standards: '.docs/wiki/system-wide/coding-standards.md',
+        coding_standards: docsPath(cwd, 'wiki/system-wide/coding-standards.md'),
       };
       has_story_file = pathExists(cwd, paths.story_file);
     }
@@ -219,6 +221,7 @@ function cmdInit(cwd, raw, args, parsed) {
     executor_model: resolveModel(cwd, 'ace-executor'),
     reviewer_model: resolveModel(cwd, 'ace-code-reviewer'),
     commit_docs: config.commit_docs,
+    docs_path: resolveDocsPath(cwd),
     has_git, has_gh_cli, github_project, agent_teams,
     story_source: storySource,
     story_valid: storyContent !== null && storyError === null,

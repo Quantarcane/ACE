@@ -1,6 +1,6 @@
 <subsystem-structure>
     <purpose>
-        Template for `.docs/wiki/subsystems/[subsystem-name]/structure.md` — the physical file
+        Template for `{docs_path}/wiki/subsystems/[subsystem-name]/structure.md` — the physical file
         organization within a single subsystem. Answers "I'm working in this subsystem, where do I put things?"
 
         Complements system-structure.md (which shows the system-wide layout and subsystem index).

@@ -1,7 +1,7 @@
 <coding-standards>
 
     <purpose>
-        Template for `.docs/wiki/system-wide/coding-standards.md` — prescriptive rules that
+        Template for `{docs_path}/wiki/system-wide/coding-standards.md` — prescriptive rules that
         ALL code in this project MUST follow. These are NOT descriptive conventions (observed patterns)
         but MANDATED STANDARDS that prevent common AI and developer mistakes.
 
@@ -12,7 +12,7 @@
         (which shows conceptual design). Coding standards tell you HOW to write code, not WHERE
         it goes or WHY the architecture exists.
 
-        Output: `.docs/wiki/system-wide/coding-standards.md`
+        Output: `{docs_path}/wiki/system-wide/coding-standards.md`
     </purpose>
 
     <!-- ═══════════════════════════════════════════════════════════════════════ -->
@@ -44,8 +44,8 @@
             - **NEVER hardcode** magic strings, color codes, URLs, config values, numeric
               thresholds, or any value that could change or has semantic meaning
             - ALL values come from: constants, configuration, environment, or parameters
-            - Reference: consult `system-structure.md` (`.docs/wiki/system-wide/system-structure.md`)
-              and `[subsystem]-structure.md` (`.docs/wiki/subsystems/[subsystem-name]/structure.md`)
+            - Reference: consult `system-structure.md` (`{docs_path}/wiki/system-wide/system-structure.md`)
+              and `[subsystem]-structure.md` (`{docs_path}/wiki/subsystems/[subsystem-name]/structure.md`)
               for where constants should live in this project
 
             ### No Silent Failures
@@ -197,8 +197,8 @@
             - **Dependency injection for ALL services** — No instantiating dependencies directly
               inside other services. Wire dependencies through constructors. Register in the
               DI container.
-              Reference: consult `system-structure.md` (`.docs/wiki/system-wide/system-structure.md`)
-              and `[subsystem]-structure.md` (`.docs/wiki/subsystems/[subsystem-name]/structure.md`)
+              Reference: consult `system-structure.md` (`{docs_path}/wiki/system-wide/system-structure.md`)
+              and `[subsystem]-structure.md` (`{docs_path}/wiki/subsystems/[subsystem-name]/structure.md`)
               for where DI configuration lives in this project
 
             ### OOP Best Practices

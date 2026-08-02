@@ -1,6 +1,6 @@
 ---
 name: map-walkthrough
-description: Create deep tutorial-style flow walkthroughs in .docs/wiki/subsystems/[name]/walkthroughs/
+description: Create deep tutorial-style flow walkthroughs under the project wiki's subsystems/[name]/walkthroughs/
 argument-hint: "flow='tick data from bybit websocket to timescaledb' subsystem='data-ingestion' emphasis-frameworks='SignalR,Redis Streams'"
 disable-model-invocation: false
 allowed-tools:
@@ -21,6 +21,10 @@ effort: max
 context: fork
 agent: ace-wiki-mapper
 ---
+
+## Environment Context (preprocessed)
+
+!`node "${CLAUDE_SKILL_DIR}/script.js" init 2>/dev/null`
 
 ## Supporting Resources (auto-loaded)
 
@@ -71,7 +75,7 @@ agent: ace-wiki-mapper
                     Subsystem where the walkthrough wiki file is placed.
                     The flow itself may span MULTIPLE subsystems — the agent follows
                     the code wherever it goes. This parameter only determines the
-                    wiki location: `.docs/wiki/subsystems/[subsystem]/walkthroughs/`.
+                    wiki location: `{docs_path}/wiki/subsystems/[subsystem]/walkthroughs/`.
                     If not provided, pause and ask the user.
                 </param>
             </required>
@@ -116,7 +120,7 @@ agent: ace-wiki-mapper
         </objective>
 
         <artifacts>
-            .docs/wiki/subsystems/[subsystem-name]/walkthroughs/[flow-name].md
+            {docs_path}/wiki/subsystems/[subsystem-name]/walkthroughs/[flow-name].md
         </artifacts>
     </output>
 
@@ -133,7 +137,7 @@ agent: ace-wiki-mapper
         <step>/clear first for a fresh context window</step>
         <step>/ace:map-walkthrough — create another walkthrough</step>
         <step>/ace:map-subsystem [subsystem] — map or refresh an entire subsystem</step>
-        <step>Review and edit files in .docs/wiki/subsystems/[subsystem-name]/walkthroughs/</step>
+        <step>Review and edit files in {docs_path}/wiki/subsystems/[subsystem-name]/walkthroughs/</step>
     </next-steps>
 
 </command>

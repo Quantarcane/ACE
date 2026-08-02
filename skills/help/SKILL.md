@@ -58,6 +58,8 @@ effort: medium
 
         <artifacts>
             - .ace/settings.json (created on first run if missing)
+            - .ace/settings.json `docs_path` — the documentation root every other
+              ACE command resolves its paths from (confirmed with the user on first run)
         </artifacts>
     </output>
 
@@ -68,4 +70,18 @@ effort: medium
 
         CRITICAL MANDATORY STEP — DO NOT SKIP:
         Before displaying the status dashboard, you MUST run:
+        ```bash
+        node "${CLAUDE_SKILL_DIR}/script.js" sync-agent-teams --raw
         ```
+        Agent Teams state lives in two files and drifts if only one is read.
+
+        This command is the entry point for project initialization, so it also owns
+        the `docs_path` setting (workflow step 2.3–2.5). Resolve it before reporting
+        on any document: `.docs` is only the default, and in a monorepo the real root
+        may be nested (e.g. `ProcerERP/.docs`). Build every path you check or display
+        from `{docs_path}` rather than typing `.docs`, otherwise the dashboard reports
+        missing documents that exist.
+    </process>
+
+</command>
+```

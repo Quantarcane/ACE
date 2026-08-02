@@ -5,7 +5,7 @@
         determine which documents need creation or updates, spawn ace-wiki-mapper agents to produce
         them, run module discovery, and generate knowledge documentation via map-story.
 
-        Produces documents in `.docs/wiki/subsystems/[subsystem-name]/`:
+        Produces documents in `{docs_path}/wiki/subsystems/[subsystem-name]/`:
         - structure.md — physical file layout within the subsystem
         - architecture.md — L3 component view, flows, dependencies, data ownership
         - systems/*.md — domain system documentation (via map-story)
@@ -17,10 +17,32 @@
 
         Also produces `.ace/artifacts/subsystems/[subsystem-name]/module-discovery/module-discovery.md`.
 
-        May also update `.docs/wiki/system-wide/system-structure.md` if this subsystem
-        is not yet listed there, and `.docs/wiki/system-wide/system-architecture.md` if
+        May also update `{docs_path}/wiki/system-wide/system-structure.md` if this subsystem
+        is not yet listed there, and `{docs_path}/wiki/system-wide/system-architecture.md` if
         the subsystem is missing from the Subsystem Responsibility Matrix.
     </purpose>
+
+    <docs-root>
+        Every `{docs_path}` below is a placeholder, not a literal path. Its value is the
+        `docs_path` field from this skill's init output (read from `.ace/settings.json`,
+        preprocessed into the prompt above). Substitute the real value before you read,
+        write, glob or `mkdir` any documentation path.
+
+        It is `.docs` in a typical single-project repo, but monorepos commonly nest it —
+        `ProcerERP/.docs`, for example. Typing a literal `.docs` in a project that nests
+        its docs creates a second, orphaned documentation tree at the repo root: the files
+        appear to be written successfully, but every other ACE command resolves the
+        configured root and will never find them.
+
+        When you spawn a subagent, state the resolved root explicitly in its prompt
+        (e.g. `Docs root: ProcerERP/.docs`) and substitute it into every path you hand it.
+        A subagent starts with a fresh context — it cannot see the init output you are
+        holding, so an unsubstituted `{docs_path}` reaches it as literal text.
+
+        If `docs_path` is missing from the init output, stop and tell the user to run
+        `/ace:help`, which detects and pins the location — do not guess.
+    </docs-root>
+
 
     <mandatory-context>
         All supporting resource files are auto-loaded in the skill prompt above. Do NOT re-read them.
@@ -82,8 +104,8 @@
             <substep order="2.1" name="read-system-docs">
                 Read (if they exist):
                 <file-list>
-                    <file path=".docs/wiki/system-wide/system-structure.md" />
-                    <file path=".docs/wiki/system-wide/system-architecture.md" />
+                    <file path="{docs_path}/wiki/system-wide/system-structure.md" />
+                    <file path="{docs_path}/wiki/system-wide/system-architecture.md" />
                 </file-list>
             </substep>
 
@@ -133,7 +155,7 @@
             </substep>
 
             <substep order="3.3" name="set-output-dir">
-                Determine wiki output directory: `.docs/wiki/subsystems/[subsystem_name]/`
+                Determine wiki output directory: `{docs_path}/wiki/subsystems/[subsystem_name]/`
             </substep>
 
             Continue to step 4.
@@ -147,7 +169,7 @@
         <step name="document-triage" order="4">
 
             <substep order="4.1" name="check-existing">
-                Check for existing documents in `.docs/wiki/subsystems/[subsystem_name]/`:
+                Check for existing documents in `{docs_path}/wiki/subsystems/[subsystem_name]/`:
                 <flags>
                     <flag name="has_structure">Does `structure.md` exist?</flag>
                     <flag name="has_architecture">Does `architecture.md` exist?</flag>
@@ -164,7 +186,7 @@
                 <variant condition="has_structure is true">
                     Use AskUserQuestion:
                     - header: "Structure"
-                    - question: "Structure document already exists at `.docs/wiki/subsystems/[subsystem_name]/structure.md`. What would you like to do?"
+                    - question: "Structure document already exists at `{docs_path}/wiki/subsystems/[subsystem_name]/structure.md`. What would you like to do?"
                     - options:
                       - "Update" — Refresh the existing document with current codebase state
                       - "Recreate" — Discard and rebuild from scratch
@@ -183,7 +205,7 @@
                 <variant condition="has_architecture is true">
                     Use AskUserQuestion:
                     - header: "Architecture"
-                    - question: "Architecture document already exists at `.docs/wiki/subsystems/[subsystem_name]/architecture.md`. What would you like to do?"
+                    - question: "Architecture document already exists at `{docs_path}/wiki/subsystems/[subsystem_name]/architecture.md`. What would you like to do?"
                     - options:
                       - "Update" — Refresh the existing document with current codebase state
                       - "Recreate" — Discard and rebuild from scratch
@@ -240,7 +262,7 @@
             Create the subsystem wiki directory if it doesn't exist:
 
             ```bash
-            mkdir -p .docs/wiki/subsystems/[subsystem_name]
+            mkdir -p {docs_path}/wiki/subsystems/[subsystem_name]
             ```
 
             Continue to step 6.
@@ -270,8 +292,8 @@
                     **Subsystem name:** [subsystem_name]
 
                     **Template:** Read ${CLAUDE_SKILL_DIR}/templates/subsystem-structure.xml
-                    **System context (if exists):** Read .docs/wiki/system-wide/system-structure.md
-                    **Output:** Write to .docs/wiki/subsystems/[subsystem_name]/structure.md
+                    **System context (if exists):** Read {docs_path}/wiki/system-wide/system-structure.md
+                    **Output:** Write to {docs_path}/wiki/subsystems/[subsystem_name]/structure.md
 
                     <agent-instructions>
                         <instruction order="1" name="explore">
@@ -309,7 +331,7 @@
                     UPDATE the existing structure document for this subsystem.
 
                     **Subsystem path:** [subsystem_path]
-                    **Current document:** Read .docs/wiki/subsystems/[subsystem_name]/structure.md
+                    **Current document:** Read {docs_path}/wiki/subsystems/[subsystem_name]/structure.md
                     **Template:** Read ${CLAUDE_SKILL_DIR}/templates/subsystem-structure.xml
 
                     <agent-instructions>
@@ -329,7 +351,7 @@
                         </instruction>
                     </agent-instructions>
 
-                    Write the updated file to .docs/wiki/subsystems/[subsystem_name]/structure.md
+                    Write the updated file to {docs_path}/wiki/subsystems/[subsystem_name]/structure.md
                     Return confirmation only — do NOT return document contents.",
                     subagent_type="ace-wiki-mapper",
                     model="{MAPPER_MODEL}",
@@ -361,9 +383,9 @@
                     **Subsystem name:** [subsystem_name]
 
                     **Template:** Read ${CLAUDE_SKILL_DIR}/templates/subsystem-architecture.xml
-                    **System context (if exists):** Read .docs/wiki/system-wide/system-architecture.md
-                    **Structure doc (if exists):** Read .docs/wiki/subsystems/[subsystem_name]/structure.md
-                    **Output:** Write to .docs/wiki/subsystems/[subsystem_name]/architecture.md
+                    **System context (if exists):** Read {docs_path}/wiki/system-wide/system-architecture.md
+                    **Structure doc (if exists):** Read {docs_path}/wiki/subsystems/[subsystem_name]/structure.md
+                    **Output:** Write to {docs_path}/wiki/subsystems/[subsystem_name]/architecture.md
 
                     <agent-instructions>
                         <instruction order="1" name="analyze">
@@ -403,9 +425,9 @@
                     UPDATE the existing architecture document for this subsystem.
 
                     **Subsystem path:** [subsystem_path]
-                    **Current document:** Read .docs/wiki/subsystems/[subsystem_name]/architecture.md
+                    **Current document:** Read {docs_path}/wiki/subsystems/[subsystem_name]/architecture.md
                     **Template:** Read ${CLAUDE_SKILL_DIR}/templates/subsystem-architecture.xml
-                    **System context (if exists):** Read .docs/wiki/system-wide/system-architecture.md
+                    **System context (if exists):** Read {docs_path}/wiki/system-wide/system-architecture.md
 
                     <agent-instructions>
                         <instruction order="1" name="compare">
@@ -423,7 +445,7 @@
                         </instruction>
                     </agent-instructions>
 
-                    Write the updated file to .docs/wiki/subsystems/[subsystem_name]/architecture.md
+                    Write the updated file to {docs_path}/wiki/subsystems/[subsystem_name]/architecture.md
                     Return confirmation only — do NOT return document contents.",
                     subagent_type="ace-wiki-mapper",
                     model="{MAPPER_MODEL}",
@@ -477,16 +499,16 @@
                         A new subsystem has just been documented. Add it to the system-wide structure document.
 
                         **New subsystem:** [subsystem_name] at [subsystem_path]
-                        **Current document:** Read .docs/wiki/system-wide/system-structure.md
-                        **Newly created docs:** Read .docs/wiki/subsystems/[subsystem_name]/structure.md
-                          and .docs/wiki/subsystems/[subsystem_name]/architecture.md to infer responsibility.
+                        **Current document:** Read {docs_path}/wiki/system-wide/system-structure.md
+                        **Newly created docs:** Read {docs_path}/wiki/subsystems/[subsystem_name]/structure.md
+                          and {docs_path}/wiki/subsystems/[subsystem_name]/architecture.md to infer responsibility.
 
                         <agent-instructions>
                             <instruction order="1" name="add-row">
                                 Add this subsystem to the Subsystem Index table with:
                                 <checklist>
                                     <item>Name, path, one-line responsibility (inferred from the subsystem code and its new docs)</item>
-                                    <item>Wiki doc link: `.docs/wiki/subsystems/[subsystem_name]/`</item>
+                                    <item>Wiki doc link: `{docs_path}/wiki/subsystems/[subsystem_name]/`</item>
                                 </checklist>
                             </instruction>
                             <instruction order="2" name="preserve">
@@ -494,7 +516,7 @@
                             </instruction>
                         </agent-instructions>
 
-                        Write the updated file to .docs/wiki/system-wide/system-structure.md
+                        Write the updated file to {docs_path}/wiki/system-wide/system-structure.md
                         Return confirmation only — do NOT return document contents.",
                         subagent_type="ace-wiki-mapper",
                         model="{MAPPER_MODEL}",
@@ -515,9 +537,9 @@
                     Add it to the matrix in the system-wide architecture document.
 
                     **Subsystem:** [subsystem_name] at [subsystem_path]
-                    **Current document:** Read .docs/wiki/system-wide/system-architecture.md
-                    **Subsystem docs:** Read .docs/wiki/subsystems/[subsystem_name]/structure.md
-                      and .docs/wiki/subsystems/[subsystem_name]/architecture.md to populate the row.
+                    **Current document:** Read {docs_path}/wiki/system-wide/system-architecture.md
+                    **Subsystem docs:** Read {docs_path}/wiki/subsystems/[subsystem_name]/structure.md
+                      and {docs_path}/wiki/subsystems/[subsystem_name]/architecture.md to populate the row.
 
                     <agent-instructions>
                         <instruction order="1" name="add-matrix-row">
@@ -535,7 +557,7 @@
                         </instruction>
                     </agent-instructions>
 
-                    Write the updated file to .docs/wiki/system-wide/system-architecture.md
+                    Write the updated file to {docs_path}/wiki/system-wide/system-architecture.md
                     Return confirmation only — do NOT return document contents.",
                     subagent_type="ace-wiki-mapper",
                     model="{MAPPER_MODEL}",
@@ -583,7 +605,7 @@
 
                     **Subsystem path:** [subsystem_path]
                     **Subsystem name:** [subsystem_name]
-                    **File inventory:** Read .docs/wiki/subsystems/[subsystem_name]/structure.md
+                    **File inventory:** Read {docs_path}/wiki/subsystems/[subsystem_name]/structure.md
 
                     <agent-instructions>
                         <instruction order="1" name="read-inventory">
@@ -643,7 +665,7 @@
                     similar files and comparing their structure.
 
                     **Subsystem path:** [subsystem_path]
-                    **File inventory:** Read .docs/wiki/subsystems/[subsystem_name]/structure.md
+                    **File inventory:** Read {docs_path}/wiki/subsystems/[subsystem_name]/structure.md
 
                     <agent-instructions>
                         <instruction order="1" name="read-inventory">
@@ -704,8 +726,8 @@
                     by reading shared infrastructure files.
 
                     **Subsystem path:** [subsystem_path]
-                    **File inventory:** Read .docs/wiki/subsystems/[subsystem_name]/structure.md
-                    **Architecture doc:** .docs/wiki/subsystems/[subsystem_name]/architecture.md
+                    **File inventory:** Read {docs_path}/wiki/subsystems/[subsystem_name]/structure.md
+                    **Architecture doc:** {docs_path}/wiki/subsystems/[subsystem_name]/architecture.md
 
                     <agent-instructions>
                         <instruction order="1" name="read-context">
@@ -853,7 +875,7 @@
                     - .ace/artifacts/subsystems/[subsystem_name]/module-discovery/discovery-flows.md       (systems)
                     - .ace/artifacts/subsystems/[subsystem_name]/module-discovery/discovery-patterns.md    (patterns)
                     - .ace/artifacts/subsystems/[subsystem_name]/module-discovery/discovery-cross-cutting.md (cross-cutting + guides)
-                    **File inventory:** .docs/wiki/subsystems/[subsystem_name]/structure.md
+                    **File inventory:** {docs_path}/wiki/subsystems/[subsystem_name]/structure.md
                     **External docs inventory (if exists):** .ace/artifacts/subsystems/[subsystem_name]/module-discovery/existing-docs-inventory.md
 
                     <agent-instructions>
@@ -864,7 +886,7 @@
                             Discover existing documentation:
                             <checklist>
                                 <item>Scan the subsystem directory ([subsystem_path]) recursively for *.md files</item>
-                                <item>Also scan common doc locations: docs/, documentation/, .docs/</item>
+                                <item>Also scan common doc locations: docs/, documentation/, {docs_path}/</item>
                                 <item>If existing-docs-inventory.md exists, read it and INCLUDE all entries
                                     in the Existing Documentation Inventory table (these are external docs
                                     already indexed — do NOT re-scan the original directory)</item>
@@ -993,7 +1015,7 @@
                         </instruction>
 
                         <instruction order="3" name="read-wiki">
-                            Read ALL existing wiki docs under .docs/wiki/subsystems/[subsystem_name]/ —
+                            Read ALL existing wiki docs under {docs_path}/wiki/subsystems/[subsystem_name]/ —
                             EVERY .md file, FULLY. Not titles. Not summaries. THE COMPLETE CONTENT.
                             Build a mental map of what is already documented so you do NOT create
                             duplicate documentation. This is MANDATORY.
@@ -1057,7 +1079,7 @@
                 ```
                 Grep(
                     pattern="(sk-[a-zA-Z0-9]{20,}|sk_live_|sk_test_|ghp_[a-zA-Z0-9]{36}|AKIA[A-Z0-9]{16}|-----BEGIN.*PRIVATE KEY)",
-                    path=".docs/wiki/subsystems/[subsystem_name]/",
+                    path="{docs_path}/wiki/subsystems/[subsystem_name]/",
                     output_mode="content"
                 )
                 ```
@@ -1072,19 +1094,19 @@
                 <stage-files>
                     <always>
                         ```bash
-                        git add .docs/wiki/subsystems/[subsystem_name]/
+                        git add {docs_path}/wiki/subsystems/[subsystem_name]/
                         ```
                     </always>
 
                     <conditional condition="system-structure.md was updated in step 9a">
                         ```bash
-                        git add .docs/wiki/system-wide/system-structure.md
+                        git add {docs_path}/wiki/system-wide/system-structure.md
                         ```
                     </conditional>
 
                     <conditional condition="system-architecture.md was updated in step 9b">
                         ```bash
-                        git add .docs/wiki/system-wide/system-architecture.md
+                        git add {docs_path}/wiki/system-wide/system-architecture.md
                         ```
                     </conditional>
 
@@ -1131,7 +1153,7 @@
               ~  system-architecture.md — subsystem responsibility matrix updated
 
               [If knowledge docs were produced in step 11:]
-              Knowledge Docs (.docs/wiki/subsystems/[subsystem_name]/):
+              Knowledge Docs ({docs_path}/wiki/subsystems/[subsystem_name]/):
               ──────────────────────────────────────────────────────────
               [For each doc written by map-story: show filename and line count]
 
@@ -1143,7 +1165,7 @@
               Also available (`/clear` first):
               - /ace:map-system — Re-run to refresh system-wide documents
               - /ace:init-coding-standards — Define coding standards
-              - Review files in .docs/wiki/subsystems/[subsystem_name]/
+              - Review files in {docs_path}/wiki/subsystems/[subsystem_name]/
             ```
 
             End workflow.
@@ -1161,11 +1183,11 @@
         <criterion>system-architecture.md subsystem responsibility matrix updated if subsystem was missing</criterion>
         <criterion>All created documents verified for content (non-empty, >20 lines)</criterion>
         <criterion>Security scan passed (no secrets in generated docs)</criterion>
-        <criterion>Documents committed to .docs/wiki/subsystems/[subsystem_name]/</criterion>
+        <criterion>Documents committed to {docs_path}/wiki/subsystems/[subsystem_name]/</criterion>
         <criterion>Module discovery completed; .ace/artifacts/subsystems/[subsystem_name]/module-discovery/module-discovery.md written</criterion>
         <criterion>map-story called sequentially for each module row; all completed</criterion>
         <criterion>Each map-story agent reads ALL existing wiki docs FULLY before writing (no duplication)</criterion>
-        <criterion>Knowledge docs written to .docs/wiki/subsystems/[subsystem_name]/</criterion>
+        <criterion>Knowledge docs written to {docs_path}/wiki/subsystems/[subsystem_name]/</criterion>
         <criterion>module-discovery.md staged and committed</criterion>
         <criterion>User sees clear completion summary with next steps</criterion>
     </success_criteria>

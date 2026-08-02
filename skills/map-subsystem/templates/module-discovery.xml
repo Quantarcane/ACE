@@ -107,7 +107,7 @@
         How to discover existing docs:
         - Scan the subsystem directory recursively for *.md files
         - Scan common documentation locations: `docs/`, `documentation/`, `README.md`,
-          `ARCHITECTURE.md`, `.docs/` (if legacy docs exist there)
+          `ARCHITECTURE.md`, `{docs_path}/` (if legacy docs exist there)
         - Include legacy implementation docs (`*-implementation-doc.md`) — they contain
           detailed knowledge about what was built and why
 

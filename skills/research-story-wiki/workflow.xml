@@ -3,7 +3,7 @@
     <purpose>
         Research and curate the Relevant Wiki section for a story specification.
         Load the story requirements (User Story, Description, AC), read the parent feature
-        for broader context, scan `.docs/wiki/` system-wide and subsystem documents,
+        for broader context, scan `{docs_path}/wiki/` system-wide and subsystem documents,
         and compile a curated list of wiki references that directly inform the technical
         solution for this story.
 
@@ -17,6 +17,28 @@
         This workflow is executed by the orchestrator directly. It spawns `ace-wiki-mapper`
         subagents (via `subagent_type="ace-wiki-mapper"`) for parallel subsystem research.
     </purpose>
+
+    <docs-root>
+        Every `{docs_path}` below is a placeholder, not a literal path. Its value is the
+        `docs_path` field from this skill's init output (read from `.ace/settings.json`,
+        preprocessed into the prompt above). Substitute the real value before you read,
+        write, glob or `mkdir` any documentation path.
+
+        It is `.docs` in a typical single-project repo, but monorepos commonly nest it —
+        `ProcerERP/.docs`, for example. Typing a literal `.docs` in a project that nests
+        its docs creates a second, orphaned documentation tree at the repo root: the files
+        appear to be written successfully, but every other ACE command resolves the
+        configured root and will never find them.
+
+        When you spawn a subagent, state the resolved root explicitly in its prompt
+        (e.g. `Docs root: ProcerERP/.docs`) and substitute it into every path you hand it.
+        A subagent starts with a fresh context — it cannot see the init output you are
+        holding, so an unsubstituted `{docs_path}` reaches it as literal text.
+
+        If `docs_path` is missing from the init output, stop and tell the user to run
+        `/ace:help`, which detects and pins the location — do not guess.
+    </docs-root>
+
 
     <mandatory-context>
         All supporting resource files are auto-loaded in the skill prompt above. Do NOT re-read them.
@@ -66,11 +88,11 @@
             **If `INIT.story_valid` is false:**
             Display error using `INIT.story_error` and exit.
 
-            **Verify wiki exists** — check that `.docs/wiki/` directory exists.
+            **Verify wiki exists** — check that `{docs_path}/wiki/` directory exists.
             **If wiki not found:**
             Display error and exit:
             ```
-              x  No wiki found at .docs/wiki/
+              x  No wiki found at {docs_path}/wiki/
                  The wiki must exist before researching story wiki references.
                  Run /ace:init-wiki or /ace:map-system first.
             ```
@@ -158,10 +180,10 @@
             assessment needed. They are mandatory context for every story implementation.
 
             Set SYSTEM_WIDE_REFS to the fixed list:
-            - `.docs/wiki/system-wide/system-structure.md` — Mandatory system-wide context
-            - `.docs/wiki/system-wide/system-architecture.md` — Mandatory system-wide context
-            - `.docs/wiki/system-wide/coding-standards.md` — Mandatory system-wide context
-            - `.docs/wiki/system-wide/testing-framework.md` — Mandatory system-wide context
+            - `{docs_path}/wiki/system-wide/system-structure.md` — Mandatory system-wide context
+            - `{docs_path}/wiki/system-wide/system-architecture.md` — Mandatory system-wide context
+            - `{docs_path}/wiki/system-wide/coding-standards.md` — Mandatory system-wide context
+            - `{docs_path}/wiki/system-wide/testing-framework.md` — Mandatory system-wide context
 
             **Do NOT read these files.** The implementing agent (pass 5) will read them.
             This step only ensures they appear in the output.
@@ -173,7 +195,7 @@
 
         <step name="identify-subsystems" order="5">
 
-            Read `.docs/wiki/system-wide/system-architecture.md` to understand subsystem
+            Read `{docs_path}/wiki/system-wide/system-architecture.md` to understand subsystem
             boundaries, responsibilities, and how they interact. This is the ONE system-wide
             doc worth reading during wiki research — it maps the subsystem landscape.
 
@@ -187,9 +209,9 @@
             4. **Feature wiki hints**: subsystems listed in the feature-level relevant-wiki.md
             5. **Wiki subsystem list**: compare against `wiki_subsystem_names` from INIT
 
-            For each identified subsystem, verify it exists in `.docs/wiki/subsystems/`:
+            For each identified subsystem, verify it exists in `{docs_path}/wiki/subsystems/`:
             ```bash
-            ls .docs/wiki/subsystems/
+            ls {docs_path}/wiki/subsystems/
             ```
 
             Store the list of affected subsystem names as AFFECTED_SUBSYSTEMS.
@@ -239,10 +261,10 @@
                 - Feature: {Feature ID} — {Feature Title}
 
                 Subsystem to investigate: {subsystem_name}
-                Subsystem wiki path: .docs/wiki/subsystems/{subsystem_name}/
+                Subsystem wiki path: {docs_path}/wiki/subsystems/{subsystem_name}/
 
                 Instructions:
-                1. List all files in .docs/wiki/subsystems/{subsystem_name}/ recursively
+                1. List all files in {docs_path}/wiki/subsystems/{subsystem_name}/ recursively
                 2. Read each document (structure.md, architecture.md, and any docs in
                    systems/, patterns/, cross-cutting/, guides/, walkthroughs/, decisions/ subdirectories)
                 3. For each document, assess: does it directly inform the technical solution
@@ -257,11 +279,11 @@
                 4. Return your findings in this EXACT format:
 
                 RELEVANT_FILES:
-                - `.docs/wiki/subsystems/{subsystem_name}/{path}` — {one-line reason}
-                - `.docs/wiki/subsystems/{subsystem_name}/{path}` — {one-line reason}
+                - `{docs_path}/wiki/subsystems/{subsystem_name}/{path}` — {one-line reason}
+                - `{docs_path}/wiki/subsystems/{subsystem_name}/{path}` — {one-line reason}
 
                 NOT_RELEVANT:
-                - `.docs/wiki/subsystems/{subsystem_name}/{path}` — {one-line reason for exclusion}
+                - `{docs_path}/wiki/subsystems/{subsystem_name}/{path}` — {one-line reason for exclusion}
 
                 If NO documents are relevant, return RELEVANT_FILES with no entries.
                 Do NOT write any files. Return text only.",

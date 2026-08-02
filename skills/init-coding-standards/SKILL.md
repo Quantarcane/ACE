@@ -70,7 +70,7 @@ effort: high
         </objective>
 
         <artifacts>
-            .docs/wiki/system-wide/coding-standards.md
+            {docs_path}/wiki/system-wide/coding-standards.md
         </artifacts>
     </output>
 
@@ -84,7 +84,7 @@ effort: high
         **After this command:**
         - `/ace:map-system` — Map codebase structure and architecture
         - `/ace:help` — Check project initialization status and next steps
-        - Review and edit `.docs/wiki/system-wide/coding-standards.md` anytime
+        - Review and edit `{docs_path}/wiki/system-wide/coding-standards.md` anytime
     </next-steps>
 
 </command>

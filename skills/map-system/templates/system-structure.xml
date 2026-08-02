@@ -1,6 +1,6 @@
 <system-structure>
     <purpose>
-        Template for `.docs/wiki/system-wide/system-structure.md` — the physical file organization
+        Template for `{docs_path}/wiki/system-wide/system-structure.md` — the physical file organization
         at the system level. Answers "what subsystems exist and where do they live?"
 
         Complements system-architecture.md (which shows conceptual design and flows).
@@ -44,7 +44,7 @@
             | `[path]` | [Subsystem Name] | [One-line responsibility] |
             | `[path]` | [Subsystem Name] | [One-line responsibility] |
 
-            Per-subsystem structure docs: `.docs/wiki/subsystems/[subsystem-name]/structure.md`
+            Per-subsystem structure docs: `{docs_path}/wiki/subsystems/[subsystem-name]/structure.md`
         </subsystem-index>
 
         <shared-directories>

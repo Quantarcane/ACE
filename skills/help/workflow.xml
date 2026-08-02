@@ -7,6 +7,28 @@
         run missing setup commands — following the GSD new-project interactive pattern.
     </purpose>
 
+    <docs-root>
+        Every `{docs_path}` below is a placeholder, not a literal path. Its value is the
+        `docs_path` field from this skill's init output (read from `.ace/settings.json`,
+        preprocessed into the prompt above). Substitute the real value before you read,
+        write, glob or `mkdir` any documentation path.
+
+        It is `.docs` in a typical single-project repo, but monorepos commonly nest it —
+        `ProcerERP/.docs`, for example. Typing a literal `.docs` in a project that nests
+        its docs creates a second, orphaned documentation tree at the repo root: the files
+        appear to be written successfully, but every other ACE command resolves the
+        configured root and will never find them.
+
+        When you spawn a subagent, state the resolved root explicitly in its prompt
+        (e.g. `Docs root: ProcerERP/.docs`) and substitute it into every path you hand it.
+        A subagent starts with a fresh context — it cannot see the init output you are
+        holding, so an unsubstituted `{docs_path}` reaches it as literal text.
+
+        If `docs_path` is missing from the init output, stop and tell the user to run
+        `/ace:help`, which detects and pins the location — do not guess.
+    </docs-root>
+
+
     <mandatory-context>
         All supporting resource files are auto-loaded in the skill prompt above. Do NOT re-read them.
     </mandatory-context>
@@ -26,11 +48,12 @@
                 ```
 
                 <output-fields>
-                    <field name="has_product_vision">Whether .docs/product/product-vision.md exists</field>
-                    <field name="has_system_architecture">Whether .docs/wiki/system-wide/system-architecture.md exists</field>
-                    <field name="has_system_structure">Whether .docs/wiki/system-wide/system-structure.md exists</field>
-                    <field name="has_coding_standards">Whether .docs/wiki/system-wide/coding-standards.md exists</field>
-                    <field name="has_testing_framework">Whether .docs/wiki/system-wide/testing-framework.md exists</field>
+                    <field name="docs_path">Configured docs root (e.g. `.docs` or `ProcerERP/.docs`) — every documentation path below is relative to it</field>
+                    <field name="has_product_vision">Whether {docs_path}/product/product-vision.md exists</field>
+                    <field name="has_system_architecture">Whether {docs_path}/wiki/system-wide/system-architecture.md exists</field>
+                    <field name="has_system_structure">Whether {docs_path}/wiki/system-wide/system-structure.md exists</field>
+                    <field name="has_coding_standards">Whether {docs_path}/wiki/system-wide/coding-standards.md exists</field>
+                    <field name="has_testing_framework">Whether {docs_path}/wiki/system-wide/testing-framework.md exists</field>
                     <field name="is_brownfield">Existing code or package files detected</field>
                     <field name="is_greenfield">No existing code detected</field>
                     <field name="has_git">Whether .git directory exists</field>
@@ -84,6 +107,89 @@
                 <variant condition="created is false">
                     No display needed — settings already exist.
                 </variant>
+            </substep>
+
+            <substep order="2.3" name="detect-docs-root">
+                **Establish where documentation lives before anything else reads or writes it.**
+
+                ACE stores the product docs and the wiki under a single root. That root is
+                `.docs` at the project root in most repos, but monorepos frequently nest it
+                (e.g. `ProcerERP/.docs`). Every other ACE command resolves the location from
+                `.ace/settings.json`, so getting it right here is what makes the rest work.
+
+                ```bash
+                DOCS=$(node "${CLAUDE_SKILL_DIR}/script.js" detect-docs-path)
+                ```
+
+                <output-fields>
+                    <field name="docs_path">Currently resolved docs root (defaults to `.docs` when unset)</field>
+                    <field name="is_explicitly_configured">Whether settings.json already pins a docs_path</field>
+                    <field name="docs_path_exists">Whether the resolved root exists on disk</field>
+                    <field name="candidates">Detected `.docs` directories, shallowest first</field>
+                    <field name="has_candidates">Whether any `.docs` directory was found</field>
+                </output-fields>
+            </substep>
+
+            <substep order="2.4" name="confirm-docs-root">
+                <variant condition="is_explicitly_configured is true">
+                    Already pinned — do not re-ask. Display:
+                    ```
+                      ✓  Docs root: {docs_path}
+                    ```
+                    Skip to step 3.
+                </variant>
+
+                <variant condition="is_explicitly_configured is false AND candidates contains exactly one entry">
+                    Confirm the detected location rather than assuming it. Use `AskUserQuestion`:
+                    - header: "Docs root"
+                    - question: "Found documentation at `{candidates[0]}`. Should ACE write the wiki and product docs there?"
+                    - options:
+                      - "Yes, use {candidates[0]} (Recommended)" — Pin this location in .ace/settings.json
+                      - "Somewhere else" — I'll provide a different path
+
+                    If "Somewhere else": ask for a project-root-relative path (e.g. `ProcerERP/.docs`).
+                </variant>
+
+                <variant condition="is_explicitly_configured is false AND candidates contains more than one entry">
+                    Use `AskUserQuestion`:
+                    - header: "Docs root"
+                    - question: "Multiple documentation folders found. Which one should ACE use?"
+                    - options: (build from candidates, max 4)
+                      - "{candidate}" — for each detected path
+
+                    If none of the listed options fit, the user can supply a different
+                    project-root-relative path.
+                </variant>
+
+                <variant condition="is_explicitly_configured is false AND has_candidates is false">
+                    Nothing exists yet, so this is a greenfield choice. Use `AskUserQuestion`:
+                    - header: "Docs root"
+                    - question: "Where should ACE keep the wiki and product docs? (Created on first use.)"
+                    - options:
+                      - ".docs (Recommended)" — Project root — the default layout
+                      - "Nested under a subproject" — e.g. `ProcerERP/.docs` for a monorepo
+
+                    If "Nested under a subproject": ask for the project-root-relative path.
+                </variant>
+            </substep>
+
+            <substep order="2.5" name="write-docs-root">
+                Runs only when 2.4 asked the user (i.e. `is_explicitly_configured` was false).
+
+                **Write it through the command below — never hand-edit `.ace/settings.json`,
+                which would skip normalization and validation.**
+
+                ```bash
+                node "${CLAUDE_SKILL_DIR}/script.js" write-docs-path path={chosen_path}
+                ```
+
+                Display:
+                ```
+                  ✓  Docs root set to {docs_path}
+                ```
+
+                Use `{docs_path}` from this point on — the dashboard below and every
+                suggested command operate against this root.
             </substep>
         </step>
 
@@ -325,6 +431,7 @@
                 ╚══════════════════════════════════════════════════╝
 
                   Project type:       {brownfield|greenfield}
+                  Docs root:          {docs_path}
 
                   Product Vision      [{check}] {status}    {suggestion}
                   System Architecture [{check}] {status}    {suggestion}
@@ -350,6 +457,7 @@
                 ```
                   Settings            [✓] .ace/settings.json
                   Model profile:      {settings.model_profile}
+                  Docs path:          {settings.docs_path}
                   Commit docs:        {settings.commit_docs}
                   Agent Teams:        {enabled (experimental) | disabled}
                 ```
@@ -541,6 +649,8 @@
     <success_criteria>
         <check>Environment detection executed successfully</check>
         <check>Settings.json ensured (created if missing)</check>
+        <check>Docs root resolved and — when not already pinned — confirmed with the user and written to .ace/settings.json via write-docs-path</check>
+        <check>Every documentation path shown to the user is built from {docs_path}, never a literal `.docs`</check>
         <check>GitHub Project integration offered to the user (not silently skipped)</check>
         <check>Agent Teams: sync-agent-teams command executed AND AskUserQuestion presented (NEVER skip this)</check>
         <check>Status dashboard displayed showing all document states, settings, and GitHub status</check>

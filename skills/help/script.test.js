@@ -167,6 +167,71 @@ describe('help script', () => {
     });
   });
 
+  describe('docs root', () => {
+    let tmpDir;
+
+    before(() => { tmpDir = createTestProject(); });
+    after(() => { cleanup(tmpDir); });
+
+    it('reports the default root and no candidates for a bare project', () => {
+      const result = JSON.parse(runScript('detect-docs-path', '', tmpDir));
+      assert.strictEqual(result.docs_path, '.docs');
+      assert.strictEqual(result.is_explicitly_configured, false);
+      assert.strictEqual(result.has_candidates, false);
+    });
+
+    it('detects a nested .docs directory as a candidate', () => {
+      const nested = fs.mkdtempSync(path.join(os.tmpdir(), 'ace-docs-'));
+      fs.mkdirSync(path.join(nested, '.ace'), { recursive: true });
+      fs.mkdirSync(path.join(nested, 'ProcerERP', '.docs', 'wiki'), { recursive: true });
+
+      const result = JSON.parse(runScript('detect-docs-path', '', nested));
+      assert.deepStrictEqual(result.candidates, ['ProcerERP/.docs']);
+      assert.strictEqual(result.has_candidates, true);
+
+      fs.rmSync(nested, { recursive: true, force: true });
+    });
+
+    it('persists a nested root and resolves paths against it afterwards', () => {
+      const written = JSON.parse(runScript('write-docs-path', 'path=ProcerERP/.docs', tmpDir));
+      assert.strictEqual(written.docs_path, 'ProcerERP/.docs');
+
+      const onDisk = JSON.parse(fs.readFileSync(path.join(tmpDir, '.ace', 'settings.json'), 'utf-8'));
+      assert.strictEqual(onDisk.docs_path, 'ProcerERP/.docs');
+
+      // init must now resolve every documentation check against the new root
+      const init = JSON.parse(runScript('init', '', tmpDir));
+      assert.strictEqual(init.docs_path, 'ProcerERP/.docs');
+
+      const detected = JSON.parse(runScript('detect-docs-path', '', tmpDir));
+      assert.strictEqual(detected.is_explicitly_configured, true);
+    });
+
+    it('normalizes backslashes and trailing slashes', () => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ace-docs-'));
+      fs.mkdirSync(path.join(dir, '.ace'), { recursive: true });
+      const written = JSON.parse(runScript('write-docs-path', 'path=apps\\\\api\\\\.docs\\\\', dir));
+      assert.strictEqual(written.docs_path, 'apps/api/.docs');
+      fs.rmSync(dir, { recursive: true, force: true });
+    });
+
+    it('rejects an absolute path', () => {
+      assert.throws(() => {
+        execSync(`node "${SCRIPT}" write-docs-path path=/tmp/elsewhere`, {
+          cwd: tmpDir, encoding: 'utf-8', stdio: 'pipe',
+        });
+      });
+    });
+
+    it('errors on write-docs-path without a path', () => {
+      assert.throws(() => {
+        execSync(`node "${SCRIPT}" write-docs-path`, {
+          cwd: tmpDir, encoding: 'utf-8', stdio: 'pipe',
+        });
+      });
+    });
+  });
+
   describe('error handling', () => {
     it('errors on unknown command', () => {
       assert.throws(() => {

@@ -1,6 +1,6 @@
 <decisions>
     <purpose>
-        Template for `.docs/wiki/subsystems/[subsystem-name]/decisions/<decision-name>.md` — an
+        Template for `{docs_path}/wiki/subsystems/[subsystem-name]/decisions/<decision-name>.md` — an
         Architecture Decision Record (ADR) capturing WHY a significant choice was made.
         Answers "Why did we choose X over Y?"
 

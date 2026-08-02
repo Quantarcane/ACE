@@ -9,7 +9,7 @@
         It runs AFTER sections 1-8 (business requirements) are complete.
 
         A research agent reads the User Story, Description, and Acceptance Criteria from pass 1,
-        then scans the `.docs/wiki/` directory to select documents that are relevant for
+        then scans the `{docs_path}/wiki/` directory to select documents that are relevant for
         designing a good technical solution for this story.
 
         The output is written directly INTO the story file — replacing or populating the
@@ -26,7 +26,7 @@
 
             &lt;!-- Pass 2. Populated by research-story-wiki workflow.
                  A research agent reads the User Story, Description, and AC,
-                 then scans `.docs/wiki/` to select documents relevant to
+                 then scans `{docs_path}/wiki/` to select documents relevant to
                  designing a good technical solution for this story.
 
                  Group references by wiki document type. Only include documents that
@@ -38,31 +38,31 @@
             &lt;!-- MANDATORY — all four system-wide docs are always included.
                  These are mandatory context for every story — no reason needed. --&gt;
 
-            - `.docs/wiki/system-wide/system-structure.md` — Mandatory system-wide context
-            - `.docs/wiki/system-wide/system-architecture.md` — Mandatory system-wide context
-            - `.docs/wiki/system-wide/coding-standards.md` — Mandatory system-wide context
-            - `.docs/wiki/system-wide/testing-framework.md` — Mandatory system-wide context
+            - `{docs_path}/wiki/system-wide/system-structure.md` — Mandatory system-wide context
+            - `{docs_path}/wiki/system-wide/system-architecture.md` — Mandatory system-wide context
+            - `{docs_path}/wiki/system-wide/coding-standards.md` — Mandatory system-wide context
+            - `{docs_path}/wiki/system-wide/testing-framework.md` — Mandatory system-wide context
 
             ### Systems
-            - [`.docs/wiki/subsystems/[name]/systems/[system].md`] — [Why this system is relevant to this story]
+            - [`{docs_path}/wiki/subsystems/[name]/systems/[system].md`] — [Why this system is relevant to this story]
 
             ### Patterns
-            - [`.docs/wiki/subsystems/[name]/patterns/[pattern].md`] — [Why this pattern applies to this story]
+            - [`{docs_path}/wiki/subsystems/[name]/patterns/[pattern].md`] — [Why this pattern applies to this story]
 
             ### Cross-Cutting Concerns
-            - [`.docs/wiki/subsystems/[name]/cross-cutting/[concern].md`] — [Why this concern matters for this story]
+            - [`{docs_path}/wiki/subsystems/[name]/cross-cutting/[concern].md`] — [Why this concern matters for this story]
 
             ### Guides
-            - [`.docs/wiki/subsystems/[name]/guides/[guide].md`] — [Why this guide is useful for this story]
+            - [`{docs_path}/wiki/subsystems/[name]/guides/[guide].md`] — [Why this guide is useful for this story]
 
             ### Walkthroughs
-            - [`.docs/wiki/subsystems/[name]/walkthroughs/[flow].md`] — [Why this flow walkthrough helps understand the implementation context]
+            - [`{docs_path}/wiki/subsystems/[name]/walkthroughs/[flow].md`] — [Why this flow walkthrough helps understand the implementation context]
 
             ### Decisions
-            - [`.docs/wiki/subsystems/[name]/decisions/[decision].md`] — [Why this ADR constrains or informs this story]
+            - [`{docs_path}/wiki/subsystems/[name]/decisions/[decision].md`] — [Why this ADR constrains or informs this story]
 
             ### Architecture
-            - [`.docs/wiki/subsystems/[name]/architecture.md`] — [Why this subsystem's architecture doc is relevant]
+            - [`{docs_path}/wiki/subsystems/[name]/architecture.md`] — [Why this subsystem's architecture doc is relevant]
 
             &lt;!-- Omit any subsystem category header that has no relevant documents.
                  The System-Wide section is NEVER omitted — it is always present.
@@ -70,20 +70,20 @@
                  Example:
 
                  ### System-Wide
-                 - `.docs/wiki/system-wide/system-structure.md` — Locates auth subsystem boundaries and shared middleware
-                 - `.docs/wiki/system-wide/system-architecture.md` — Documents API gateway routing to auth service
-                 - `.docs/wiki/system-wide/coding-standards.md` — Error handling conventions for API responses
-                 - `.docs/wiki/system-wide/testing-framework.md` — Integration test setup for auth endpoints
+                 - `{docs_path}/wiki/system-wide/system-structure.md` — Locates auth subsystem boundaries and shared middleware
+                 - `{docs_path}/wiki/system-wide/system-architecture.md` — Documents API gateway routing to auth service
+                 - `{docs_path}/wiki/system-wide/coding-standards.md` — Error handling conventions for API responses
+                 - `{docs_path}/wiki/system-wide/testing-framework.md` — Integration test setup for auth endpoints
 
                  ### Systems
-                 - `.docs/wiki/subsystems/auth/systems/oauth-provider.md` — Implements the provider abstraction this story extends
-                 - `.docs/wiki/subsystems/auth/systems/session-manager.md` — Manages tokens created by the OAuth flow
+                 - `{docs_path}/wiki/subsystems/auth/systems/oauth-provider.md` — Implements the provider abstraction this story extends
+                 - `{docs_path}/wiki/subsystems/auth/systems/session-manager.md` — Manages tokens created by the OAuth flow
 
                  ### Patterns
-                 - `.docs/wiki/subsystems/auth/patterns/strategy-pattern.md` — Each OAuth provider is a strategy; new provider must follow this
+                 - `{docs_path}/wiki/subsystems/auth/patterns/strategy-pattern.md` — Each OAuth provider is a strategy; new provider must follow this
 
                  ### Decisions
-                 - `.docs/wiki/subsystems/auth/decisions/adr-003-jwt-over-sessions.md` — Constrains token format to JWT
+                 - `{docs_path}/wiki/subsystems/auth/decisions/adr-003-jwt-over-sessions.md` — Constrains token format to JWT
             --&gt;
         </section>
 

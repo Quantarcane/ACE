@@ -1,7 +1,7 @@
 <wiki-readme>
       <purpose>
-          Template for `.docs/wiki/wiki-readme.md` — the entry point and usage guide for the
-          engineering wiki. Generated once when the `.docs/wiki/` directory is first created
+          Template for `{docs_path}/wiki/wiki-readme.md` — the entry point and usage guide for the
+          engineering wiki. Generated once when the `{docs_path}/wiki/` directory is first created
           (typically by `/ace:map-system`).
 
           Serves two audiences:
@@ -27,7 +27,7 @@
               ## Directory Structure
 
               ```
-              .docs/wiki/
+              {docs_path}/wiki/
               |-- wiki-readme.md                          # This file — how to use the wiki
               |-- system-wide/                            # Documents that span all subsystems
               |   |-- system-structure.md                 # Physical layout, subsystem index, shared dirs

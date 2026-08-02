@@ -3,7 +3,7 @@
     <purpose>
         Orchestrate living knowledge documentation: analyze what was built (story mode) or what
         exists (file mode), then create or update topic-scoped documents in
-        `.docs/wiki/subsystems/[subsystem-name]/`.
+        `{docs_path}/wiki/subsystems/[subsystem-name]/`.
 
         Produces documents across six categories:
         - systems/       — WHAT exists (domain subsystems and their current state)
@@ -23,6 +23,28 @@
         agents. The agents are identical regardless of mode — they read all source files,
         read ALL existing wiki docs, and make thorough create-vs-update decisions.
     </purpose>
+
+    <docs-root>
+        Every `{docs_path}` below is a placeholder, not a literal path. Its value is the
+        `docs_path` field from this skill's init output (read from `.ace/settings.json`,
+        preprocessed into the prompt above). Substitute the real value before you read,
+        write, glob or `mkdir` any documentation path.
+
+        It is `.docs` in a typical single-project repo, but monorepos commonly nest it —
+        `ProcerERP/.docs`, for example. Typing a literal `.docs` in a project that nests
+        its docs creates a second, orphaned documentation tree at the repo root: the files
+        appear to be written successfully, but every other ACE command resolves the
+        configured root and will never find them.
+
+        When you spawn a subagent, state the resolved root explicitly in its prompt
+        (e.g. `Docs root: ProcerERP/.docs`) and substitute it into every path you hand it.
+        A subagent starts with a fresh context — it cannot see the init output you are
+        holding, so an unsubstituted `{docs_path}` reaches it as literal text.
+
+        If `docs_path` is missing from the init output, stop and tell the user to run
+        `/ace:help`, which detects and pins the location — do not guess.
+    </docs-root>
+
 
     <mandatory-context>
         All supporting resource files are auto-loaded in the skill prompt above. Do NOT re-read them.
@@ -210,7 +232,7 @@
                     Agent, AskUserQuestion — are unavailable to ace-wiki-mapper agents.
 
                     <substep order="2e.1" name="check-system-structure">
-                        Check if `.docs/wiki/system-wide/system-structure.md` exists.
+                        Check if `{docs_path}/wiki/system-wide/system-structure.md` exists.
 
                         <variant condition="file does not exist">
                             Display:
@@ -222,7 +244,7 @@
                         </variant>
 
                         <variant condition="file exists">
-                            Read `.docs/wiki/system-wide/system-structure.md`.
+                            Read `{docs_path}/wiki/system-wide/system-structure.md`.
                             Parse the **Subsystem Index** table to extract known subsystem
                             directory paths (the Directory column values).
                             Store as `known_subsystems`.
@@ -499,7 +521,7 @@
                             YOUR INPUTS:
 
                             **Subsystem:** [subsystem_name]
-                            **Wiki directory:** .docs/wiki/subsystems/[subsystem_name]/
+                            **Wiki directory:** {docs_path}/wiki/subsystems/[subsystem_name]/
 
                             **Source files to analyze:**
                             [list every file path with its A/M/D status (story mode) or just paths (file mode)]
@@ -555,7 +577,7 @@
                             <substep order="B.1">
                                 Scan for existing docs — use the Glob tool (NOT bash find):
                                 ```
-                                Glob(pattern='**/*.md', path='.docs/wiki/subsystems/[subsystem_name]')
+                                Glob(pattern='**/*.md', path='{docs_path}/wiki/subsystems/[subsystem_name]')
                                 ```
                             </substep>
 
@@ -588,7 +610,7 @@
 
                             If the wiki directory does not exist:
                             ```bash
-                            mkdir -p .docs/wiki/subsystems/[subsystem_name]/{systems,patterns,cross-cutting,guides,walkthroughs,decisions}
+                            mkdir -p {docs_path}/wiki/subsystems/[subsystem_name]/{systems,patterns,cross-cutting,guides,walkthroughs,decisions}
                             ```
                         </instruction>
 
@@ -757,7 +779,7 @@
                             - The flow is complex enough that an intern couldn't follow it from code alone
                             - No existing walkthrough already covers this flow
 
-                            Check `.docs/wiki/subsystems/[subsystem_name]/walkthroughs/` for existing
+                            Check `{docs_path}/wiki/subsystems/[subsystem_name]/walkthroughs/` for existing
                             walkthroughs. Do NOT suggest flows already covered.
 
                             For each candidate, identify:
@@ -841,11 +863,11 @@
         <step name="update-tech-debt-index" order="5">
 
             <variant condition="story mode AND ALL_TECH_DEBT is not empty">
-                Update `.docs/wiki/system-wide/tech-debt-index.md` using the
+                Update `{docs_path}/wiki/system-wide/tech-debt-index.md` using the
                 tech-debt-index template (from execution-context).
 
                 <substep order="5.1" name="read-existing-index">
-                    Read `.docs/wiki/system-wide/tech-debt-index.md` if it exists.
+                    Read `{docs_path}/wiki/system-wide/tech-debt-index.md` if it exists.
                     If it doesn't exist, create it from the template.
                 </substep>
 
@@ -884,7 +906,7 @@
                 ```
                 Grep(
                     pattern="(sk-[a-zA-Z0-9]{20,}|sk_live_|sk_test_|ghp_[a-zA-Z0-9]{36}|AKIA[A-Z0-9]{16}|-----BEGIN.*PRIVATE KEY)",
-                    path=".docs/wiki/subsystems/",
+                    path="{docs_path}/wiki/subsystems/",
                     output_mode="content"
                 )
                 ```
@@ -915,7 +937,7 @@
                     ### New Subsystems Mapped (via map-subsystem)
                     [For each new subsystem report:]
                     - **[subsystem.name]** at `[subsystem.path]` — [modules] modules, [docs] knowledge docs
-                      Docs: `.docs/wiki/subsystems/[subsystem.name]/`
+                      Docs: `{docs_path}/wiki/subsystems/[subsystem.name]/`
 
                     [For each remaining subsystem, include the agent's report:]
 
@@ -930,7 +952,7 @@
                     [If tech debt was integrated:]
                     ### Tech Debt Integrated
                     - [N] items added across [M] subsystem wiki docs
-                    - Tech debt index updated: .docs/wiki/system-wide/tech-debt-index.md
+                    - Tech debt index updated: {docs_path}/wiki/system-wide/tech-debt-index.md
 
                     [If any agent failures:]
                     ### Failures
@@ -985,7 +1007,7 @@
 
                     Stage and commit walkthrough files:
                     ```bash
-                    git add .docs/wiki/subsystems/*/walkthroughs/
+                    git add {docs_path}/wiki/subsystems/*/walkthroughs/
                     git commit -m "docs: add walkthroughs from map-story suggestions"
                     ```
 
@@ -997,7 +1019,7 @@
                            /ace:map-story — document another story
                            /ace:map-walkthrough — create another walkthrough
                            /ace:map-subsystem [subsystem] — map or refresh an entire subsystem
-                           Review files in .docs/wiki/subsystems/
+                           Review files in {docs_path}/wiki/subsystems/
                     ```
                 </mode>
 

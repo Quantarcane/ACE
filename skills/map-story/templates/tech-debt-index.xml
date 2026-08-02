@@ -1,6 +1,6 @@
 <tech-debt-index>
     <purpose>
-        Template for `.docs/wiki/system-wide/tech-debt-index.md` — a cross-cutting index of all
+        Template for `{docs_path}/wiki/system-wide/tech-debt-index.md` — a cross-cutting index of all
         known tech debt across the entire codebase. Answers "What quality issues exist, where,
         and how severe are they?"
 
@@ -34,7 +34,7 @@
             ## By Subsystem
 
             ### [subsystem-name] ([N] items)
-            **Wiki doc**: `.docs/wiki/subsystems/[name]/[relevant-doc].md`
+            **Wiki doc**: `{docs_path}/wiki/subsystems/[name]/[relevant-doc].md`
 
             | # | Severity | Description | File | Discovered |
             |---|----------|-------------|------|------------|

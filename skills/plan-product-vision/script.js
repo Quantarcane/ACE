@@ -13,6 +13,7 @@
 const {
   loadConfig, pathExists, resolveModel,
   detectBrownfieldStatus, output, error, runSkillScript,
+  docsPath, resolveDocsPath,
 } = require('../../shared/lib/ace-core');
 
 // ─── CLI Dispatch ────────────────────────────────────────────────────────────
@@ -33,15 +34,16 @@ function cmdInit(cwd, raw, args, parsed) {
 
     // Config
     commit_docs: config.commit_docs,
+    docs_path: resolveDocsPath(cwd),
 
     // Existing state
-    has_product_vision: pathExists(cwd, '.docs/product/product-vision.md'),
+    has_product_vision: pathExists(cwd, docsPath(cwd, 'product/product-vision.md')),
 
     // Brownfield detection
     ...brownfield,
 
     // Architecture context
-    has_system_architecture: pathExists(cwd, '.docs/wiki/system-wide/system-architecture.md'),
+    has_system_architecture: pathExists(cwd, docsPath(cwd, 'wiki/system-wide/system-architecture.md')),
 
     // Git state
     has_git: pathExists(cwd, '.git'),

@@ -1,6 +1,6 @@
 ---
 name: ace-wiki-mapper
-description: Explores codebase and writes structured wiki documents. Spawned by any command that creates, updates, or curates .docs/wiki/ documents. Writes directly to files to reduce orchestrator context load.
+description: Explores codebase and writes structured wiki documents. Spawned by any command that creates, updates, or curates project wiki documents. The wiki root is supplied in the task prompt — never assume a fixed location. Writes directly to files to reduce orchestrator context load.
 tools: Read, Edit, Bash, Grep, Glob, Write
 color: cyan
 ---
@@ -21,9 +21,16 @@ You are spawned by:
 - `/ace:map-cross-cutting` — create/update a cross-cutting concern doc (cross-cutting/)
 - Any command that needs wiki documents created or updated
 
-Your output lives in `.docs/wiki/` and is structured as:
+**Docs root:** Your orchestrator passes the documentation root in your task prompt (the
+`docs_path` value it read from `.ace/settings.json`). Everything written below as
+`{docs_path}` means that value — substitute it before writing anything. It is `.docs` in a
+typical repo, but monorepos nest it (e.g. `ProcerERP/.docs`), so a hardcoded `.docs` would
+silently build a second wiki at the repo root that no ACE command reads. If your prompt
+does not state a docs root, say so and stop rather than guessing.
+
+Your output lives in `{docs_path}/wiki/` and is structured as:
 ```
-.docs/wiki/
+{docs_path}/wiki/
 |-- system-wide/
 |   |-- system-architecture.md
 |   |-- system-structure.md
@@ -171,7 +178,7 @@ Extract: naming conventions, file organization, error handling approach, testing
 When spawned, you receive a **focus** parameter that determines which documents to produce.
 
 ### Focus: `system-architecture`
-**Produces:** `.docs/wiki/system-wide/system-architecture.md`
+**Produces:** `{docs_path}/wiki/system-wide/system-architecture.md`
 **Template:** `${CLAUDE_SKILL_DIR}/templates/system-architecture.xml`
 **Analysis:**
 - Identify all subsystems, external integrations, data stores
@@ -181,7 +188,7 @@ When spawned, you receive a **focus** parameter that determines which documents 
 - Extract system-wide architectural decisions
 
 ### Focus: `system-structure`
-**Produces:** `.docs/wiki/system-wide/system-structure.md`
+**Produces:** `{docs_path}/wiki/system-wide/system-structure.md`
 **Template:** `${CLAUDE_SKILL_DIR}/templates/system-structure.xml`
 **Analysis:**
 - Map directory tree to subsystem boundaries
@@ -190,7 +197,7 @@ When spawned, you receive a **focus** parameter that determines which documents 
 - Document system-wide naming conventions
 
 ### Focus: `subsystem-structure`
-**Produces:** `.docs/wiki/subsystems/[name]/structure.md`
+**Produces:** `{docs_path}/wiki/subsystems/[name]/structure.md`
 **Template:** `${CLAUDE_SKILL_DIR}/templates/subsystem-structure.xml`
 **Requires:** `subsystem` parameter (path or name)
 **Analysis:**
@@ -200,7 +207,7 @@ When spawned, you receive a **focus** parameter that determines which documents 
 - Naming conventions (or "follows system-wide" if no deviation)
 
 ### Focus: `system`
-**Produces:** `.docs/wiki/subsystems/[name]/systems/[system-name].md`
+**Produces:** `{docs_path}/wiki/subsystems/[name]/systems/[system-name].md`
 **Template:** `${CLAUDE_SKILL_DIR}/templates/system.xml`
 **Requires:** `subsystem` parameter, list of source files belonging to the system
 **Analysis:**
@@ -213,7 +220,7 @@ When spawned, you receive a **focus** parameter that determines which documents 
 - Error propagation paths
 
 ### Focus: `pattern`
-**Produces:** `.docs/wiki/subsystems/[name]/patterns/[pattern-name].md`
+**Produces:** `{docs_path}/wiki/subsystems/[name]/patterns/[pattern-name].md`
 **Template:** `${CLAUDE_SKILL_DIR}/templates/pattern.xml`
 **Requires:** `subsystem` parameter, pattern identified across 2+ implementations
 **Analysis:**
@@ -224,14 +231,14 @@ When spawned, you receive a **focus** parameter that determines which documents 
 - Gotchas
 
 ### Focus: `cross-cutting`
-**Produces:** `.docs/wiki/subsystems/[name]/cross-cutting/[concern-name].md`
+**Produces:** `{docs_path}/wiki/subsystems/[name]/cross-cutting/[concern-name].md`
 **Analysis:**
 - Shared infrastructure spanning multiple systems within the subsystem
 - Registration/configuration details
 - How systems interact through this concern
 
 ### Focus: `guide`
-**Produces:** `.docs/wiki/subsystems/[name]/guides/[task-name].md`
+**Produces:** `{docs_path}/wiki/subsystems/[name]/guides/[task-name].md`
 **Template:** `${CLAUDE_SKILL_DIR}/templates/guide.xml`
 **Requires:** `subsystem` parameter, recurring task identified
 **Analysis:**
@@ -241,7 +248,7 @@ When spawned, you receive a **focus** parameter that determines which documents 
 - Common mistakes
 
 ### Focus: `walkthrough`
-**Produces:** `.docs/wiki/subsystems/[name]/walkthroughs/[flow-name].md`
+**Produces:** `{docs_path}/wiki/subsystems/[name]/walkthroughs/[flow-name].md`
 **Template:** `${CLAUDE_SKILL_DIR}/templates/walkthrough.xml`
 **Requires:** `subsystem` parameter, source files involved in the flow
 **Optional:** emphasis-frameworks (list of frameworks requiring deep explanation), framework research context (provided by orchestrator)
@@ -266,7 +273,7 @@ When spawned, you receive a **focus** parameter that determines which documents 
 - Length comes from code snippets and completeness, not from prose
 
 ### Focus: `decision`
-**Produces:** `.docs/wiki/subsystems/[name]/decisions/ADR-NNN-[slug].md`
+**Produces:** `{docs_path}/wiki/subsystems/[name]/decisions/ADR-NNN-[slug].md`
 **Template:** `${CLAUDE_SKILL_DIR}/templates/decizions.xml`
 **Requires:** `subsystem` parameter, decision context
 **Analysis:**
@@ -277,7 +284,7 @@ When spawned, you receive a **focus** parameter that determines which documents 
 - Under 30 lines. ADRs are immutable once accepted.
 
 ### Focus: `coding-standards`
-**Produces:** `.docs/wiki/system-wide/coding-standards.md`
+**Produces:** `{docs_path}/wiki/system-wide/coding-standards.md`
 **Template:** `${CLAUDE_SKILL_DIR}/templates/coding-standards.xml`
 **Analysis:**
 - Detect language(s) and paradigm(s) (OOP, FP, systems)
@@ -287,7 +294,7 @@ When spawned, you receive a **focus** parameter that determines which documents 
 - Include project-specific rules from user input
 
 ### Focus: `testing-framework`
-**Produces:** `.docs/wiki/system-wide/testing-framework.md`
+**Produces:** `{docs_path}/wiki/system-wide/testing-framework.md`
 **Template:** `${CLAUDE_SKILL_DIR}/templates/testing-framework.xml`
 **Analysis:**
 - Identify test runner and assertion library from config/deps
@@ -297,7 +304,7 @@ When spawned, you receive a **focus** parameter that determines which documents 
 - Extract run commands from package scripts
 
 ### Focus: `tech-debt`
-**Produces:** `.docs/wiki/system-wide/tech-debt.md`
+**Produces:** `{docs_path}/wiki/system-wide/tech-debt.md`
 **Template:** `${CLAUDE_SKILL_DIR}/templates/tech-debt.xml`
 **Analysis:**
 - Grep for TODO, FIXME, HACK, XXX comments
@@ -388,8 +395,8 @@ When done, return confirmation to the orchestrator. Do NOT return document conte
 
 **Focus:** {focus}
 **Documents written:**
-- `.docs/wiki/{path}/{document}.md` ({N} lines)
-- `.docs/wiki/{path}/{document}.md` ({N} lines)
+- `{docs_path}/wiki/{path}/{document}.md` ({N} lines)
+- `{docs_path}/wiki/{path}/{document}.md` ({N} lines)
 
 **Key findings:**
 - {1-2 sentence notable finding, e.g., "Monolith with 3 bounded contexts identified as subsystems"}
@@ -404,10 +411,10 @@ Ready for orchestrator.
 
 **Trigger:** {what changed — e.g., "New subsystem 'notifications' added"}
 **Documents updated:**
-- `.docs/wiki/{path}/{document}.md` — {what changed, one line}
+- `{docs_path}/wiki/{path}/{document}.md` — {what changed, one line}
 
 **Documents checked, no update needed:**
-- `.docs/wiki/{path}/{document}.md` — {why, one line}
+- `{docs_path}/wiki/{path}/{document}.md` — {why, one line}
 
 Ready for orchestrator.
 ```

@@ -1,6 +1,6 @@
 ---
 name: map-sys-doc
-description: Create or update a system document in .docs/wiki/subsystems/[name]/systems/ — describes WHAT exists, HOW it works, WHERE things live
+description: Create or update a system document under the project wiki's subsystems/[name]/systems/ — describes WHAT exists, HOW it works, WHERE things live
 argument-hint: "text='Drawing system - manages all drawing tools on chart' subsystem='qarc-charts-v2' commits=3"
 disable-model-invocation: false
 allowed-tools:
@@ -16,6 +16,10 @@ effort: max
 context: fork
 agent: ace-wiki-mapper
 ---
+
+## Environment Context (preprocessed)
+
+!`node "${CLAUDE_SKILL_DIR}/script.js" init 2>/dev/null`
 
 ## Supporting Resources (auto-loaded)
 
@@ -62,7 +66,7 @@ agent: ace-wiki-mapper
                 </param>
                 <param name="subsystem" type="path | text">
                     Subsystem where this system doc belongs.
-                    Wiki location: `.docs/wiki/subsystems/[subsystem]/systems/`.
+                    Wiki location: `{docs_path}/wiki/subsystems/[subsystem]/systems/`.
                     If not provided, pause and ask the user.
                 </param>
             </required>
@@ -99,7 +103,7 @@ agent: ace-wiki-mapper
         </objective>
 
         <artifacts>
-            .docs/wiki/subsystems/[subsystem-name]/systems/[system-name].md
+            {docs_path}/wiki/subsystems/[subsystem-name]/systems/[system-name].md
         </artifacts>
     </output>
 
@@ -118,7 +122,7 @@ agent: ace-wiki-mapper
         <step>/ace:map-pattern — document a pattern used by this system</step>
         <step>/ace:map-guide — create a how-to guide for this system</step>
         <step>/ace:map-cross-cutting — document a cross-cutting concern</step>
-        <step>Review file at .docs/wiki/subsystems/[subsystem-name]/systems/</step>
+        <step>Review file at {docs_path}/wiki/subsystems/[subsystem-name]/systems/</step>
     </next-steps>
 
 </command>

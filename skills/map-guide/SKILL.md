@@ -1,6 +1,6 @@
 ---
 name: map-guide
-description: Create or update a step-by-step guide in .docs/wiki/subsystems/[name]/guides/ — recipes for common implementation tasks
+description: Create or update a step-by-step guide under the project wiki's subsystems/[name]/guides/ — recipes for common implementation tasks
 argument-hint: "text='How to add a new drawing tool' subsystem='qarc-charts-v2' commits=3"
 disable-model-invocation: false
 allowed-tools:
@@ -16,6 +16,10 @@ effort: max
 context: fork
 agent: ace-wiki-mapper
 ---
+
+## Environment Context (preprocessed)
+
+!`node "${CLAUDE_SKILL_DIR}/script.js" init 2>/dev/null`
 
 ## Supporting Resources (auto-loaded)
 
@@ -62,7 +66,7 @@ agent: ace-wiki-mapper
                 </param>
                 <param name="subsystem" type="path | text">
                     Subsystem where this guide belongs.
-                    Wiki location: `.docs/wiki/subsystems/[subsystem]/guides/`.
+                    Wiki location: `{docs_path}/wiki/subsystems/[subsystem]/guides/`.
                     If not provided, pause and ask the user.
                 </param>
             </required>
@@ -101,7 +105,7 @@ agent: ace-wiki-mapper
         </objective>
 
         <artifacts>
-            .docs/wiki/subsystems/[subsystem-name]/guides/[guide-name].md
+            {docs_path}/wiki/subsystems/[subsystem-name]/guides/[guide-name].md
         </artifacts>
     </output>
 
@@ -119,7 +123,7 @@ agent: ace-wiki-mapper
         <step>/ace:map-guide — create another guide</step>
         <step>/ace:map-pattern — document a pattern referenced by this guide</step>
         <step>/ace:map-sys-doc — document a system referenced by this guide</step>
-        <step>Review file at .docs/wiki/subsystems/[subsystem-name]/guides/</step>
+        <step>Review file at {docs_path}/wiki/subsystems/[subsystem-name]/guides/</step>
     </next-steps>
 
 </command>

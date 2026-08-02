@@ -1,6 +1,6 @@
 ---
 name: map-subsystem
-description: Map a subsystem's structure, architecture, and knowledge docs into .docs/wiki/subsystems/[name]/
+description: Map a subsystem's structure, architecture, and knowledge docs into the project wiki under subsystems/[name]/
 argument-hint: "subsystem='src/api' (or subsystem name) existing-docs=comma separated paths | directory"
 disable-model-invocation: true
 allowed-tools: Read, Bash, Glob, Grep, Write, Task, AskUserQuestion
@@ -48,7 +48,7 @@ effort: max
             <trigger>When a new subsystem is added and needs to be documented</trigger>
         </runs-after>
         <use-when>
-            <condition>A subsystem has not yet been documented in `.docs/wiki/subsystems/`</condition>
+            <condition>A subsystem has not yet been documented in `{docs_path}/wiki/subsystems/`</condition>
             <condition>An existing subsystem's docs are stale after a significant refactor</condition>
             <condition>You want a deep-dive view of a specific subsystem's internals (components, flows, data)</condition>
         </use-when>
@@ -101,18 +101,18 @@ effort: max
         </objective>
 
         <artifacts>
-            - .docs/wiki/subsystems/[subsystem-name]/structure.md
-            - .docs/wiki/subsystems/[subsystem-name]/architecture.md
-            - .docs/wiki/subsystems/[subsystem-name]/systems/*.md (created/updated by map-story)
-            - .docs/wiki/subsystems/[subsystem-name]/patterns/*.md (created/updated by map-story)
-            - .docs/wiki/subsystems/[subsystem-name]/cross-cutting/*.md (created/updated by map-story)
-            - .docs/wiki/subsystems/[subsystem-name]/guides/*.md (created/updated by map-story)
-            - .docs/wiki/subsystems/[subsystem-name]/walkthroughs/*.md (created/updated by map-story)
-            - .docs/wiki/subsystems/[subsystem-name]/decisions/*.md (created/updated by map-story)
+            - {docs_path}/wiki/subsystems/[subsystem-name]/structure.md
+            - {docs_path}/wiki/subsystems/[subsystem-name]/architecture.md
+            - {docs_path}/wiki/subsystems/[subsystem-name]/systems/*.md (created/updated by map-story)
+            - {docs_path}/wiki/subsystems/[subsystem-name]/patterns/*.md (created/updated by map-story)
+            - {docs_path}/wiki/subsystems/[subsystem-name]/cross-cutting/*.md (created/updated by map-story)
+            - {docs_path}/wiki/subsystems/[subsystem-name]/guides/*.md (created/updated by map-story)
+            - {docs_path}/wiki/subsystems/[subsystem-name]/walkthroughs/*.md (created/updated by map-story)
+            - {docs_path}/wiki/subsystems/[subsystem-name]/decisions/*.md (created/updated by map-story)
             - .ace/artifacts/subsystems/[subsystem-name]/module-discovery/module-discovery.md
             - .ace/artifacts/subsystems/[subsystem-name]/module-discovery/existing-docs-inventory.md (if existing-docs directory provided)
-            - .docs/wiki/system-wide/system-structure.md (subsystem entry added if new)
-            - .docs/wiki/system-wide/system-architecture.md (subsystem responsibility matrix updated if missing)
+            - {docs_path}/wiki/system-wide/system-structure.md (subsystem entry added if new)
+            - {docs_path}/wiki/system-wide/system-architecture.md (subsystem responsibility matrix updated if missing)
         </artifacts>
     </output>
 
@@ -148,7 +148,7 @@ effort: max
         Also suggest:
         - `/ace:init-coding-standards` — Define prescriptive coding standards
         - `/ace:help` — Check project initialization status and next steps
-        - Review and edit files in `.docs/wiki/system-wide/` anytime
+        - Review and edit files in `{docs_path}/wiki/system-wide/` anytime
     </next-steps>
 
 </command>

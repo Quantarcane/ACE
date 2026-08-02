@@ -1,6 +1,6 @@
 <system-architecture>
     <purpose>
-        Template for `.docs/wiki/system-wide/system-architecture.md` — the living high-level
+        Template for `{docs_path}/wiki/system-wide/system-architecture.md` — the living high-level
         architecture document. Captures L1/L2 views (C4 model), core runtime flows, and tech stack.
 
         Complements per-subsystem docs (which cover L3 Component and L4 Code levels).

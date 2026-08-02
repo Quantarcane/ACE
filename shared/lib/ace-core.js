@@ -30,6 +30,7 @@ const SETTINGS_DEFAULTS = {
   model_profile: 'balanced',
   commit_docs: true,
   agent_teams: false,
+  docs_path: '.docs',
   github_project: {
     enabled: false,
     gh_installed: false,
@@ -121,6 +122,82 @@ function pathExists(cwd, targetPath) {
 function safeReadFile(filePath) {
   try { return fs.readFileSync(filePath, 'utf-8'); }
   catch { return null; }
+}
+
+// ─── Docs Root ───────────────────────────────────────────────────────────────
+//
+// The wiki/product docs root is NOT always `.docs` at the repo root. Monorepos
+// commonly nest it (e.g. `ProcerERP/.docs`). The location lives in
+// `.ace/settings.json` under `docs_path` and every skill resolves it from there
+// — nothing in ACE may hardcode `.docs`.
+
+/**
+ * Normalize a configured docs path to a forward-slash, trailing-slash-free
+ * string. Returns null for empty/invalid values so callers can fall back to the
+ * default.
+ */
+function normalizeDocsPath(value) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim()
+    .replace(/\\/g, '/')   // accept Windows-style input
+    .replace(/\/{2,}/g, '/')
+    .replace(/\/+$/, '');
+  if (!trimmed || trimmed === '.') return null;
+  return trimmed;
+}
+
+/**
+ * The project's docs root, relative to cwd (e.g. '.docs' or 'ProcerERP/.docs').
+ */
+function resolveDocsPath(cwd) {
+  return loadSettings(cwd).docs_path;
+}
+
+/**
+ * Build a path underneath the configured docs root.
+ * docsPath(cwd, 'wiki/system-wide', 'coding-standards.md')
+ *   -> 'ProcerERP/.docs/wiki/system-wide/coding-standards.md'
+ *
+ * Always returns forward slashes — these strings are handed to workflows,
+ * agent prompts and markdown links, not only to the filesystem.
+ */
+function docsPath(cwd, ...segments) {
+  const parts = [resolveDocsPath(cwd), ...segments]
+    .filter(s => s !== undefined && s !== null && s !== '')
+    .map(s => String(s).replace(/\\/g, '/').replace(/^\/+|\/+$/g, ''));
+  return parts.join('/');
+}
+
+/**
+ * Find candidate docs roots by walking the tree for directories named `.docs`.
+ * Used by /ace:help to propose a location instead of forcing the user to type
+ * one. Returns cwd-relative POSIX paths, shallowest first.
+ */
+function detectDocsCandidates(cwd, maxDepth = 3) {
+  const ignoreDirs = new Set([
+    'node_modules', '.git', '.ace', '.gsd', '.claude', '.codex', '.opencode',
+    'dist', 'build', 'bin', 'obj', 'out', 'target', 'vendor', '__pycache__',
+  ]);
+  const found = [];
+
+  function walk(dir, depth) {
+    if (depth > maxDepth || found.length >= 10) return;
+    let entries;
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); }
+    catch { return; }
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const full = path.join(dir, entry.name);
+      if (entry.name === '.docs') {
+        found.push(path.relative(cwd, full).replace(/\\/g, '/'));
+        continue;
+      }
+      if (!ignoreDirs.has(entry.name)) walk(full, depth + 1);
+    }
+  }
+
+  walk(cwd, 0);
+  return found.sort((a, b) => a.split('/').length - b.split('/').length || a.localeCompare(b));
 }
 
 // ─── Slug & Timestamp ────────────────────────────────────────────────────────
@@ -233,6 +310,7 @@ function loadSettings(cwd) {
       model_profile: parsed.model_profile ?? SETTINGS_DEFAULTS.model_profile,
       commit_docs: parsed.commit_docs ?? SETTINGS_DEFAULTS.commit_docs,
       agent_teams: parsed.agent_teams ?? SETTINGS_DEFAULTS.agent_teams,
+      docs_path: normalizeDocsPath(parsed.docs_path) ?? SETTINGS_DEFAULTS.docs_path,
       github_project: {
         enabled: parsed.github_project?.enabled ?? SETTINGS_DEFAULTS.github_project.enabled,
         gh_installed: parsed.github_project?.gh_installed ?? SETTINGS_DEFAULTS.github_project.gh_installed,
@@ -347,6 +425,10 @@ module.exports = {
   loadConfig,
   pathExists,
   safeReadFile,
+  normalizeDocsPath,
+  resolveDocsPath,
+  docsPath,
+  detectDocsCandidates,
   generateSlug,
   currentTimestamp,
   resolveModel,

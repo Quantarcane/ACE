@@ -44,7 +44,7 @@
         <pass order="2" template="story-wiki.xml" output="story-file" required="true">
             Wiki Research — relevant-wiki section.
             Input: User Story + Description + AC from pass 1.
-            Agent scans `.docs/wiki/` for documents relevant to technical solution.
+            Agent scans `{docs_path}/wiki/` for documents relevant to technical solution.
         </pass>
         <pass order="3" template="external-solution.xml" output="external-analysis.md" required="false">
             External Analysis — analyze reference implementations or external systems.
@@ -197,7 +197,7 @@
 
             &lt;!-- Pass 2. Populated by story-wiki.xml template.
                  A research agent reads the User Story, Description, and AC,
-                 then scans `.docs/wiki/` to select documents relevant to
+                 then scans `{docs_path}/wiki/` to select documents relevant to
                  designing a good technical solution for this story.
                  See story-wiki.xml for full section structure and selection criteria. --&gt;
         </section>
@@ -395,7 +395,7 @@
 
         **Pass 2 — Wiki Research (story-wiki.xml → story file):**
         A research agent reads the User Story, Description, and AC from pass 1,
-        then scans `.docs/wiki/` to populate the Relevant Wiki section with documents
+        then scans `{docs_path}/wiki/` to populate the Relevant Wiki section with documents
         that inform the technical solution.
 
         **Pass 3 — External Analysis (external-solution.xml → external-analysis.md) — OPTIONAL:**

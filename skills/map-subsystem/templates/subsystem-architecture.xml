@@ -1,6 +1,6 @@
 <subsystem-architecture>
     <purpose>
-        Template for `.docs/wiki/subsystems/[subsystem-name]/architecture.md` — the internal
+        Template for `{docs_path}/wiki/subsystems/[subsystem-name]/architecture.md` — the internal
         architecture view of a single subsystem. Captures component structure (C4 L3), internal
         flows, dependency contracts, data ownership, and subsystem-specific decisions.
 

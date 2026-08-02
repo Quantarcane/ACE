@@ -15,6 +15,7 @@ const path = require('path');
 const {
   loadConfig, pathExists, safeReadFile, loadSettings, resolveModel,
   execCommand, output, error, runSkillScript,
+  docsPath, resolveDocsPath,
 } = require('../../shared/lib/ace-core');
 
 const {
@@ -71,6 +72,7 @@ function cmdInit(cwd, raw, args, parsed) {
       analyst_model: resolveModel(cwd, 'ace-code-integration-analyst'),
       mapper_model: resolveModel(cwd, 'ace-wiki-mapper'),
       commit_docs: config.commit_docs,
+      docs_path: resolveDocsPath(cwd),
       has_git, has_gh_cli, github_project,
       story_source: null,
       story_valid: false,
@@ -194,6 +196,7 @@ function cmdInit(cwd, raw, args, parsed) {
     analyst_model: resolveModel(cwd, 'ace-code-integration-analyst'),
     mapper_model: resolveModel(cwd, 'ace-wiki-mapper'),
     commit_docs: config.commit_docs,
+    docs_path: resolveDocsPath(cwd),
     has_git, has_gh_cli, github_project,
     story_source: storySource,
     story_valid: storyContent !== null && storyError === null,

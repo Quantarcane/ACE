@@ -36,3 +36,8 @@ The installer registers this repo as a local marketplace and installs/updates th
 - Agents are referenced by name only — Claude Code resolves them from the `agents/` directory.
 - ONE commit per story — after ALL work is done.
 - Hook scripts use `${CLAUDE_PLUGIN_ROOT}` and `${CLAUDE_PLUGIN_DATA}` environment variables, NOT hardcoded `~/.claude/` paths.
+- NEVER hardcode `.docs` anywhere. The documentation root lives in `.ace/settings.json` as `docs_path` (default `.docs`, commonly nested in monorepos e.g. `ProcerERP/.docs`).
+  - JS: resolve via `resolveDocsPath(cwd)` / `docsPath(cwd, 'wiki/system-wide/...')` from `shared/lib/ace-core.js`.
+  - Every skill's `script.js init` MUST include `docs_path` in its JSON output.
+  - Workflows, SKILL.md files, templates and agents use the `{docs_path}` placeholder plus the `<docs-root>` contract block — never a literal `.docs`.
+  - `/ace:help` owns detection and persistence (`detect-docs-path` / `write-docs-path`).

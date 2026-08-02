@@ -1,6 +1,6 @@
 <system>
     <purpose>
-        Template for `.docs/wiki/subsystems/[subsystem-name]/systems/<system-name>.md` — a coherent
+        Template for `{docs_path}/wiki/subsystems/[subsystem-name]/systems/<system-name>.md` — a coherent
         domain system within a codebase subsystem. Answers "How does this system work RIGHT NOW?"
 
         Each system doc describes WHAT exists, HOW it works, and WHERE things live for one

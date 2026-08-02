@@ -3,7 +3,7 @@
 
 <testing-framework>
     <purpose>
-        Template for `.docs/wiki/testing-framework.md` — captures test framework, patterns, and
+        Template for `{docs_path}/wiki/testing-framework.md` — captures test framework, patterns, and
         conventions for the project. Answers "How do I write and run tests that match existing patterns?"
 
         **Purpose:** Document how tests are written and run. Guide for adding tests that match

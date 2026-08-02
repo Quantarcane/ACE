@@ -8,6 +8,7 @@ const {
   loadConfig, pathExists, safeReadFile, generateSlug, currentTimestamp,
   resolveModel, detectBrownfieldStatus,
   loadSettings, writeSettings, parseKeyValueArgs, MODEL_PROFILES,
+  normalizeDocsPath, resolveDocsPath, docsPath, detectDocsCandidates,
 } = require('./ace-core');
 
 function createTempDir() {
@@ -239,7 +240,17 @@ describe('loadSettings / writeSettings', () => {
     const settings = loadSettings(tmpDir);
     assert.strictEqual(settings.model_profile, 'balanced');
     assert.strictEqual(settings.commit_docs, true);
+    assert.strictEqual(settings.docs_path, '.docs');
     assert.strictEqual(settings.github_project.enabled, false);
+  });
+
+  it('backfills docs_path for settings written by an older ACE version', () => {
+    fs.mkdirSync(path.join(tmpDir, '.ace'), { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, '.ace', 'settings.json'), JSON.stringify({
+      model_profile: 'quality',
+      commit_docs: true,
+    }));
+    assert.strictEqual(loadSettings(tmpDir).docs_path, '.docs');
   });
 
   it('reads existing settings', () => {
@@ -260,6 +271,80 @@ describe('loadSettings / writeSettings', () => {
     const written = JSON.parse(fs.readFileSync(path.join(tmpDir, '.ace', 'settings.json'), 'utf-8'));
     assert.strictEqual(written.model_profile, 'budget');
     assert.strictEqual(written.commit_docs, false);
+  });
+});
+
+// ─── Docs Root ───────────────────────────────────────────────────────────────
+
+describe('normalizeDocsPath', () => {
+  it('normalizes separators and strips trailing slashes', () => {
+    assert.strictEqual(normalizeDocsPath('ProcerERP\\.docs\\'), 'ProcerERP/.docs');
+    assert.strictEqual(normalizeDocsPath('  .docs/  '), '.docs');
+  });
+
+  it('returns null for values that carry no location', () => {
+    assert.strictEqual(normalizeDocsPath(''), null);
+    assert.strictEqual(normalizeDocsPath('   '), null);
+    assert.strictEqual(normalizeDocsPath('.'), null);
+    assert.strictEqual(normalizeDocsPath(null), null);
+    assert.strictEqual(normalizeDocsPath(42), null);
+  });
+});
+
+describe('resolveDocsPath / docsPath', () => {
+  let tmpDir;
+  beforeEach(() => { tmpDir = createTempDir(); });
+  afterEach(() => { cleanup(tmpDir); });
+
+  it('defaults to .docs when nothing is configured', () => {
+    assert.strictEqual(resolveDocsPath(tmpDir), '.docs');
+    assert.strictEqual(docsPath(tmpDir, 'wiki/system-wide'), '.docs/wiki/system-wide');
+  });
+
+  it('honours a nested docs root from settings.json', () => {
+    writeSettings(tmpDir, { docs_path: 'ProcerERP/.docs' });
+    assert.strictEqual(resolveDocsPath(tmpDir), 'ProcerERP/.docs');
+    assert.strictEqual(
+      docsPath(tmpDir, 'wiki/system-wide/coding-standards.md'),
+      'ProcerERP/.docs/wiki/system-wide/coding-standards.md'
+    );
+  });
+
+  it('joins multiple segments with forward slashes and no doubling', () => {
+    writeSettings(tmpDir, { docs_path: 'apps/api/.docs/' });
+    assert.strictEqual(docsPath(tmpDir, '/wiki/', 'subsystems/auth'), 'apps/api/.docs/wiki/subsystems/auth');
+  });
+
+  it('returns the bare root when no segments are given', () => {
+    writeSettings(tmpDir, { docs_path: 'ProcerERP/.docs' });
+    assert.strictEqual(docsPath(tmpDir), 'ProcerERP/.docs');
+  });
+});
+
+describe('detectDocsCandidates', () => {
+  let tmpDir;
+  beforeEach(() => { tmpDir = createTempDir(); });
+  afterEach(() => { cleanup(tmpDir); });
+
+  it('finds nested .docs directories', () => {
+    fs.mkdirSync(path.join(tmpDir, 'ProcerERP', '.docs', 'wiki'), { recursive: true });
+    assert.deepStrictEqual(detectDocsCandidates(tmpDir), ['ProcerERP/.docs']);
+  });
+
+  it('orders shallowest first', () => {
+    fs.mkdirSync(path.join(tmpDir, '.docs'), { recursive: true });
+    fs.mkdirSync(path.join(tmpDir, 'apps', 'api', '.docs'), { recursive: true });
+    assert.deepStrictEqual(detectDocsCandidates(tmpDir), ['.docs', 'apps/api/.docs']);
+  });
+
+  it('ignores dependency and build directories', () => {
+    fs.mkdirSync(path.join(tmpDir, 'node_modules', 'pkg', '.docs'), { recursive: true });
+    fs.mkdirSync(path.join(tmpDir, 'dist', '.docs'), { recursive: true });
+    assert.deepStrictEqual(detectDocsCandidates(tmpDir), []);
+  });
+
+  it('returns an empty list when nothing exists', () => {
+    assert.deepStrictEqual(detectDocsCandidates(tmpDir), []);
   });
 });
 

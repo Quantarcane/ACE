@@ -2,12 +2,34 @@
 
     <purpose>
         Orchestrate coding standards generation through environment detection, user interview,
-        and document writing. Produces `.docs/wiki/system-wide/coding-standards.md` — a prescriptive,
+        and document writing. Produces `{docs_path}/wiki/system-wide/coding-standards.md` — a prescriptive,
         paradigm-aware coding standards document tailored to the project.
 
         Brownfield projects: detect language/paradigm/frameworks from codebase, then interview.
         Greenfield projects: gather tech choices from user interview directly.
     </purpose>
+
+    <docs-root>
+        Every `{docs_path}` below is a placeholder, not a literal path. Its value is the
+        `docs_path` field from this skill's init output (read from `.ace/settings.json`,
+        preprocessed into the prompt above). Substitute the real value before you read,
+        write, glob or `mkdir` any documentation path.
+
+        It is `.docs` in a typical single-project repo, but monorepos commonly nest it —
+        `ProcerERP/.docs`, for example. Typing a literal `.docs` in a project that nests
+        its docs creates a second, orphaned documentation tree at the repo root: the files
+        appear to be written successfully, but every other ACE command resolves the
+        configured root and will never find them.
+
+        When you spawn a subagent, state the resolved root explicitly in its prompt
+        (e.g. `Docs root: ProcerERP/.docs`) and substitute it into every path you hand it.
+        A subagent starts with a fresh context — it cannot see the init output you are
+        holding, so an unsubstituted `{docs_path}` reaches it as literal text.
+
+        If `docs_path` is missing from the init output, stop and tell the user to run
+        `/ace:help`, which detects and pins the location — do not guess.
+    </docs-root>
+
 
     <mandatory-context>
         All supporting resource files are auto-loaded in the skill prompt above. Do NOT re-read them.
@@ -43,7 +65,7 @@
 
             Use AskUserQuestion:
             - header: "Standards exist"
-            - question: "Coding standards already exist at `.docs/wiki/system-wide/coding-standards.md`. What would you like to do?"
+            - question: "Coding standards already exist at `{docs_path}/wiki/system-wide/coding-standards.md`. What would you like to do?"
             - options:
               - "Update" — Refine the existing standards through a new interview
               - "Start fresh" — Discard and create new standards from scratch
@@ -101,7 +123,7 @@
                 Check for: .eslintrc, .prettierrc, ruff.toml, .editorconfig, biome.json
 
                 **Step 4 — Detect existing standards:**
-                Check for existing CLAUDE.md, .docs/ standards, lint configs, .editorconfig
+                Check for existing CLAUDE.md, {docs_path}/ standards, lint configs, .editorconfig
 
                 **Step 5 — Detect project structure patterns:**
                 Find where constants, config, DI registration, and shared code live.
@@ -242,7 +264,7 @@
         <step name="generate" order="4">
             **Create directory structure:**
             ```bash
-            mkdir -p .docs/wiki/system-wide
+            mkdir -p {docs_path}/wiki/system-wide
             ```
 
             **Prepare a context brief (300-500 words) that distills:**
@@ -283,7 +305,7 @@
                 4. Tone: DIRECT and EMPHATIC. Bold for emphasis, caps for critical words.
                    This is a mandate document, not suggestions.
                 5. Target length: 150-350 lines. Comprehensive but not bloated.
-                6. Write the file to `.docs/wiki/system-wide/coding-standards.md`
+                6. Write the file to `{docs_path}/wiki/system-wide/coding-standards.md`
 
                 **Return format — ONLY this, nothing else:**
                 DONE
@@ -306,7 +328,7 @@
             Show the agent's returned summary to the user. Then:
 
             - header: "Standards"
-            - question: "Coding standards written to `.docs/wiki/system-wide/coding-standards.md`. Does this look right? Review the full file in your editor for details."
+            - question: "Coding standards written to `{docs_path}/wiki/system-wide/coding-standards.md`. Does this look right? Review the full file in your editor for details."
             - options:
               - "Approve" — Looks good, commit it
               - "Adjust" — I want to change some things
@@ -317,7 +339,7 @@
             - Spawn the ace-wiki-mapper agent to adjust:
               ```
               Task(
-                  prompt="Read `.docs/wiki/system-wide/coding-standards.md` and make these changes:
+                  prompt="Read `{docs_path}/wiki/system-wide/coding-standards.md` and make these changes:
                   {user's requested changes}.
                   If changes reference codebase paths or patterns, explore the codebase to verify.
                   Use the Edit tool to modify in place. Return only a confirmation of what changed.",
@@ -344,7 +366,7 @@
             Commit the coding standards:
 
             ```bash
-            git add .docs/wiki/system-wide/coding-standards.md
+            git add {docs_path}/wiki/system-wide/coding-standards.md
             git commit -m "docs: initialize coding standards"
             ```
 
@@ -355,7 +377,7 @@
             ║  ACE > Coding Standards Created                  ║
             ╚══════════════════════════════════════════════════╝
 
-              +  .docs/wiki/system-wide/coding-standards.md committed.
+              +  {docs_path}/wiki/system-wide/coding-standards.md committed.
 
               i  These standards will be used as context by ACE commands
                  when planning and executing stories.
@@ -375,7 +397,7 @@
         - coding-standards.md written with appropriate paradigm modules
         - Document is prescriptive and emphatic, not descriptive
         - User reviewed and approved the document
-        - Document committed to .docs/wiki/system-wide/
+        - Document committed to {docs_path}/wiki/system-wide/
     </success_criteria>
 
 </workflow>

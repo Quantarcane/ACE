@@ -1,6 +1,6 @@
 <guide>
     <purpose>
-        Template for `.docs/wiki/subsystems/[subsystem-name]/guides/<task-name>.md` — a step-by-step
+        Template for `{docs_path}/wiki/subsystems/[subsystem-name]/guides/<task-name>.md` — a step-by-step
         recipe for a common implementation task. Answers "How do I add/create/implement X?"
 
         Each guide combines knowledge from multiple systems, patterns, and cross-cutting concerns

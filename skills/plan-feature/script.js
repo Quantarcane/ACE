@@ -21,6 +21,7 @@ const path = require('path');
 const {
   loadConfig, pathExists, generateSlug, resolveModel,
   detectBrownfieldStatus, loadSettings, output, error, runSkillScript,
+  docsPath, resolveDocsPath,
 } = require('../../shared/lib/ace-core');
 
 const {
@@ -55,14 +56,14 @@ function cmdInit(cwd, raw, args, parsed) {
   const brownfield = detectBrownfieldStatus(cwd);
 
   // Wiki detection — system-wide
-  const wikiSystemDir = '.docs/wiki/system-wide';
+  const wikiSystemDir = docsPath(cwd, 'wiki/system-wide');
   const has_wiki_system_wide = pathExists(cwd, wikiSystemDir);
   const has_system_architecture = pathExists(cwd, path.join(wikiSystemDir, 'system-architecture.md'));
   const has_system_structure = pathExists(cwd, path.join(wikiSystemDir, 'system-structure.md'));
   const has_testing_framework = pathExists(cwd, path.join(wikiSystemDir, 'testing-framework.md'));
 
   // Wiki detection — subsystems
-  const wikiSubsystemsDir = '.docs/wiki/subsystems';
+  const wikiSubsystemsDir = docsPath(cwd, 'wiki/subsystems');
   const has_wiki_subsystems = pathExists(cwd, wikiSubsystemsDir);
 
   let wiki_subsystem_names = [];
@@ -84,9 +85,10 @@ function cmdInit(cwd, raw, args, parsed) {
 
     // Config
     commit_docs: config.commit_docs,
+    docs_path: resolveDocsPath(cwd),
 
     // Product artifacts
-    has_product_vision: pathExists(cwd, '.docs/product/product-vision.md'),
+    has_product_vision: pathExists(cwd, docsPath(cwd, 'product/product-vision.md')),
     has_product_backlog: pathExists(cwd, '.ace/artifacts/product/product-backlog.md'),
 
     // Wiki analysis cache (from previous runs)

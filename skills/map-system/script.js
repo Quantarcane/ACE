@@ -16,6 +16,7 @@ const path = require('path');
 const {
   loadConfig, pathExists, resolveModel,
   detectBrownfieldStatus, output, error, runSkillScript,
+  docsPath, resolveDocsPath,
 } = require('../../shared/lib/ace-core');
 
 // ─── CLI Dispatch ────────────────────────────────────────────────────────────
@@ -31,7 +32,7 @@ function cmdInit(cwd, raw, args, parsed) {
   const brownfield = detectBrownfieldStatus(cwd);
 
   // Check existing wiki documents
-  const wikiDir = '.docs/wiki/system-wide';
+  const wikiDir = docsPath(cwd, 'wiki/system-wide');
   const wikiDirExists = pathExists(cwd, wikiDir);
 
   const has_system_structure = pathExists(cwd, path.join(wikiDir, 'system-structure.md'));
@@ -53,6 +54,7 @@ function cmdInit(cwd, raw, args, parsed) {
 
     // Config
     commit_docs: config.commit_docs,
+    docs_path: resolveDocsPath(cwd),
 
     // Brownfield detection
     ...brownfield,

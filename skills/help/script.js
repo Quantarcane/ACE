@@ -7,6 +7,8 @@
  * Subcommands:
  *   init                             Environment detection for help workflow
  *   ensure-settings                  Create .ace/settings.json with defaults if missing
+ *   detect-docs-path                 Report the configured docs root + detected candidates
+ *   write-docs-path <path>           Persist the docs root to .ace/settings.json
  *   setup-github                     Detect gh CLI, repo, and list GitHub Projects
  *   write-github-settings            Write GitHub Project settings (key=value args)
  *   sync-agent-teams                 Sync agent_teams from runtime settings to .ace/settings.json
@@ -21,7 +23,8 @@ const path = require('path');
 
 const {
   loadConfig, pathExists, resolveModel,
-  detectBrownfieldStatus, loadSettings, writeSettings,
+  detectBrownfieldStatus, loadSettings, writeSettings, SETTINGS_DEFAULTS,
+  docsPath, resolveDocsPath, detectDocsCandidates, normalizeDocsPath,
   output, error, runSkillScript,
 } = require('../../shared/lib/ace-core');
 
@@ -53,6 +56,8 @@ const RUNTIME_CONFIG_DIR = getRuntimeConfigDirName();
 runSkillScript({
   init: cmdInit,
   'ensure-settings': (cwd, raw) => cmdEnsureSettings(cwd, raw),
+  'detect-docs-path': (cwd, raw) => cmdDetectDocsPath(cwd, raw),
+  'write-docs-path': (cwd, raw, args, parsed) => cmdWriteDocsPath(cwd, raw, args, parsed),
   'setup-github': (cwd, raw) => cmdSetupGithubProject(cwd, raw),
   'write-github-settings': (cwd, raw, args) => cmdWriteGithubSettings(cwd, raw, args),
   'sync-agent-teams': (cwd, raw) => cmdSyncAgentTeams(cwd, raw),
@@ -84,14 +89,15 @@ function cmdInit(cwd, raw) {
     // Config
     commit_docs: config.commit_docs,
     runtime_config_dir: RUNTIME_CONFIG_DIR,
+    docs_path: resolveDocsPath(cwd),
 
     // Existing state
-    has_product_vision: pathExists(cwd, '.docs/product/product-vision.md'),
-    has_system_architecture: pathExists(cwd, '.docs/wiki/system-wide/system-architecture.md'),
-    has_system_structure: pathExists(cwd, '.docs/wiki/system-wide/system-structure.md'),
-    has_coding_standards: pathExists(cwd, '.docs/wiki/system-wide/coding-standards.md'),
-    has_testing_framework: pathExists(cwd, '.docs/wiki/system-wide/testing-framework.md'),
-    project_exists: pathExists(cwd, '.docs/product/product-vision.md'),
+    has_product_vision: pathExists(cwd, docsPath(cwd, 'product/product-vision.md')),
+    has_system_architecture: pathExists(cwd, docsPath(cwd, 'wiki/system-wide/system-architecture.md')),
+    has_system_structure: pathExists(cwd, docsPath(cwd, 'wiki/system-wide/system-structure.md')),
+    has_coding_standards: pathExists(cwd, docsPath(cwd, 'wiki/system-wide/coding-standards.md')),
+    has_testing_framework: pathExists(cwd, docsPath(cwd, 'wiki/system-wide/testing-framework.md')),
+    project_exists: pathExists(cwd, docsPath(cwd, 'product/product-vision.md')),
     has_codebase_map: pathExists(cwd, '.ace/codebase'),
     planning_exists: pathExists(cwd, '.ace'),
 
@@ -122,25 +128,66 @@ function cmdEnsureSettings(cwd, raw) {
   const alreadyExists = pathExists(cwd, '.ace/settings.json');
 
   if (!alreadyExists) {
-    const SETTINGS_DEFAULTS = {
-      model_profile: 'balanced',
-      commit_docs: true,
-      agent_teams: false,
-      github_project: {
-        enabled: false,
-        gh_installed: false,
-        repo: '',
-        project_number: null,
-        owner: '',
-      },
-    };
     const defaults = JSON.parse(JSON.stringify(SETTINGS_DEFAULTS));
     writeSettings(cwd, defaults);
     output({ created: true, path: settingsPath, settings: defaults }, raw);
   } else {
+    // loadSettings backfills keys added by newer ACE versions (e.g. docs_path)
+    // so an older settings.json is upgraded in place rather than half-read.
     const settings = loadSettings(cwd);
+    writeSettings(cwd, settings);
     output({ created: false, path: settingsPath, settings }, raw);
   }
+}
+
+// ─── Docs Root ──────────────────────────────────────────────────────────────
+
+/**
+ * Report where the docs root is configured and what candidates exist on disk.
+ * The workflow uses this to confirm the location with the user instead of
+ * assuming `.docs` sits at the repo root — monorepos often nest it.
+ */
+function cmdDetectDocsPath(cwd, raw) {
+  const settingsRaw = (() => {
+    try { return JSON.parse(fs.readFileSync(path.join(cwd, '.ace', 'settings.json'), 'utf-8')); }
+    catch { return {}; }
+  })();
+
+  const configured = resolveDocsPath(cwd);
+  const candidates = detectDocsCandidates(cwd);
+
+  output({
+    docs_path: configured,
+    // false when settings.json has no docs_path yet — the workflow should ask
+    is_explicitly_configured: normalizeDocsPath(settingsRaw.docs_path) !== null,
+    docs_path_exists: pathExists(cwd, configured),
+    candidates,
+    has_candidates: candidates.length > 0,
+  }, raw);
+}
+
+/**
+ * Persist the docs root. Accepts `path=<value>` or a bare positional argument.
+ */
+function cmdWriteDocsPath(cwd, raw, extraArgs, parsed) {
+  const requested = parsed.path || parsed._positional || extraArgs[0];
+  const normalized = normalizeDocsPath(requested);
+  if (!normalized) error('path required for write-docs-path (e.g. path=ProcerERP/.docs)');
+
+  if (path.isAbsolute(normalized)) {
+    error(`docs_path must be relative to the project root, got: ${normalized}`);
+  }
+
+  const settings = loadSettings(cwd);
+  settings.docs_path = normalized;
+  writeSettings(cwd, settings);
+
+  output({
+    written: true,
+    docs_path: normalized,
+    docs_path_exists: pathExists(cwd, normalized),
+    settings,
+  }, raw);
 }
 
 // ─── Setup GitHub Project ───────────────────────────────────────────────────

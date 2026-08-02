@@ -19,6 +19,10 @@ context: fork
 agent: ace-wiki-mapper
 ---
 
+## Environment Context (preprocessed)
+
+!`node "${CLAUDE_SKILL_DIR}/script.js" init 2>/dev/null`
+
 ## Supporting Resources (auto-loaded)
 
 !`cat "${CLAUDE_SKILL_DIR}/workflow.xml"`
@@ -154,14 +158,14 @@ agent: ace-wiki-mapper
         </objective>
 
         <artifacts>
-            .docs/wiki/subsystems/[subsystem-name]/systems/[system-name].md
-            .docs/wiki/subsystems/[subsystem-name]/patterns/[pattern-name].md
-            .docs/wiki/subsystems/[subsystem-name]/cross-cutting/[concern-name].md
-            .docs/wiki/subsystems/[subsystem-name]/guides/[guide-name].md
-            .docs/wiki/subsystems/[subsystem-name]/walkthroughs/[flow-name].md (if user approves suggestions)
-            .docs/wiki/subsystems/[subsystem-name]/decisions/[decision-name].md
-            .docs/wiki/system-wide/system-structure.md (updated if new subsystem mapped)
-            .docs/wiki/system-wide/system-architecture.md (updated if new subsystem mapped)
+            {docs_path}/wiki/subsystems/[subsystem-name]/systems/[system-name].md
+            {docs_path}/wiki/subsystems/[subsystem-name]/patterns/[pattern-name].md
+            {docs_path}/wiki/subsystems/[subsystem-name]/cross-cutting/[concern-name].md
+            {docs_path}/wiki/subsystems/[subsystem-name]/guides/[guide-name].md
+            {docs_path}/wiki/subsystems/[subsystem-name]/walkthroughs/[flow-name].md (if user approves suggestions)
+            {docs_path}/wiki/subsystems/[subsystem-name]/decisions/[decision-name].md
+            {docs_path}/wiki/system-wide/system-structure.md (updated if new subsystem mapped)
+            {docs_path}/wiki/system-wide/system-architecture.md (updated if new subsystem mapped)
         </artifacts>
     </output>
 
@@ -175,7 +179,7 @@ agent: ace-wiki-mapper
         <step>/clear first for a fresh context window</step>
         <step>/ace:map-story — document another story or module</step>
         <step>/ace:map-subsystem [subsystem] — map or refresh an entire subsystem</step>
-        <step>Review and edit files in .docs/wiki/subsystems/[subsystem-name]/</step>
+        <step>Review and edit files in {docs_path}/wiki/subsystems/[subsystem-name]/</step>
     </next-steps>
 
 </command>

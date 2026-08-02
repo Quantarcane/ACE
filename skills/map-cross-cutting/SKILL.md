@@ -1,6 +1,6 @@
 ---
 name: map-cross-cutting
-description: Create or update a cross-cutting concern doc in .docs/wiki/subsystems/[name]/cross-cutting/ — shared infrastructure spanning multiple systems
+description: Create or update a cross-cutting concern doc under the project wiki's subsystems/[name]/cross-cutting/ — shared infrastructure spanning multiple systems
 argument-hint: "text='Event system used across all drawing components' subsystem='qarc-charts-v2' commits=3"
 disable-model-invocation: false
 allowed-tools:
@@ -16,6 +16,10 @@ effort: max
 context: fork
 agent: ace-wiki-mapper
 ---
+
+## Environment Context (preprocessed)
+
+!`node "${CLAUDE_SKILL_DIR}/script.js" init 2>/dev/null`
 
 ## Supporting Resources (auto-loaded)
 
@@ -62,7 +66,7 @@ agent: ace-wiki-mapper
                 </param>
                 <param name="subsystem" type="path | text">
                     Subsystem where this cross-cutting doc belongs.
-                    Wiki location: `.docs/wiki/subsystems/[subsystem]/cross-cutting/`.
+                    Wiki location: `{docs_path}/wiki/subsystems/[subsystem]/cross-cutting/`.
                     If not provided, pause and ask the user.
                 </param>
             </required>
@@ -101,7 +105,7 @@ agent: ace-wiki-mapper
         </objective>
 
         <artifacts>
-            .docs/wiki/subsystems/[subsystem-name]/cross-cutting/[concern-name].md
+            {docs_path}/wiki/subsystems/[subsystem-name]/cross-cutting/[concern-name].md
         </artifacts>
     </output>
 
@@ -119,7 +123,7 @@ agent: ace-wiki-mapper
         <step>/ace:map-cross-cutting — create another cross-cutting concern doc</step>
         <step>/ace:map-sys-doc — document a system that uses this concern</step>
         <step>/ace:map-guide — create a guide that includes registration steps</step>
-        <step>Review file at .docs/wiki/subsystems/[subsystem-name]/cross-cutting/</step>
+        <step>Review file at {docs_path}/wiki/subsystems/[subsystem-name]/cross-cutting/</step>
     </next-steps>
 
 </command>

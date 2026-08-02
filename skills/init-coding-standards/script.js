@@ -13,6 +13,7 @@
 const {
   loadConfig, pathExists,
   detectBrownfieldStatus, output, error, runSkillScript,
+  docsPath, resolveDocsPath,
 } = require('../../shared/lib/ace-core');
 
 // ─── CLI Dispatch ────────────────────────────────────────────────────────────
@@ -30,17 +31,18 @@ function cmdInit(cwd, raw, args, parsed) {
   const result = {
     // Config
     commit_docs: config.commit_docs,
+    docs_path: resolveDocsPath(cwd),
 
     // Brownfield detection
     ...brownfield,
 
     // Existing coding standards
-    has_coding_standards: pathExists(cwd, '.docs/wiki/system-wide/coding-standards.md'),
-    wiki_dir_exists: pathExists(cwd, '.docs/wiki/system-wide'),
+    has_coding_standards: pathExists(cwd, docsPath(cwd, 'wiki/system-wide/coding-standards.md')),
+    wiki_dir_exists: pathExists(cwd, docsPath(cwd, 'wiki/system-wide')),
 
     // Existing wiki context (useful for cross-referencing)
-    has_system_architecture: pathExists(cwd, '.docs/wiki/system-wide/system-architecture.md'),
-    has_system_structure: pathExists(cwd, '.docs/wiki/system-wide/system-structure.md'),
+    has_system_architecture: pathExists(cwd, docsPath(cwd, 'wiki/system-wide/system-architecture.md')),
+    has_system_structure: pathExists(cwd, docsPath(cwd, 'wiki/system-wide/system-structure.md')),
 
     // Git state
     has_git: pathExists(cwd, '.git'),
